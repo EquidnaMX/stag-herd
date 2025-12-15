@@ -71,7 +71,7 @@ final class Payment
      * Retrieves all configured payment methods.
      *
      * @param  bool $onlyEnabled  If true, filters out disabled methods.
-     * @return array              Configuration array of methods.
+     * @return array<string, array<string, mixed>>  Configuration array of methods.
      */
     public static function getMethods(bool $onlyEnabled = false): array
     {
@@ -204,9 +204,12 @@ final class Payment
      */
     public function getMethod(): PaymentMethod
     {
-        return PaymentMethod::tryFrom($this->payment_model->method)
-            ?? PaymentMethod::tryFrom('CUSTOM')
-            ?? $this->payment_model->method;
+        $method = PaymentMethod::tryFrom($this->payment_model->method);
+        if ($method === null) {
+            $method = PaymentMethod::tryFrom('CUSTOM') ?? $this->payment_model->method;
+        }
+
+        return $method;
     }
 
     /**

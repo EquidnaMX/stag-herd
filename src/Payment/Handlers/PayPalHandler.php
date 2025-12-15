@@ -32,6 +32,7 @@ use stdClass;
 class PayPalHandler extends PaymentHandler
 {
     public const PAYMENT_METHOD = \Equidna\StagHerd\Enums\PaymentMethod::PAYPAL->value;
+
     public const CFDI_PAYMENT_FORM = '04';
 
     /**
@@ -88,18 +89,10 @@ class PayPalHandler extends PaymentHandler
                 $payment_details = $this->paypal_adapter->getOrderDetails((string) $methodId);
                 $payment_status = $payment_details->status ?? null;
             } else {
-                // If no methodId, it might mean we need to create a new order, OR it's a bug if strictly required.
-                // Assuming we request a new payment if not provided.
-                // Original code threw exception ONLY if methodId check failed inside the try block...?
-                // Original code structure was weird: if ($methodId) ... else throw ... catch ... requestPayment.
-                // This implies if methodId is missing, it goes to catch block to create new payment.
-                // Let's replicate that logic properly.
-
+                // If no methodId, create new payment
                 if (!$methodId) {
-                     // Force exception to trigger catch block for new payment creation
-                     // simpler to just put logic in else or cleaner flow.
-                     // But let's follow logic: Create new payment.
-                     goto create_payment;
+                    // Force exception to trigger catch block for new payment creation
+                    goto create_payment;
                 }
             }
         } catch (Exception $e) {
@@ -146,7 +139,7 @@ class PayPalHandler extends PaymentHandler
     /**
      * Validates payment against PayPal API.
      *
-     * @param  mixed $paymentModel
+     * @param  object $paymentModel
      * @return \Equidna\StagHerd\Data\PaymentResult
      */
     protected function validatePayment(object $paymentModel): \Equidna\StagHerd\Data\PaymentResult
@@ -180,17 +173,16 @@ class PayPalHandler extends PaymentHandler
             $status = $paypal_result->status ?? null;
 
             if ($status == 'COMPLETED' || $status == 'APPROVED') {
-               return \Equidna\StagHerd\Data\PaymentResult::success(
-                   result: 'APPROVED',
-                   method_id: (string) $paymentModel->method_id
-               );
+                return \Equidna\StagHerd\Data\PaymentResult::success(
+                    result: 'APPROVED',
+                    method_id: (string) $paymentModel->method_id
+                );
             }
-            
-            return \Equidna\StagHerd\Data\PaymentResult::pending(
-                   method_id: (string) $paymentModel->method_id,
-                   reason: 'PayPal Status: ' . $status
-            );
 
+            return \Equidna\StagHerd\Data\PaymentResult::pending(
+                method_id: (string) $paymentModel->method_id,
+                reason: 'PayPal Status: ' . $status
+            );
         } catch (Exception $e) {
             return \Equidna\StagHerd\Data\PaymentResult::declined(
                 reason: $e->getMessage()
@@ -201,7 +193,7 @@ class PayPalHandler extends PaymentHandler
     /**
      * Cancels the payment (refunds).
      *
-     * @param  mixed $paymentModel
+     * @param  object $paymentModel
      * @return \Equidna\StagHerd\Data\PaymentResult
      */
     public function cancelPayment(object $paymentModel): \Equidna\StagHerd\Data\PaymentResult
@@ -219,7 +211,7 @@ class PayPalHandler extends PaymentHandler
      * Verifies PayPal webhook signature.
      *
      * @param  Request $request
-     * @return array
+     * @return array{valid: bool, reason?: string, eventId?: string|null}
      */
     public static function verifyWebhook(Request $request): array
     {

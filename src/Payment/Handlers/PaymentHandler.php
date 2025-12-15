@@ -29,8 +29,11 @@ use stdClass;
 abstract class PaymentHandler
 {
     public const PAYMENT_METHOD = 'BASE';
+
     public const CFDI = null;
+
     public const CFDI_PAYMENT_FORM = '01';
+
     public const ALLOW_DUPLICATED_METHOD_ID = false;
 
     /**
@@ -111,7 +114,7 @@ abstract class PaymentHandler
     /**
      * Approves the payment.
      *
-     * @param  mixed $paymentModel                    The payment model.
+     * @param  object $paymentModel                   The payment model.
      * @return \Equidna\StagHerd\Data\PaymentResult   Approval result.
      */
     public function approvePayment(object $paymentModel): \Equidna\StagHerd\Data\PaymentResult
@@ -122,7 +125,7 @@ abstract class PaymentHandler
     /**
      * Cancels the payment.
      *
-     * @param  mixed $paymentModel                    The payment model.
+     * @param  object $paymentModel                   The payment model.
      * @return \Equidna\StagHerd\Data\PaymentResult   Cancellation result.
      */
     public function cancelPayment(object $paymentModel): \Equidna\StagHerd\Data\PaymentResult
@@ -167,8 +170,8 @@ abstract class PaymentHandler
      *
      * Static method to allow verification before instantiation.
      *
-     * @param  Request $request                                                    The incoming request.
-     * @return array{valid: bool, eventId: ?string, reason: ?string, data: ?array} Verification result.
+     * @param  Request $request                                                           The incoming request.
+     * @return array{valid: bool, eventId: string|null, reason: string|null, data: mixed} Verification result.
      */
     public static function verifyWebhook(Request $request): array
     {

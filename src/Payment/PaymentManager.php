@@ -25,7 +25,6 @@ use Equidna\StagHerd\Payment\Exceptions\InvalidPaymentMethodException;
 use Equidna\StagHerd\Payment\Exceptions\PaymentDeclinedException;
 use Equidna\StagHerd\Payment\Exceptions\PaymentNotFoundException;
 use Equidna\StagHerd\Payment\Handlers\PaymentHandler;
-use stdClass;
 
 /**
  * Service class for managing payment lifecycles.
@@ -104,7 +103,7 @@ class PaymentManager
         ]);
 
         if ($result->result == PaymentStatus::APPROVED->value) {
-            if (method_exists($payment, 'setAttribute')) {
+            if (method_exists($payment, 'setAttribute') && property_exists($payment, 'dt_executed')) {
                 $payment->dt_executed = Carbon::now();
                 $this->repository->save($payment);
             }
@@ -168,7 +167,7 @@ class PaymentManager
         $legacyData = (object) (array) $method_data;
 
         if ($handlerClass === PaymentHandler::class) {
-            return new class ($amount, $order, $legacyData) extends PaymentHandler {
+            return new class($amount, $order, $legacyData) extends PaymentHandler {
                 public function __construct(float $amount, ?PayableOrder $order = null, ?object $method_data = null)
                 {
                     parent::__construct($amount, $order, $method_data);

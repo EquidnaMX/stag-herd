@@ -32,6 +32,7 @@ use stdClass;
 class MercadoPagoHandler extends PaymentHandler
 {
     public const PAYMENT_METHOD = \Equidna\StagHerd\Enums\PaymentMethod::MERCADOPAGO->value;
+
     public const CFDI_PAYMENT_FORM = '04';
 
     private MercadoPagoAdapter $mercadopago_adapter;
@@ -69,7 +70,7 @@ class MercadoPagoHandler extends PaymentHandler
     public function requestPayment(): \Equidna\StagHerd\Data\PaymentResult
     {
         // Don't call parent
-        
+
         $methodId = null;
         if (
             is_object($this->method_data)
@@ -113,9 +114,9 @@ class MercadoPagoHandler extends PaymentHandler
         };
 
         if ($resultStatus == 'DECLINED') {
-             return \Equidna\StagHerd\Data\PaymentResult::declined(
-                 reason: 'MercadoPago status: ' . ($payment_status ?? 'Unknown')
-             );
+            return \Equidna\StagHerd\Data\PaymentResult::declined(
+                reason: 'MercadoPago status: ' . ($payment_status ?? 'Unknown')
+            );
         }
 
         return \Equidna\StagHerd\Data\PaymentResult::success(
@@ -128,7 +129,7 @@ class MercadoPagoHandler extends PaymentHandler
     /**
      * Validates payment result.
      *
-     * @param  mixed $paymentModel
+     * @param  object $paymentModel
      * @return \Equidna\StagHerd\Data\PaymentResult
      */
     protected function validatePayment(object $paymentModel): \Equidna\StagHerd\Data\PaymentResult
@@ -145,15 +146,15 @@ class MercadoPagoHandler extends PaymentHandler
             $status = $mercadopago_result->status ?? null;
 
             if ($status == 'approved') {
-                 return \Equidna\StagHerd\Data\PaymentResult::success(
-                     result: 'APPROVED',
-                     method_id: (string) $paymentModel->method_id
-                 );
+                return \Equidna\StagHerd\Data\PaymentResult::success(
+                    result: 'APPROVED',
+                    method_id: (string) $paymentModel->method_id
+                );
             }
-            
+
             return \Equidna\StagHerd\Data\PaymentResult::pending(
-                   method_id: (string) $paymentModel->method_id,
-                   reason: 'MercadoPago Status: ' . $status
+                method_id: (string) $paymentModel->method_id,
+                reason: 'MercadoPago Status: ' . $status
             );
         } catch (Exception $e) {
             return \Equidna\StagHerd\Data\PaymentResult::declined($e->getMessage());
@@ -163,7 +164,7 @@ class MercadoPagoHandler extends PaymentHandler
     /**
      * Cancels payment (refunds).
      *
-     * @param  mixed $paymentModel
+     * @param  object $paymentModel
      * @return \Equidna\StagHerd\Data\PaymentResult
      */
     public function cancelPayment(object $paymentModel): \Equidna\StagHerd\Data\PaymentResult
@@ -184,7 +185,7 @@ class MercadoPagoHandler extends PaymentHandler
      * Verifies webhook signature.
      *
      * @param  Request $request
-     * @return array
+     * @return array{valid: bool, reason?: string, eventId?: string|null}
      */
     public static function verifyWebhook(Request $request): array
     {

@@ -22,8 +22,11 @@ use RuntimeException;
 class PayPalAdapter
 {
     private string $apiUrl;
+
     private string $clientId;
+
     private string $clientSecret;
+
     private bool $sandbox;
 
     public function __construct()

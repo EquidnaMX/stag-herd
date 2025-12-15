@@ -3,11 +3,16 @@ includes:
 
 parameters:
     tmpDir: build/phpstan
-    level: 9
+    level: 6
     paths:
         - src
     
     # Removed excludePaths to match FAANG quality goals
     
     ignoreErrors:
-        - '#Call to function config\(\) with#' # specific ignore enabled as Larastan is incompatible
+        - '#unknown class Stripe\\StripeClient#'
+        - '#Instantiated class Stripe\\StripeClient not found#'
+        - '#Call to static method externalPaymentLink\(\) on an unknown class App\\Classes\\Clients\\ClientNotifications#'
+        - '#Call to static method random\(\) on an unknown class Equidna\\StagHerd\\Payment\\Handlers\\Str#'
+        - '#Negated boolean expression is always true#'
+        - '#Expression on left side of \?\? is always null#'

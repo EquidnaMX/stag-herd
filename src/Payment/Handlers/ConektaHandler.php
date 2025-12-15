@@ -24,9 +24,10 @@ use stdClass;
 class ConektaHandler extends PaymentHandler
 {
     public const PAYMENT_METHOD = \Equidna\StagHerd\Enums\PaymentMethod::CONEKTA->value;
+
     public const CFDI_PAYMENT_FORM = '01';
 
-    private $conekta_adapter;
+    private ConektaAdapter $conekta_adapter;
 
     public function __construct(
         float $amount,
@@ -44,7 +45,7 @@ class ConektaHandler extends PaymentHandler
     public function requestPayment(): \Equidna\StagHerd\Data\PaymentResult
     {
         // Don't call parent
-        
+
         $methodId = null;
         $link = null;
         $result = 'PENDING';

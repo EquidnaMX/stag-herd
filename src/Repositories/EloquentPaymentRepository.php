@@ -35,6 +35,9 @@ class EloquentPaymentRepository implements PaymentRepository
         }
     }
 
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model>
+     */
     protected function query()
     {
         $class = $this->modelClass;
@@ -42,7 +45,7 @@ class EloquentPaymentRepository implements PaymentRepository
         return $class::query();
     }
 
-    public function find(int|string $id)
+    public function find(int|string $id): ?object
     {
         return $this->query()->find($id);
     }
@@ -50,24 +53,29 @@ class EloquentPaymentRepository implements PaymentRepository
     public function findByMethodId(
         string $method,
         string $methodId,
-    ) {
+    ): ?object {
         return $this->query()
             ->where('method', $method)
             ->where('method_id', $methodId)
             ->first();
     }
 
-    public function create(array $data)
+    /**
+     * @param array<string, mixed> $data
+     */
+    public function create(array $data): object
     {
         $class = $this->modelClass;
 
         return $class::create($data);
     }
 
-    public function save($paymentModel)
+    public function save(object $paymentModel): object
     {
         if ($paymentModel instanceof Model) {
-            return $paymentModel->save();
+            $paymentModel->save();
+
+            return $paymentModel;
         }
 
         throw new InvalidArgumentException('Payment model is not an Eloquent instance');

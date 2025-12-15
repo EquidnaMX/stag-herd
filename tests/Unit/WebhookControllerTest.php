@@ -13,6 +13,7 @@ use Mockery;
 class WebhookControllerTest extends TestCase
 {
     protected $paymentManager;
+
     protected $controller;
 
     protected function setUp(): void

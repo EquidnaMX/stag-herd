@@ -114,23 +114,23 @@ class PaymentTest extends TestCase
 class TestPaymentHandler extends \Equidna\StagHerd\Payment\Handlers\PaymentHandler
 {
     public const PAYMENT_METHOD = 'TEST_METHOD';
+
     public const VARIABLE_FEE_RATE = 0.10;
+
     public const FIXED_FEE = 5;
 
-    public function requestPayment(): \stdClass
+    public function requestPayment(): \Equidna\StagHerd\Data\PaymentResult
     {
-        $result = parent::requestPayment();
-        $result->method_id = 'test-' . uniqid();
-        $result->result = 'PENDING';
-
-        return $result;
+        return \Equidna\StagHerd\Data\PaymentResult::pending(
+            method_id: 'test-' . uniqid()
+        );
     }
 
-    protected function validatePayment($paymentModel): \stdClass
+    protected function validatePayment(object $paymentModel): \Equidna\StagHerd\Data\PaymentResult
     {
-        $result = parent::validatePayment($paymentModel);
-        $result->result = 'APPROVED';
-
-        return $result;
+        return \Equidna\StagHerd\Data\PaymentResult::success(
+            result: 'APPROVED',
+            method_id: (string) $paymentModel->method_id
+        );
     }
 }

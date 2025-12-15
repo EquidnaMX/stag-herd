@@ -2,18 +2,17 @@
 
 namespace Equidna\StagHerd\Tests\Fixtures;
 
+use Equidna\StagHerd\Data\PaymentResult;
 use Equidna\StagHerd\Payment\Handlers\PaymentHandler;
-use stdClass;
 
 class TestHandler extends PaymentHandler
 {
     public const PAYMENT_METHOD = 'TEST_METHOD';
 
-    public function requestPayment(): stdClass
+    public function requestPayment(): PaymentResult
     {
-        $result = parent::requestPayment();
-        $result->method_id = 'test_id_' . uniqid();
-
-        return $result;
+        return PaymentResult::pending(
+            method_id: 'test_id_' . uniqid()
+        );
     }
 }

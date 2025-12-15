@@ -20,7 +20,9 @@ use Illuminate\Support\Facades\Http;
 class OpenPayAdapter
 {
     private string $merchantId;
+
     private string $privateKey;
+
     private bool $sandbox;
 
     public function __construct()

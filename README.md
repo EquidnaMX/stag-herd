@@ -151,21 +151,21 @@ class CustomHandler extends PaymentHandler
     public function requestPayment(): stdClass
     {
         $result = parent::requestPayment();
-        
+
         // Custom logic
         $result->method_id = 'custom-' . uniqid();
         $result->result = 'PENDING';
-        
+
         return $result;
     }
 
     protected function validatePayment($paymentModel): stdClass
     {
         $result = parent::validatePayment($paymentModel);
-        
+
         // Validation logic
         $result->result = 'APPROVED';
-        
+
         return $result;
     }
 }
@@ -181,6 +181,93 @@ Webhooks are automatically registered with the configured prefix (default: `stag
 - `POST /stag-herd/conekta`
 - `POST /stag-herd/kueski`
 - `POST /stag-herd/openpay`
+
+## Webhooks
+
+This package verifies webhook signatures for each provider using their official schemes. Ensure you send the raw request body to the verifier and configure secrets.
+
+### Stripe
+
+- Header: `Stripe-Signature: t=<timestamp>,v1=<signature>`
+- Signature: `HMAC-SHA256("<timestamp>.<raw_body>", STRIPE_WEBHOOK_SECRET)`
+- Tolerance: default 300 seconds; events outside tolerance are rejected.
+- Idempotency: the event `id` is deduplicated to prevent reprocessing.
+
+### Mercado Pago
+
+- Headers: `X-Signature`, `X-Request-Id`
+- Signature parts: `ts=<unix_ts>,v1=<signature>`
+- Manifest: `id:<data.id>;request-id:<X-Request-Id>;ts:<ts>;`
+- Signature: `HMAC-SHA256(manifest, MERCADOPAGO_WEBHOOK_SECRET)`
+- `data.id` is taken from query/body JSON `data.id` or `id`.
+
+### Conekta
+
+- Header: `Digest: sha-256=<base64_hmac>`
+- Signature: `base64(HMAC-SHA256(raw_body, CONEKTA_WEBHOOK_SECRET))`
+- Secret source: `config('stag-herd.conekta.secret')` (populate from `CONEKTA_WEBHOOK_SECRET`).
+- Event id: body JSON `id` when present.
+
+### Kueski Pay
+
+- Headers: `X-Kueski-Signature`, `X-Kueski-Timestamp`
+- Signature: `HMAC-SHA256("<timestamp>" . raw_body, KUESKI_WEBHOOK_SECRET)`
+- Event id: body JSON `event_id` or `id`.
+
+### Openpay
+
+- Header: `Verification-Signature: t=<timestamp>,v1=<signature>` (or `Signature-Digest`)
+- Signature: `HMAC-SHA256("<timestamp>.<raw_body>", OPENPAY_WEBHOOK_SECRET)`
+- Event id: body JSON `event_id` or `id`.
+
+### Idempotency
+
+- `WebhookVerifier::checkIdempotency(eventId, provider, ttl)` returns true for duplicates and stores new events via cache.
+- Configure a persistent cache backend in production to retain deduplication keys.
+
+### Examples
+
+```http
+POST /webhook HTTP/1.1
+Stripe-Signature: t=1710000000,v1=abcdef...
+Content-Type: application/json
+
+{"id":"evt_123","type":"charge.succeeded"}
+```
+
+```http
+POST /webhook HTTP/1.1
+X-Signature: ts=1710000000,v1=abcdef...
+X-Request-Id: req-123
+Content-Type: application/json
+
+{"data":{"id":"123"}}
+```
+
+```http
+POST /webhook HTTP/1.1
+Digest: sha-256=abc123base64=
+Content-Type: application/json
+
+{"id":"evt_123","type":"charge.paid"}
+```
+
+```http
+POST /webhook HTTP/1.1
+X-Kueski-Timestamp: 1710000000
+X-Kueski-Signature: abcdef...
+Content-Type: application/json
+
+{"event_id":"evt_ksk","id":"ksk_123"}
+```
+
+```http
+POST /webhook HTTP/1.1
+Verification-Signature: t=1710000000,v1=abcdef...
+Content-Type: application/json
+
+{"event_id":"evt_op","id":"op_123"}
+```
 
 ## Events
 

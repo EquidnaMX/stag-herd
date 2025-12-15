@@ -31,6 +31,7 @@ use stdClass;
 class GooglePayHandler extends PaymentHandler
 {
     public const PAYMENT_METHOD = \Equidna\StagHerd\Enums\PaymentMethod::GOOGLEPAY->value;
+
     public const CFDI_PAYMENT_FORM = '04';
 
     private StripeAdapter $stripe_adapter;
@@ -94,7 +95,7 @@ class GooglePayHandler extends PaymentHandler
     /**
      * Validates payment result.
      *
-     * @param  mixed $paymentModel
+     * @param  object $paymentModel
      * @return \Equidna\StagHerd\Data\PaymentResult
      */
     protected function validatePayment(object $paymentModel): \Equidna\StagHerd\Data\PaymentResult
@@ -116,7 +117,7 @@ class GooglePayHandler extends PaymentHandler
                     method_id: (string) $paymentModel->method_id
                 );
             }
-            
+
             return \Equidna\StagHerd\Data\PaymentResult::pending(
                 method_id: (string) $paymentModel->method_id,
                 reason: 'Stripe Status: ' . $status
@@ -129,7 +130,7 @@ class GooglePayHandler extends PaymentHandler
     /**
      * Cancels payment (refunds).
      *
-     * @param  mixed $paymentModel
+     * @param  object $paymentModel
      * @return \Equidna\StagHerd\Data\PaymentResult
      */
     public function cancelPayment(object $paymentModel): \Equidna\StagHerd\Data\PaymentResult
@@ -147,7 +148,7 @@ class GooglePayHandler extends PaymentHandler
      * Verifies webhook signature.
      *
      * @param  Request $request
-     * @return array
+     * @return array{valid: bool, reason?: string, eventId?: string|null}
      */
     public static function verifyWebhook(Request $request): array
     {

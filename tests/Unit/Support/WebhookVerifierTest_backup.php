@@ -17,6 +17,8 @@ namespace Equidna\StagHerd\Tests\Unit\Support;
 use Equidna\StagHerd\Support\WebhookVerifier;
 use Equidna\StagHerd\Tests\TestCase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
 
 class WebhookVerifierTest extends TestCase
 {
@@ -135,134 +137,96 @@ class WebhookVerifierTest extends TestCase
         $this->assertFalse($result['valid']);
     }
 
-    public function test_verifies_valid_conekta_digest()
+    public function test_verifies_paypal_signature_success()
     {
-        $payload = '{"id":"evt_123","type":"charge.paid"}';
-        $secret = 'conekta_secret';
+        config(['cache.default' => 'array']);
 
-        config(['stag-herd.conekta.secret' => $secret]);
+        $payload = json_encode(['id' => 'WH-123', 'event_type' => 'PAYMENT.CAPTURED']);
+        $headers = [
+            'HTTP_PAYPAL_AUTH_ALGO' => 'SHA256',
+            'HTTP_PAYPAL_CERT_URL' => 'https://api-m.sandbox.paypal.com/certs',
+            'HTTP_PAYPAL_TRANSMISSION_ID' => 'abcd-1234',
+            'HTTP_PAYPAL_TRANSMISSION_SIG' => 'sig',
+            'HTTP_PAYPAL_TRANSMISSION_TIME' => gmdate('c'),
+        ];
 
-        $digest = base64_encode(hash_hmac('sha256', $payload, $secret, true));
-        $request = Request::create('/webhook', 'POST', [], [], [], [
-            'HTTP_DIGEST' => "sha-256={$digest}",
-            'CONTENT_TYPE' => 'application/json',
+        Http::fake([
+            'https://api-m.sandbox.paypal.com/v1/oauth2/token' => Http::response([
+                'access_token' => 'tkn',
+                'expires_in' => 3000,
+            ], 200),
+            'https://api-m.sandbox.paypal.com/v1/notifications/verify-webhook-signature' => Http::response([
+                'verification_status' => 'SUCCESS',
+            ], 200),
+        ]);
+
+        $request = Request::create('/paypal', 'POST', [], [], [], $headers, $payload);
+
+        $result = WebhookVerifier::verifyPayPalSignature(
+            $request,
+            webhookId: 'WHID-TEST',
+            sandbox: true,
+            clientId: 'client',
+            clientSecret: 'secret'
+        );
+
+        $this->assertTrue($result['valid']);
+        $this->assertSame('WH-123', $result['eventId']);
+    }
+
+    public function test_rejects_paypal_signature_with_missing_headers()
+    {
+        $payload = '{}';
+        $request = Request::create('/paypal', 'POST', [], [], [], [], $payload);
+
+        $result = WebhookVerifier::verifyPayPalSignature(
+            $request,
+            webhookId: 'WHID',
+            sandbox: true,
+            clientId: 'client',
+            clientSecret: 'secret'
+        );
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('Missing transmission headers', $result['reason']);
+    }
+
+    public function test_verifies_openpay_signature_success()
+    {
+        $secret = 'sek';
+        $ts = '1700000000';
+        $payload = json_encode([
+            'id' => 'evt_123',
+            'type' => 'charge.succeeded',
+            'data' => ['transaction' => ['id' => 'tr_123']],
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+    // Signature now uses raw body instead of re-encoded data
+    $sig = hash_hmac('sha256', $ts . '.' . $payload, $secret);
+
+        $request = Request::create('/openpay', 'POST', [], [], [], [
+            'HTTP_VERIFICATION_SIGNATURE' => "t={$ts},v1={$sig}",
         ], $payload);
 
-        $result = WebhookVerifier::verifyConektaSignature($request);
+        $result = WebhookVerifier::verifyOpenpaySignature($request, $secret);
 
         $this->assertTrue($result['valid']);
         $this->assertSame('evt_123', $result['eventId']);
     }
 
-    public function test_rejects_conekta_digest_mismatch()
-    {
-        $payload = '{"id":"evt_123","type":"charge.paid"}';
-        $secret = 'conekta_secret';
-
-        config(['stag-herd.conekta.secret' => $secret]);
-
-        $request = Request::create('/webhook', 'POST', [], [], [], [
-            'HTTP_DIGEST' => 'sha-256=invalid',
-        ], $payload);
-
-        $result = WebhookVerifier::verifyConektaSignature($request);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Digest mismatch', $result['reason']);
-    }
-
-    public function test_rejects_conekta_without_secret()
-    {
-        $payload = '{"id":"evt_123"}';
-
-        config(['stag-herd.conekta.secret' => null]);
-
-        $request = Request::create('/webhook', 'POST', [], [], [], [
-            'HTTP_DIGEST' => 'sha-256=anything',
-        ], $payload);
-
-        $result = WebhookVerifier::verifyConektaSignature($request);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Missing Conekta secret', $result['reason']);
-    }
-
-    public function test_verifies_valid_kueski_signature()
-    {
-        $payload = '{"id":"ksk_123","event_id":"evt_ksk"}';
-        $secret = 'kueski_secret';
-        $timestamp = '1710000000';
-
-        $signature = hash_hmac('sha256', $timestamp . $payload, $secret);
-
-        $request = Request::create('/webhook', 'POST', [], [], [], [
-            'HTTP_X_KUESKI_SIGNATURE' => $signature,
-            'HTTP_X_KUESKI_TIMESTAMP' => $timestamp,
-            'CONTENT_TYPE' => 'application/json',
-        ], $payload);
-
-        $result = WebhookVerifier::verifyKueskiSignature($request, $secret);
-
-        $this->assertTrue($result['valid']);
-        $this->assertSame('evt_ksk', $result['eventId']);
-    }
-
-    public function test_rejects_kueski_signature_mismatch()
-    {
-        $payload = '{"id":"ksk_123"}';
-        $secret = 'kueski_secret';
-        $timestamp = '1710000000';
-
-        $request = Request::create('/webhook', 'POST', [], [], [], [
-            'HTTP_X_KUESKI_SIGNATURE' => 'invalid',
-            'HTTP_X_KUESKI_TIMESTAMP' => $timestamp,
-        ], $payload);
-
-        $result = WebhookVerifier::verifyKueskiSignature($request, $secret);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Signature mismatch', $result['reason']);
-    }
-
-    public function test_rejects_kueski_when_headers_missing()
-    {
-        $payload = '{"id":"ksk_123"}';
-        $secret = 'kueski_secret';
-
-        $request = Request::create('/webhook', 'POST', [], [], [], [], $payload);
-
-        $result = WebhookVerifier::verifyKueskiSignature($request, $secret);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Missing Kueski Pay headers', $result['reason']);
-    }
-
-    public function test_verifies_valid_openpay_signature()
-    {
-        $payload = '{"event_id":"evt_op"}';
-        $secret = 'openpay_secret';
-        $timestamp = '1710000000';
-
-        $signature = hash_hmac('sha256', $timestamp . '.' . $payload, $secret);
-
-        $request = Request::create('/webhook', 'POST', [], [], [], [
-            'HTTP_VERIFICATION_SIGNATURE' => "t={$timestamp},v1={$signature}",
-        ], $payload);
-
-        $result = WebhookVerifier::verifyOpenpaySignature($request, $secret);
-
-        $this->assertTrue($result['valid']);
-        $this->assertSame('evt_op', $result['eventId']);
-    }
-
     public function test_rejects_openpay_signature_mismatch()
     {
-        $payload = '{"id":"op_123"}';
-        $secret = 'openpay_secret';
-        $timestamp = '1710000000';
+        $secret = 'sek';
+        $ts = '1700000000';
 
-        $request = Request::create('/webhook', 'POST', [], [], [], [
-            'HTTP_VERIFICATION_SIGNATURE' => "t={$timestamp},v1=invalid",
+        $payload = json_encode([
+            'id' => 'evt_123',
+            'type' => 'charge.succeeded',
+            'data' => ['ok' => true],
+        ]);
+
+        $request = Request::create('/openpay', 'POST', [], [], [], [
+            'HTTP_VERIFICATION_SIGNATURE' => "t={$ts},v1=invalid",
         ], $payload);
 
         $result = WebhookVerifier::verifyOpenpaySignature($request, $secret);
@@ -271,16 +235,36 @@ class WebhookVerifierTest extends TestCase
         $this->assertStringContainsString('Signature mismatch', $result['reason']);
     }
 
-    public function test_rejects_openpay_when_signature_header_missing()
+    public function test_verifies_kueski_signature_success()
     {
-        $payload = '{"id":"op_123"}';
-        $secret = 'openpay_secret';
+        $secret = 'sek';
+        $payload = json_encode(['status' => 'approved']);
+        $timestamp = 'abc123';
+        $signature = hash_hmac('sha256', $timestamp . $payload, $secret);
 
-        $request = Request::create('/webhook', 'POST', [], [], [], [], $payload);
+        $request = Request::create('/kueski', 'POST', [], [], [], [
+            'HTTP_X_KUESKI_SIGNATURE' => $signature,
+            'HTTP_X_KUESKI_TIMESTAMP' => $timestamp,
+        ], $payload);
 
-        $result = WebhookVerifier::verifyOpenpaySignature($request, $secret);
-
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('Missing signature header', $result['reason']);
+        $result = WebhookVerifier::verifyKueskiSignature($request, $secret);
+        $this->assertTrue($result['valid']);
     }
-}
+
+    public function test_rejects_kueski_signature_invalid()
+    {
+        $secret = 'sek';
+        $payload = json_encode(['status' => 'approved']);
+        $timestamp = 'abc123';
+
+        $request = Request::create('/kueski', 'POST', [], [], [], [
+            'HTTP_X_KUESKI_SIGNATURE' => 'bad',
+            'HTTP_X_KUESKI_TIMESTAMP' => $timestamp,
+        ], $payload);
+
+        $result = WebhookVerifier::verifyKueskiSignature($request, $secret);
+        $this->assertFalse($result['valid']);
+    }
+
+    public function test_conekta_verifies_valid_hmac_digest()
+        $secret = 'test_conekta_secret';

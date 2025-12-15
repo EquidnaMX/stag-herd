@@ -13,11 +13,11 @@
  * @license   https://opensource.org/licenses/MIT MIT License
  */
 
-// Load main app autoloader (relative to this file in tests/)
-$autoloaderPath = __DIR__ . '/../../../../vendor/autoload.php';
+// Load package autoloader (vendor at project root)
+$autoloaderPath = dirname(__DIR__) . '/vendor/autoload.php';
 if (!file_exists($autoloaderPath)) {
-    // Fallback for different execution contexts
-    $autoloaderPath = dirname(__DIR__, 4) . '/vendor/autoload.php';
+    // Fallback: try project root two levels up
+    $autoloaderPath = dirname(__DIR__, 2) . '/vendor/autoload.php';
 }
 require_once $autoloaderPath;
 

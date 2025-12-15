@@ -16,11 +16,19 @@ use Equidna\StagHerd\Payment\Payment;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
+/**
+ * Dispatched when a payment link is generated.
+ */
 class PaymentLinkGenerated
 {
     use Dispatchable;
     use SerializesModels;
 
+    /**
+     * Creates a new PaymentLinkGenerated event.
+     *
+     * @param Payment $payment  The payment with generated link.
+     */
     public function __construct(public Payment $payment)
     {
         //

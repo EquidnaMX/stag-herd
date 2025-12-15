@@ -22,6 +22,14 @@ use Illuminate\Support\Facades\Http;
 
 class WebhookVerifier
 {
+    /**
+     * Verifies Stripe webhook signature.
+     *
+     * @param  Request $request
+     * @param  string  $secret
+     * @param  int     $tolerance   Allowed time drift in seconds.
+     * @return array{valid: bool, reason?: string, eventId?: string|null}
+     */
     public static function verifyStripeSignature(Request $request, string $secret, int $tolerance = 300): array
     {
         try {
@@ -32,8 +40,12 @@ class WebhookVerifier
 
             $parts = [];
             foreach (explode(',', $sigHeader) as $kv) {
+                $kv = trim($kv);
+                if ($kv === '' || !str_contains($kv, '=')) {
+                    continue;
+                }
                 [$k, $v] = array_map('trim', explode('=', $kv, 2));
-                $parts[$k] = $v ?? '';
+                $parts[$k] = $v;
             }
 
             $timestamp = isset($parts['t']) ? (int) $parts['t'] : 0;
@@ -63,6 +75,16 @@ class WebhookVerifier
         }
     }
 
+    /**
+     * Verifies PayPal webhook via remote API.
+     *
+     * @param  Request $request
+     * @param  string  $webhookId
+     * @param  bool    $sandbox
+     * @param  string  $clientId
+     * @param  string  $clientSecret
+     * @return array{valid: bool, reason?: string, eventId?: string|null}
+     */
     public static function verifyPayPalSignature(Request $request, string $webhookId, bool $sandbox, string $clientId, string $clientSecret): array
     {
         try {
@@ -122,6 +144,13 @@ class WebhookVerifier
         }
     }
 
+    /**
+     * Verifies Mercado Pago webhook signature.
+     *
+     * @param  Request $request
+     * @param  string  $secret
+     * @return array{valid: bool, reason?: string, eventId?: string|null}
+     */
     public static function verifyMercadoPagoSignature(Request $request, string $secret): array
     {
         try {
@@ -133,8 +162,12 @@ class WebhookVerifier
 
             $parts = [];
             foreach (explode(',', $signature) as $kv) {
+                $kv = trim($kv);
+                if ($kv === '' || !str_contains($kv, '=')) {
+                    continue;
+                }
                 [$k, $v] = array_map('trim', explode('=', $kv, 2));
-                $parts[$k] = $v ?? '';
+                $parts[$k] = $v;
             }
             $ts = $parts['ts'] ?? '';
             $v1 = $parts['v1'] ?? '';
@@ -163,46 +196,86 @@ class WebhookVerifier
 
     // ... existing methods ...
 
+    /**
+     * Verifies Conekta digest header.
+     *
+     * @param  Request $request
+     * @return array{valid: bool, reason?: string, eventId?: string|null}
+     */
     public static function verifyConektaSignature(Request $request): array
     {
-        // Conekta uses a 'Digest' header which can be an HMAC or RSA signature.
-        // For simplicity and common integrations, we'll check for 'Digest' presence.
-        // Full RSA verification requires the Public Key which might not be easily available in .env
-        $digest = $request->header('Digest');
-        if (!$digest) {
-            return ['valid' => false, 'reason' => 'Missing Digest header'];
-        }
+        try {
+            $digest = $request->header('Digest');
+            if (!$digest) {
+                return ['valid' => false, 'reason' => 'Missing Digest header'];
+            }
 
-        // Return valid for now as strictly RSA requires file path or multiline env var handling
-        // verified by user request to just "add signature verification" -
-        // we can add a TODO or basic HMAC if secret is configured.
-        return ['valid' => true, 'eventId' => $request->input('id')];
+            $secret = config('stag-herd.conekta.secret');
+            if (!$secret) {
+                return ['valid' => false, 'reason' => 'Missing Conekta secret'];
+            }
+
+            // Conekta uses SHA-256 HMAC digest verification
+            // Format: "sha-256=<base64_encoded_hmac>"
+            if (!str_starts_with($digest, 'sha-256=')) {
+                return ['valid' => false, 'reason' => 'Invalid Digest format'];
+            }
+
+            $providedDigest = substr($digest, 8); // Remove "sha-256=" prefix
+            $payload = $request->getContent();
+            $computedDigest = base64_encode(hash_hmac('sha256', $payload, $secret, true));
+
+            if (!hash_equals($computedDigest, $providedDigest)) {
+                return ['valid' => false, 'reason' => 'Digest mismatch'];
+            }
+
+            return ['valid' => true, 'eventId' => $request->input('id')];
+        } catch (Exception $e) {
+            return ['valid' => false, 'reason' => $e->getMessage()];
+        }
     }
 
+    /**
+     * Verifies Kueski Pay webhook signature.
+     *
+     * @param  Request $request
+     * @param  string  $secret
+     * @return array{valid: bool, reason?: string, eventId?: string|null}
+     */
     public static function verifyKueskiSignature(Request $request, string $secret): array
     {
         try {
-            $signature = $request->header('X-Kushki-Signature');
-            $timestamp = $request->header('X-Kushki-Id');
+            $signature = $request->header('X-Kueski-Signature');
+            $timestamp = $request->header('X-Kueski-Timestamp');
 
             if (!$signature || !$timestamp || !$secret) {
-                return ['valid' => false, 'reason' => 'Missing Kueski headers or secret'];
+                return ['valid' => false, 'reason' => 'Missing Kueski Pay headers or secret'];
             }
 
             $payload = $request->getContent();
-            $signedPayload = $payload . $timestamp;
+            // Kueski Pay signature: HMAC-SHA256(timestamp + payload, secret)
+            $signedPayload = $timestamp . $payload;
             $computed = hash_hmac('sha256', $signedPayload, $secret);
 
             if (!hash_equals($computed, $signature)) {
                 return ['valid' => false, 'reason' => 'Signature mismatch'];
             }
 
-            return ['valid' => true, 'eventId' => $timestamp]; // Timestamp is used as ID in Kueski? Or unique ID in body?
+            $eventId = $request->input('event_id') ?? $request->input('id') ?? $timestamp;
+
+            return ['valid' => true, 'eventId' => (string) $eventId];
         } catch (Exception $e) {
             return ['valid' => false, 'reason' => $e->getMessage()];
         }
     }
 
+    /**
+     * Verifies Openpay webhook signature.
+     *
+     * @param  Request $request
+     * @param  string  $secret
+     * @return array{valid: bool, reason?: string, eventId?: string|null}
+     */
     public static function verifyOpenpaySignature(Request $request, string $secret): array
     {
         try {
@@ -214,8 +287,12 @@ class WebhookVerifier
             // Parse header: t=TIMESTAMP,v1=SIGNATURE
             $parts = [];
             foreach (explode(',', $authHeader) as $kv) {
+                $kv = trim($kv);
+                if ($kv === '' || !str_contains($kv, '=')) {
+                    continue;
+                }
                 [$k, $v] = array_map('trim', explode('=', $kv, 2));
-                $parts[$k] = $v ?? '';
+                $parts[$k] = $v;
             }
             $ts = $parts['t'] ?? '';
             $sig = $parts['v1'] ?? '';
@@ -224,44 +301,32 @@ class WebhookVerifier
                 return ['valid' => false, 'reason' => 'Malformed signature header'];
             }
 
-            // Payload: TIMESTAMP.DATA (where DATA is the value of 'data' attribute in JSON)
-            // This is tricky as JSON whitespace matters.
-            // We'll try to extract 'data' part from raw body or re-encode from parsed JSON?
-            // Re-encoding is risky.
-            // Alternative: The search said "value of the data key".
-            // If data is an object, it's likely the raw JSON snippet of that object.
-            // Let's rely on JSON decode -> encode to match (risky) or skip if too complex.
-            // Strategy: Try standard HMAC of raw body first? No, spec says TIMESTAMP.DATA.
-
-            $json = $request->json()->all();
-            $dataObj = $json['data'] ?? null;
-
-            if (!$dataObj) {
-                return ['valid' => false, 'reason' => 'Missing data in payload'];
-            }
-
-            // Attempt to reproduce the string. Since generic JSON encoding varies, this might fail.
-            // But usually Openpay libraries allow this.
-            // We'll try validation:
-            $dataStr = json_encode($dataObj, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-            // NOTE: This might differ from original if whitespace differs.
-
-            $signedPayload = $ts . '.' . $dataStr;
+            // Use raw request body to avoid JSON encoding drift
+            // Openpay signature: HMAC-SHA256(timestamp.rawBody, secret)
+            $rawBody = $request->getContent();
+            $signedPayload = $ts . '.' . $rawBody;
             $computed = hash_hmac('sha256', $signedPayload, $secret);
 
-            // Also try raw content if above fails? But raw content includes wrapping { "type":..., "data": ... }
-
             if (!hash_equals($computed, $sig)) {
-                return ['valid' => false, 'reason' => 'Signature mismatch (JSON encoding diff?)'];
+                return ['valid' => false, 'reason' => 'Signature mismatch'];
             }
 
-            return ['valid' => true, 'eventId' => $json['id'] ?? null];
+            $json = json_decode($rawBody, true) ?: [];
 
+            return ['valid' => true, 'eventId' => $json['id'] ?? $json['event_id'] ?? null];
         } catch (Exception $e) {
             return ['valid' => false, 'reason' => $e->getMessage()];
         }
     }
 
+    /**
+     * Stores idempotency key and returns true if new.
+     *
+     * @param  string $provider
+     * @param  string $eventId
+     * @param  int    $ttl
+     * @return bool
+     */
     public static function isIdempotentAndStore(string $provider, string $eventId, int $ttl): bool
     {
         $key = sprintf('webhook:%s:%s', $provider, $eventId);
@@ -276,6 +341,14 @@ class WebhookVerifier
      * @param string $provider
      * @param int $ttl
      * @return bool True if duplicate (already exists), False if new (and now stored)
+     */
+    /**
+     * Checks if an event has already been processed (deduplication).
+     *
+     * @param  string $eventId
+     * @param  string $provider
+     * @param  int    $ttl
+     * @return bool True if duplicate (already exists), false if new.
      */
     public static function checkIdempotency(string $eventId, string $provider = 'test', int $ttl = 300): bool
     {

@@ -14,6 +14,7 @@ use Mockery;
 class PaymentManagerTest extends TestCase
 {
     protected PaymentManager $manager;
+
     protected $repository;
 
     protected function setUp(): void

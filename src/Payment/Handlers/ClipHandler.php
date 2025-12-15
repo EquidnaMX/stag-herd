@@ -26,9 +26,10 @@ use stdClass;
 class ClipHandler extends PaymentHandler
 {
     public const PAYMENT_METHOD = \Equidna\StagHerd\Enums\PaymentMethod::CLIP->value;
+
     public const CFDI_PAYMENT_FORM = '04';
 
-    private $clip_adapter;
+    private ClipAdapter $clip_adapter;
 
     public function __construct(
         float $amount,
@@ -46,7 +47,7 @@ class ClipHandler extends PaymentHandler
     public function requestPayment(): \Equidna\StagHerd\Data\PaymentResult
     {
         // Don't call parent
-        
+
         $methodId = null;
         if (
             is_object($this->method_data)
@@ -116,17 +117,16 @@ class ClipHandler extends PaymentHandler
             $status = $clip_result->status ?? null;
 
             if ($status == 'paid') {
-                 return \Equidna\StagHerd\Data\PaymentResult::success(
-                     result: 'APPROVED',
-                     method_id: (string) $paymentModel->method_id
-                 );
+                return \Equidna\StagHerd\Data\PaymentResult::success(
+                    result: 'APPROVED',
+                    method_id: (string) $paymentModel->method_id
+                );
             }
-            
-            return \Equidna\StagHerd\Data\PaymentResult::pending(
-                   method_id: (string) $paymentModel->method_id,
-                   reason: 'Clip Status: ' . $status
-            );
 
+            return \Equidna\StagHerd\Data\PaymentResult::pending(
+                method_id: (string) $paymentModel->method_id,
+                reason: 'Clip Status: ' . $status
+            );
         } catch (Exception $e) {
             return \Equidna\StagHerd\Data\PaymentResult::declined(
                 reason: $e->getMessage()

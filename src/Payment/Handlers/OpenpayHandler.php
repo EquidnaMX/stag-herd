@@ -25,6 +25,7 @@ use stdClass;
 class OpenpayHandler extends PaymentHandler
 {
     public const PAYMENT_METHOD = \Equidna\StagHerd\Enums\PaymentMethod::OPENPAY->value;
+
     public const CFDI_PAYMENT_FORM = '03';
 
     public function __construct(
@@ -44,7 +45,7 @@ class OpenpayHandler extends PaymentHandler
     public function requestPayment(): \Equidna\StagHerd\Data\PaymentResult
     {
         // Don't call parent
-        
+
         $methodId = null;
         $link = null;
         $result = 'PENDING';
@@ -98,14 +99,14 @@ class OpenpayHandler extends PaymentHandler
 
             if ($status == 'completed') {
                 return \Equidna\StagHerd\Data\PaymentResult::success(
-                     result: 'APPROVED',
-                     method_id: (string) $paymentModel->method_id
+                    result: 'APPROVED',
+                    method_id: (string) $paymentModel->method_id
                 );
             }
-            
+
             return \Equidna\StagHerd\Data\PaymentResult::pending(
-                   method_id: (string) $paymentModel->method_id,
-                   reason: 'Openpay Status: ' . $status
+                method_id: (string) $paymentModel->method_id,
+                reason: 'Openpay Status: ' . $status
             );
         } catch (Exception $e) {
             return \Equidna\StagHerd\Data\PaymentResult::declined($e->getMessage());

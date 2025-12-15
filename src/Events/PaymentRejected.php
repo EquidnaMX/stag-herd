@@ -16,11 +16,19 @@ use Equidna\StagHerd\Payment\Payment;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
+/**
+ * Dispatched when a payment is rejected.
+ */
 class PaymentRejected
 {
     use Dispatchable;
     use SerializesModels;
 
+    /**
+     * Creates a new PaymentRejected event.
+     *
+     * @param Payment $payment  The rejected payment.
+     */
     public function __construct(public Payment $payment)
     {
         //

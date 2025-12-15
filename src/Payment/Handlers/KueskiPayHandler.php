@@ -24,9 +24,10 @@ use stdClass;
 class KueskiPayHandler extends PaymentHandler
 {
     public const PAYMENT_METHOD = \Equidna\StagHerd\Enums\PaymentMethod::KUESKIPAY->value;
+
     public const CFDI_PAYMENT_FORM = '99';
 
-    private $kueski_adapter;
+    private KueskiAdapter $kueski_adapter;
 
     public function __construct(
         float $amount,
@@ -44,7 +45,7 @@ class KueskiPayHandler extends PaymentHandler
     public function requestPayment(): \Equidna\StagHerd\Data\PaymentResult
     {
         // Don't call parent
-        
+
         $methodId = null;
         $link = null;
         $result = 'PENDING';
