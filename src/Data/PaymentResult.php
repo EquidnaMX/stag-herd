@@ -36,7 +36,8 @@ class PaymentResult
         public ?string $method_id = null,
         public ?string $link = null,
         public array $metadata = []
-    ) {}
+    ) {
+    }
 
     /**
      * Creates a successful payment result.

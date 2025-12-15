@@ -23,6 +23,7 @@ use Equidna\StagHerd\Support\WebhookVerifier;
 use Equidna\Toolkit\Exceptions\BadRequestException;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use stdClass;
 
 /**

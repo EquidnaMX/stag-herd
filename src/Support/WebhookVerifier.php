@@ -102,6 +102,19 @@ class WebhookVerifier
                 return ['valid' => false, 'reason' => 'Missing transmission headers'];
             }
 
+            // SSRF Protection: Whitelist PayPal certificate domains
+            $allowedDomains = [
+                'api.paypal.com',
+                'api-m.paypal.com',
+                'api.sandbox.paypal.com',
+                'api-m.sandbox.paypal.com',
+            ];
+            $parsedUrl = parse_url($certUrl);
+            $host = $parsedUrl['host'] ?? '';
+            if (!in_array($host, $allowedDomains, true)) {
+                return ['valid' => false, 'reason' => 'Invalid certificate URL domain'];
+            }
+
             $cacheKey = 'paypal_oauth_token';
             $token = Cache::get($cacheKey);
             if (!$token) {

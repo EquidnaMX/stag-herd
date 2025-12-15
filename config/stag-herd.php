@@ -18,8 +18,9 @@ return [
     // Enable/disable cash payments
     'cash_enabled' => env('CASH_PAYMENT_ENABLED', true),
 
-    // Eloquent Model for Payment persistence
-    'payment_model' => 'App\Models\Finance\Payment',
+    // Eloquent Model for Payment persistence (must be configured by host app)
+    // Default is null to force explicit configuration and avoid stale defaults.
+    'payment_model' => null,
 
     // Stripe webhook verification
     'stripe' => [
@@ -71,6 +72,14 @@ return [
 
     // Idempotency configuration for webhook processing
     'idempotency_ttl' => (int) env('WEBHOOK_IDEMPOTENCY_TTL', 604800), // default 7 days
+
+    // Rate limiting for webhook endpoints
+    'webhook_rate_limit' => (int) env('WEBHOOK_RATE_LIMIT', 60), // requests per minute
+    'webhook_rate_decay' => (int) env('WEBHOOK_RATE_DECAY', 1), // decay minutes
+
+    // Audit logging configuration
+    'audit_log_channel' => env('STAG_HERD_AUDIT_CHANNEL', 'stack'),
+    'audit_log_enabled' => (bool) env('STAG_HERD_AUDIT_ENABLED', true),
 
     // Payment Fees Configuration
     // Defaults fall back to handler constants if not defined here.

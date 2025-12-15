@@ -23,42 +23,11 @@ use Illuminate\Support\Facades\Log;
 
 class ConektaController extends Controller
 {
+    /**
+     * Proxy to unified WebhookController.
+     */
     public function handle(Request $request): JsonResponse
     {
-        try {
-            $verification = WebhookVerifier::verifyConektaSignature($request);
-            if (!$verification['valid']) {
-                Log::warning('Conekta Webhook Verification Failed: ' . ($verification['reason'] ?? 'Unknown'));
-
-                return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 400);
-            }
-
-            $eventId = $verification['eventId'] ?? null;
-            if ($eventId && !WebhookVerifier::isIdempotentAndStore('conekta', $eventId, config('stag-herd.idempotency_ttl'))) {
-                return response()->json(['status' => 'success', 'message' => 'Event already processed']);
-            }
-
-            $data = $request->all();
-
-            if (!isset($data['type']) || $data['type'] != 'order.paid') {
-                return response()->json(['status' => 'ignored']);
-            }
-
-            // Conekta: Validar que sea 'order.paid' y obtener object['id']
-            $order_id = $data['data']['object']['id'] ?? null;
-
-            if (!$order_id) {
-                return response()->json(['status' => 'error', 'message' => 'Missing order ID'], 400);
-            }
-
-            $payment = Payment::fromMethodID('CONEKTA', $order_id);
-            $payment->approvePayment();
-
-            return response()->json(['status' => 'success']);
-        } catch (\Exception $e) {
-            Log::error('Conekta Webhook Error: ' . $e->getMessage());
-
-            return response()->json(['status' => 'error'], 500);
-        }
+        return app(WebhookController::class)->handle($request, 'conekta');
     }
 }

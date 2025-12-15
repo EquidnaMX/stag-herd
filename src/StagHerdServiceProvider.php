@@ -24,6 +24,8 @@ use Equidna\StagHerd\Payment\Handlers\OpenpayHandler;
 use Equidna\StagHerd\Payment\Handlers\PaymentHandler;
 use Equidna\StagHerd\Payment\Handlers\PayPalHandler;
 use Equidna\StagHerd\Repositories\EloquentPaymentRepository;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class StagHerdServiceProvider extends ServiceProvider
@@ -38,6 +40,16 @@ class StagHerdServiceProvider extends ServiceProvider
         );
 
         $this->loadRoutesFrom(__DIR__ . '/../routes/webhooks.php');
+
+        // Configure webhook rate limiter
+        RateLimiter::for(
+            'webhook',
+            function () {
+                return Limit::perMinute(config('stag-herd.webhook_rate_limit', 60))
+                    ->by(request()->ip())
+                    ->response(fn () => response()->json(['error' => 'Too many requests'], 429));
+            }
+        );
     }
 
     public function register(): void

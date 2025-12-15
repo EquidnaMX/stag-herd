@@ -167,7 +167,7 @@ class PaymentManager
         $legacyData = (object) (array) $method_data;
 
         if ($handlerClass === PaymentHandler::class) {
-            return new class($amount, $order, $legacyData) extends PaymentHandler {
+            return new class ($amount, $order, $legacyData) extends PaymentHandler {
                 public function __construct(float $amount, ?PayableOrder $order = null, ?object $method_data = null)
                 {
                     parent::__construct($amount, $order, $method_data);

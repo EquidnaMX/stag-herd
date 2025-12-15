@@ -17,6 +17,7 @@ namespace Equidna\StagHerd\Repositories;
 
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -26,12 +27,18 @@ class EloquentPaymentRepository implements PaymentRepository
 
     public function __construct(?string $modelClass = null)
     {
-        $this->modelClass = $modelClass ?? config('stag-herd.payment_model');
+        $this->modelClass = $modelClass ?? (config('stag-herd.payment_model') ?? '');
 
-        if (!$this->modelClass || !class_exists($this->modelClass)) {
-            throw new RuntimeException(
-                'Payment model class not found. Please configure stag-herd.payment_model'
-            );
+        if ($this->modelClass === '') {
+            throw new RuntimeException('stag-herd.payment_model is not configured');
+        }
+
+        if (!class_exists($this->modelClass)) {
+            throw new RuntimeException('Payment model class not found: ' . $this->modelClass);
+        }
+
+        if (!is_subclass_of($this->modelClass, Model::class)) {
+            throw new RuntimeException('Payment model must extend ' . Model::class);
         }
     }
 
@@ -65,15 +72,19 @@ class EloquentPaymentRepository implements PaymentRepository
      */
     public function create(array $data): object
     {
-        $class = $this->modelClass;
+        return DB::transaction(function () use ($data) {
+            $class = $this->modelClass;
 
-        return $class::create($data);
+            return $class::create($data);
+        });
     }
 
     public function save(object $paymentModel): object
     {
         if ($paymentModel instanceof Model) {
-            $paymentModel->save();
+            DB::transaction(function () use ($paymentModel) {
+                $paymentModel->save();
+            });
 
             return $paymentModel;
         }
