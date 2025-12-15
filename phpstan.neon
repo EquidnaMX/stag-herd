@@ -1,0 +1,13 @@
+includes:
+    # - ../../../vendor/larastan/larastan/extension.neon
+
+parameters:
+    tmpDir: build/phpstan
+    level: 9
+    paths:
+        - src
+    
+    # Removed excludePaths to match FAANG quality goals
+    
+    ignoreErrors:
+        - '#Call to function config\(\) with#' # specific ignore enabled as Larastan is incompatible
