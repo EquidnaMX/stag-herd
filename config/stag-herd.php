@@ -94,4 +94,24 @@ return [
         ],
         // Add other providers as needed
     ],
+
+    // Cleanup and maintenance routines for payment records
+    'cleanup' => [
+        'enabled' => (bool) env('STAG_HERD_CLEANUP_ENABLED', true),
+        'cron' => env('STAG_HERD_CLEANUP_CRON', '0 3 * * *'),
+        'timestamp_column' => env('STAG_HERD_PAYMENT_TIMESTAMP_COLUMN', 'dt_registration'),
+        'stale_pending_days' => (int) env('STAG_HERD_STALE_PENDING_DAYS', 14),
+        'stale_status' => env('STAG_HERD_STALE_PENDING_STATUS', 'CANCELED'),
+        'revalidate' => [
+            'enabled' => (bool) env('STAG_HERD_REVALIDATE_ENABLED', false),
+            'lookback_hours' => (int) env('STAG_HERD_REVALIDATE_LOOKBACK_HOURS', 24),
+            'methods' => [
+                'MERCADOPAGO',
+                'PAYPAL',
+                'OPENPAY',
+                'GOOGLEPAY',
+                'CLIP',
+            ],
+        ],
+    ],
 ];

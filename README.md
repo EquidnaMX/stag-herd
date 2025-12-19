@@ -102,6 +102,18 @@ $payment = Payment::request(
 $paymentLink = $payment->getPaymentModel()->link;
 ```
 
+## Maintenance & Cleanup
+
+Run the scheduled cleanup to remove orphan payments and close stale pending records:
+
+```bash
+php artisan stag-herd:payments:clean
+```
+
+- The package schedules this command daily at 03:00 (cron `0 3 * * *`) when `STAG_HERD_CLEANUP_ENABLED=true`.
+- Use `--revalidate` to force revalidation of recent pending payments; `--skip-revalidate` suppresses revalidation even if enabled in config.
+- Configure behavior via `config/stag-herd.php` (`cleanup` section): cron expression, lookback window for revalidation, and stale pending age (default 14 days).
+
 ### Implementing Contracts
 
 Your application must implement the required contracts:

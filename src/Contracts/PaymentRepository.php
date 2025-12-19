@@ -12,6 +12,9 @@
 
 namespace Equidna\StagHerd\Contracts;
 
+use Carbon\CarbonInterface;
+use Illuminate\Support\LazyCollection;
+
 /**
  * Interface for payment persistence operations.
  */
@@ -49,4 +52,34 @@ interface PaymentRepository
      * @return object                Saved payment model.
      */
     public function save(object $paymentModel): object;
+
+    /**
+     * Deletes payments without an associated order reference.
+     *
+     * @return int  Number of deleted payment records.
+     */
+    public function deleteOrphans(): int;
+
+    /**
+     * Retrieves pending payments within a registration date range.
+     *
+     * @param  CarbonInterface|null $from     Inclusive lower bound for the registration timestamp.
+     * @param  CarbonInterface|null $to       Inclusive upper bound for the registration timestamp.
+     * @param  array<int, string>   $methods  Payment method codes to include; empty for all.
+     * @return LazyCollection<object>         Iterable list of pending payment models.
+     */
+    public function pendingPayments(
+        ?CarbonInterface $from = null,
+        ?CarbonInterface $to = null,
+        array $methods = []
+    ): LazyCollection;
+
+    /**
+     * Marks pending payments older than the threshold with the provided status.
+     *
+     * @param  CarbonInterface $threshold  Upper bound timestamp; payments older than this are updated.
+     * @param  string          $status     Status value to set for stale payments.
+     * @return int                         Number of updated payment records.
+     */
+    public function cancelPendingBefore(CarbonInterface $threshold, string $status): int;
 }

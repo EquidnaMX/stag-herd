@@ -14,6 +14,7 @@
 
 namespace Equidna\StagHerd;
 
+use Equidna\StagHerd\Console\Commands\PaymentsCleanupCommand;
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Payment\Handlers\ClipHandler;
 use Equidna\StagHerd\Payment\Handlers\ConektaHandler;
@@ -25,6 +26,7 @@ use Equidna\StagHerd\Payment\Handlers\PaymentHandler;
 use Equidna\StagHerd\Payment\Handlers\PayPalHandler;
 use Equidna\StagHerd\Repositories\EloquentPaymentRepository;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -47,9 +49,17 @@ class StagHerdServiceProvider extends ServiceProvider
             function () {
                 return Limit::perMinute(config('stag-herd.webhook_rate_limit', 60))
                     ->by(request()->ip())
-                    ->response(fn () => response()->json(['error' => 'Too many requests'], 429));
+                    ->response(fn() => response()->json(['error' => 'Too many requests'], 429));
             }
         );
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                PaymentsCleanupCommand::class,
+            ]);
+
+            $this->scheduleCleanup();
+        }
     }
 
     public function register(): void
@@ -143,5 +153,23 @@ class StagHerdServiceProvider extends ServiceProvider
             );
             config(['stag-herd.methods' => $mergedMethods]);
         }
+    }
+
+    /**
+     * Registers the package scheduler for cleanup routines.
+     */
+    private function scheduleCleanup(): void
+    {
+        if (!config('stag-herd.cleanup.enabled', true)) {
+            return;
+        }
+
+        $this->app->booted(function () {
+            $schedule = $this->app->make(Schedule::class);
+
+            $schedule->command('stag-herd:payments:clean')
+                ->cron(config('stag-herd.cleanup.cron', '0 0 * * *'))
+                ->runInBackground();
+        });
     }
 }
