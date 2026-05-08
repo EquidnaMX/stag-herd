@@ -15,11 +15,12 @@
 
 namespace Equidna\StagHerd\Adapters;
 
+use Equidna\StagHerd\Contracts\OpenpayGateway;
 use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class OpenPayAdapter
+class OpenPayAdapter implements OpenpayGateway
 {
     private string $merchantId;
 

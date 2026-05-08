@@ -15,7 +15,7 @@
 
 namespace Equidna\StagHerd\Payment\Handlers;
 
-use Equidna\StagHerd\Adapters\ClipAdapter;
+use Equidna\StagHerd\Contracts\ClipGateway;
 use Equidna\StagHerd\Contracts\PayableOrder;
 use Equidna\StagHerd\Data\PaymentData;
 use Equidna\StagHerd\Data\PaymentResult;
@@ -35,19 +35,20 @@ class ClipHandler extends PaymentHandler
 
     public const CFDI_PAYMENT_FORM = '04';
 
-    private ClipAdapter $clip_adapter;
+    private ClipGateway $clip_adapter;
 
     public function __construct(
         float $amount,
         ?PayableOrder $order = null,
         ?PaymentData $method_data = null,
+        ?ClipGateway $clip_adapter = null,
     ) {
         parent::__construct(
             amount: $amount,
             order: $order,
             method_data: $method_data,
         );
-        $this->clip_adapter = new ClipAdapter();
+        $this->clip_adapter = $clip_adapter ?? app(ClipGateway::class);
     }
 
     public function requestPayment(): PaymentResult
@@ -203,7 +204,7 @@ class ClipHandler extends PaymentHandler
             return;
         }
 
-        $details = (new ClipAdapter())->getPaymentDetails($paymentRequestId);
+        $details = app(ClipGateway::class)->getPaymentDetails($paymentRequestId);
         self::storeClipDetails($payment, $details, $payload);
 
         $status = strtoupper((string) (

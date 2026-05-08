@@ -15,13 +15,14 @@
 
 namespace Equidna\StagHerd\Adapters;
 
+use Equidna\StagHerd\Contracts\PayPalGateway;
 use Equidna\Toolkit\Exceptions\UnprocessableEntityException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
-class PayPalAdapter
+class PayPalAdapter implements PayPalGateway
 {
     private string $apiUrl;
 

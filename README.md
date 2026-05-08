@@ -260,6 +260,36 @@ class CustomHandler extends PaymentHandler
 }
 ```
 
+### Gateway Contracts
+
+Provider adapters are bound behind contracts so host applications can replace them for tests, sandbox wrappers, tracing, or custom retry policies:
+
+```php
+use Equidna\StagHerd\Contracts\ClipGateway;
+use App\Payments\InstrumentedClipGateway;
+
+app()->bind(ClipGateway::class, InstrumentedClipGateway::class);
+```
+
+Available gateway contracts:
+
+- `ClipGateway`
+- `ConektaGateway`
+- `MercadoPagoGateway`
+- `OpenpayGateway`
+- `PayPalGateway`
+- `StripeGateway`
+
+### Payment State Machine
+
+`Payment::applyResult()` enforces payment state transitions centrally:
+
+- `PENDING` can resolve to `APPROVED`, `REJECTED`, `DECLINED`, `CANCELED`, `REFUNDED`, or `CHARGEBACK`.
+- `APPROVED` can move to `REFUNDED`, `CHARGEBACK`, or `CANCELED`.
+- `REJECTED`, `DECLINED`, `CANCELED`, `REFUNDED`, and `CHARGEBACK` are terminal except for idempotent repeats of the same status.
+
+Invalid transitions are logged and ignored, for example `REJECTED -> APPROVED`.
+
 ## Webhook Routes
 
 Webhooks are automatically registered with the configured prefix (default: `stag-herd`):

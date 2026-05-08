@@ -15,9 +15,21 @@
 
 namespace Equidna\StagHerd;
 
+use Equidna\StagHerd\Adapters\ClipAdapter;
+use Equidna\StagHerd\Adapters\ConektaAdapter;
+use Equidna\StagHerd\Adapters\MercadoPagoAdapter;
+use Equidna\StagHerd\Adapters\OpenPayAdapter;
+use Equidna\StagHerd\Adapters\PayPalAdapter;
+use Equidna\StagHerd\Adapters\StripeAdapter;
 use Equidna\StagHerd\Console\Commands\PaymentsCleanupCommand;
+use Equidna\StagHerd\Contracts\ClipGateway;
+use Equidna\StagHerd\Contracts\ConektaGateway;
+use Equidna\StagHerd\Contracts\MercadoPagoGateway;
+use Equidna\StagHerd\Contracts\OpenpayGateway;
 use Equidna\StagHerd\Contracts\PaymentContextProvider;
 use Equidna\StagHerd\Contracts\PaymentRepository;
+use Equidna\StagHerd\Contracts\PayPalGateway;
+use Equidna\StagHerd\Contracts\StripeGateway;
 use Equidna\StagHerd\Payment\Handlers\ClipHandler;
 use Equidna\StagHerd\Payment\Handlers\ConektaHandler;
 use Equidna\StagHerd\Payment\Handlers\GooglePayHandler;
@@ -73,6 +85,9 @@ class StagHerdServiceProvider extends ServiceProvider
         // Register package-provided payment handlers after config is merged
         $this->registerPackageHandlers();
 
+        // Bind provider gateways behind contracts
+        $this->registerGatewayContracts();
+
         // Merge custom handlers from config
         $this->mergeCustomHandlers();
 
@@ -87,6 +102,19 @@ class StagHerdServiceProvider extends ServiceProvider
             PaymentRepository::class,
             EloquentPaymentRepository::class,
         );
+    }
+
+    /**
+     * Register gateway adapters behind contracts for container injection.
+     */
+    private function registerGatewayContracts(): void
+    {
+        $this->app->bindIf(ClipGateway::class, ClipAdapter::class);
+        $this->app->bindIf(ConektaGateway::class, ConektaAdapter::class);
+        $this->app->bindIf(MercadoPagoGateway::class, MercadoPagoAdapter::class);
+        $this->app->bindIf(OpenpayGateway::class, OpenPayAdapter::class);
+        $this->app->bindIf(PayPalGateway::class, PayPalAdapter::class);
+        $this->app->bindIf(StripeGateway::class, StripeAdapter::class);
     }
 
     /**

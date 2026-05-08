@@ -15,8 +15,8 @@
 
 namespace Equidna\StagHerd\Payment\Handlers;
 
-use Equidna\StagHerd\Adapters\PayPalAdapter;
 use Equidna\StagHerd\Contracts\PayableOrder;
+use Equidna\StagHerd\Contracts\PayPalGateway;
 use Equidna\StagHerd\Data\PaymentData;
 use Equidna\StagHerd\Data\PaymentResult;
 use Equidna\StagHerd\Enums\PaymentMethod;
@@ -39,26 +39,28 @@ class PayPalHandler extends PaymentHandler
 
     public const CFDI_PAYMENT_FORM = '04';
 
+    private PayPalGateway $paypal_adapter;
+
     /**
      * Creates a new PayPalHandler instance.
      *
      * @param float              $amount         Payment amount.
      * @param PayableOrder|null  $order          Order context.
      * @param PaymentData|null   $method_data    Extra data.
-     * @param PayPalAdapter|null $paypal_adapter Injected adapter.
+     * @param PayPalGateway|null $paypal_adapter Injected gateway.
      */
     public function __construct(
         float $amount,
         ?PayableOrder $order = null,
         ?PaymentData $method_data = null,
-        private ?PayPalAdapter $paypal_adapter = null,
+        ?PayPalGateway $paypal_adapter = null,
     ) {
         parent::__construct(
             amount: $amount,
             order: $order,
             method_data: $method_data,
         );
-        $this->paypal_adapter ??= new PayPalAdapter();
+        $this->paypal_adapter = $paypal_adapter ?? app(PayPalGateway::class);
     }
 
     /**

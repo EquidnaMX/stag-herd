@@ -2,7 +2,7 @@
 
 namespace Equidna\StagHerd\Http\Controllers;
 
-use Equidna\StagHerd\Adapters\PayPalAdapter;
+use Equidna\StagHerd\Contracts\PayPalGateway;
 use Equidna\StagHerd\Data\PaymentResult;
 use Equidna\StagHerd\Enums\PaymentStatus;
 use Equidna\StagHerd\Payment\Exceptions\PaymentNotFoundException;
@@ -17,7 +17,7 @@ class PayPalController extends Controller
     /**
      * Handles the return_url redirect from PayPal.
      */
-    public function return(Request $request, PayPalAdapter $paypal): JsonResponse
+    public function return(Request $request, PayPalGateway $paypal): JsonResponse
     {
         $orderId = (string) ($request->query('token') ?? $request->query('order_id') ?? $request->query('id') ?? '');
 

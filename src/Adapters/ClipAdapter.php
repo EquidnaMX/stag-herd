@@ -15,11 +15,12 @@
 
 namespace Equidna\StagHerd\Adapters;
 
+use Equidna\StagHerd\Contracts\ClipGateway;
 use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class ClipAdapter
+class ClipAdapter implements ClipGateway
 {
     private string $apiKey;
 

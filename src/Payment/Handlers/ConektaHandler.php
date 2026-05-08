@@ -15,7 +15,7 @@
 
 namespace Equidna\StagHerd\Payment\Handlers;
 
-use Equidna\StagHerd\Adapters\ConektaAdapter;
+use Equidna\StagHerd\Contracts\ConektaGateway;
 use Equidna\StagHerd\Contracts\PayableOrder;
 use Equidna\StagHerd\Data\PaymentData;
 use Equidna\StagHerd\Data\PaymentResult;
@@ -34,19 +34,20 @@ class ConektaHandler extends PaymentHandler
 
     public const CFDI_PAYMENT_FORM = '01';
 
-    private ConektaAdapter $conekta_adapter;
+    private ConektaGateway $conekta_adapter;
 
     public function __construct(
         float $amount,
         ?PayableOrder $order = null,
         ?PaymentData $method_data = null,
+        ?ConektaGateway $conekta_adapter = null,
     ) {
         parent::__construct(
             amount: $amount,
             order: $order,
             method_data: $method_data,
         );
-        $this->conekta_adapter = new ConektaAdapter();
+        $this->conekta_adapter = $conekta_adapter ?? app(ConektaGateway::class);
     }
 
     public function requestPayment(): PaymentResult

@@ -15,8 +15,8 @@
 
 namespace Equidna\StagHerd\Payment\Handlers;
 
-use Equidna\StagHerd\Adapters\StripeAdapter;
 use Equidna\StagHerd\Contracts\PayableOrder;
+use Equidna\StagHerd\Contracts\StripeGateway;
 use Equidna\StagHerd\Data\PaymentData;
 use Equidna\StagHerd\Data\PaymentResult;
 use Equidna\StagHerd\Enums\PaymentMethod;
@@ -40,7 +40,7 @@ class GooglePayHandler extends PaymentHandler
 
     public const CFDI_PAYMENT_FORM = '04';
 
-    private StripeAdapter $stripe_adapter;
+    private StripeGateway $stripe_adapter;
 
     /**
      * Creates a new GooglePayHandler instance.
@@ -53,13 +53,14 @@ class GooglePayHandler extends PaymentHandler
         float $amount,
         ?PayableOrder $order = null,
         ?PaymentData $method_data = null,
+        ?StripeGateway $stripe_adapter = null,
     ) {
         parent::__construct(
             amount: $amount,
             order: $order,
             method_data: $method_data,
         );
-        $this->stripe_adapter = new StripeAdapter();
+        $this->stripe_adapter = $stripe_adapter ?? app(StripeGateway::class);
     }
 
     /**

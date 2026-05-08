@@ -15,13 +15,14 @@
 
 namespace Equidna\StagHerd\Adapters;
 
+use Equidna\StagHerd\Contracts\MercadoPagoGateway;
 use Equidna\Toolkit\Exceptions\UnprocessableEntityException;
 use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
-class MercadoPagoAdapter
+class MercadoPagoAdapter implements MercadoPagoGateway
 {
     private string $accessToken;
 

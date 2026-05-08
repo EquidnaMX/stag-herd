@@ -15,6 +15,7 @@
 
 namespace Equidna\StagHerd\Adapters;
 
+use Equidna\StagHerd\Contracts\StripeGateway;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -25,7 +26,7 @@ use Stripe\StripeClient;
  *
  * Handles charge and refund operations for Stripe.
  */
-class StripeAdapter
+class StripeAdapter implements StripeGateway
 {
     /**
      * StripeClient instance for API operations.

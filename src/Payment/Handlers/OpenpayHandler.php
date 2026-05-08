@@ -15,7 +15,7 @@
 
 namespace Equidna\StagHerd\Payment\Handlers;
 
-use Equidna\StagHerd\Adapters\OpenPayAdapter;
+use Equidna\StagHerd\Contracts\OpenpayGateway;
 use Equidna\StagHerd\Contracts\PayableOrder;
 use Equidna\StagHerd\Data\PaymentData;
 use Equidna\StagHerd\Data\PaymentResult;
@@ -35,18 +35,20 @@ class OpenpayHandler extends PaymentHandler
 
     public const CFDI_PAYMENT_FORM = '03';
 
+    private OpenpayGateway $openpay_adapter;
+
     public function __construct(
         float $amount,
         ?PayableOrder $order = null,
         ?PaymentData $method_data = null,
-        private ?OpenPayAdapter $openpay_adapter = null,
+        ?OpenpayGateway $openpay_adapter = null,
     ) {
         parent::__construct(
             amount: $amount,
             order: $order,
             method_data: $method_data,
         );
-        $this->openpay_adapter ??= new OpenPayAdapter();
+        $this->openpay_adapter = $openpay_adapter ?? app(OpenpayGateway::class);
     }
 
     public function requestPayment(): PaymentResult

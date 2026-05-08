@@ -15,12 +15,13 @@
 
 namespace Equidna\StagHerd\Adapters;
 
+use Equidna\StagHerd\Contracts\ConektaGateway;
 use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
-class ConektaAdapter
+class ConektaAdapter implements ConektaGateway
 {
     private string $secretKey;
 

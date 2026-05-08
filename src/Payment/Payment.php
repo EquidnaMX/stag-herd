@@ -216,18 +216,46 @@ final class Payment
      */
     public function applyResult(PaymentResult $result): PaymentResult
     {
+        $currentStatus = PaymentStateMachine::normalize((string) ($this->payment_model->status ?? PaymentStatus::PENDING->value))
+            ?? PaymentStatus::PENDING;
+        $targetStatus = PaymentStateMachine::normalize($result->result);
+
         Log::channel(config('stag-herd.audit_log_channel', 'stack'))->info('Applying payment result', [
             'payment_id' => $this->getID(),
+            'current_status' => $currentStatus->value,
             'result' => $result->result,
             'reason' => $result->reason,
         ]);
-        if ($result->result == PaymentStatus::PENDING->value) {
+
+        if (is_null($targetStatus)) {
+            return $this->blockedTransitionResult(
+                currentStatus: $currentStatus,
+                requestedStatus: $result->result,
+                reason: 'Unknown target status',
+            );
+        }
+
+        if (!PaymentStateMachine::canTransition($currentStatus, $targetStatus)) {
+            return $this->blockedTransitionResult(
+                currentStatus: $currentStatus,
+                requestedStatus: $targetStatus->value,
+                reason: 'Invalid payment state transition',
+            );
+        }
+
+        if ($targetStatus == PaymentStatus::PENDING) {
             $this->repository->save($this->payment_model);
 
             return $result;
         }
 
-        $this->payment_model->status = $result->result;
+        if ($currentStatus === $targetStatus) {
+            $this->repository->save($this->payment_model);
+
+            return $result;
+        }
+
+        $this->payment_model->status = $targetStatus->value;
 
         if (method_exists($this->payment_model, 'setAttribute') || property_exists($this->payment_model, 'dt_executed')) {
             $this->payment_model->dt_executed = Carbon::now();
@@ -250,20 +278,56 @@ final class Payment
         $this->repository->save($this->payment_model);
         Log::channel(config('stag-herd.audit_log_channel', 'stack'))->info('Payment status updated', [
             'payment_id' => $this->getID(),
-            'result' => $result->result,
+            'from_status' => $currentStatus->value,
+            'to_status' => $targetStatus->value,
         ]);
 
-        match ($result->result) {
-            PaymentStatus::APPROVED->value => PaymentApproved::dispatch($this),
-            PaymentStatus::REJECTED->value,
-            PaymentStatus::DECLINED->value => PaymentRejected::dispatch($this),
-            PaymentStatus::CANCELED->value => PaymentCanceled::dispatch($this),
-            PaymentStatus::REFUNDED->value => PaymentRefunded::dispatch($this),
-            PaymentStatus::CHARGEBACK->value => PaymentChargeback::dispatch($this),
-            default => null,
-        };
+        switch ($targetStatus) {
+            case PaymentStatus::APPROVED:
+                PaymentApproved::dispatch($this);
+
+                break;
+            case PaymentStatus::REJECTED:
+            case PaymentStatus::DECLINED:
+                PaymentRejected::dispatch($this);
+
+                break;
+            case PaymentStatus::CANCELED:
+                PaymentCanceled::dispatch($this);
+
+                break;
+            case PaymentStatus::REFUNDED:
+                PaymentRefunded::dispatch($this);
+
+                break;
+            case PaymentStatus::CHARGEBACK:
+                PaymentChargeback::dispatch($this);
+
+                break;
+            case PaymentStatus::PENDING:
+                break;
+        }
 
         return $result;
+    }
+
+    private function blockedTransitionResult(
+        PaymentStatus $currentStatus,
+        string $requestedStatus,
+        string $reason,
+    ): PaymentResult {
+        Log::channel(config('stag-herd.audit_log_channel', 'stack'))->warning('Payment state transition blocked', [
+            'payment_id' => $this->getID(),
+            'current_status' => $currentStatus->value,
+            'requested_status' => $requestedStatus,
+            'reason' => $reason,
+        ]);
+
+        return new PaymentResult(
+            error: true,
+            result: $currentStatus->value,
+            reason: $reason . ': ' . $currentStatus->value . ' -> ' . $requestedStatus,
+        );
     }
 
     /**

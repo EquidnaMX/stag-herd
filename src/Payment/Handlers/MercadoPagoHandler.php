@@ -15,7 +15,7 @@
 
 namespace Equidna\StagHerd\Payment\Handlers;
 
-use Equidna\StagHerd\Adapters\MercadoPagoAdapter;
+use Equidna\StagHerd\Contracts\MercadoPagoGateway;
 use Equidna\StagHerd\Contracts\PayableOrder;
 use Equidna\StagHerd\Data\PaymentData;
 use Equidna\StagHerd\Data\PaymentResult;
@@ -38,7 +38,7 @@ class MercadoPagoHandler extends PaymentHandler
 
     public const CFDI_PAYMENT_FORM = '04';
 
-    private MercadoPagoAdapter $mercadopago_adapter;
+    private MercadoPagoGateway $mercadopago_adapter;
 
     /**
      * Creates a new MercadoPagoHandler instance.
@@ -51,13 +51,14 @@ class MercadoPagoHandler extends PaymentHandler
         float $amount,
         ?PayableOrder $order = null,
         ?PaymentData $method_data = null,
+        ?MercadoPagoGateway $mercadopago_adapter = null,
     ) {
         parent::__construct(
             amount: $amount,
             order: $order,
             method_data: $method_data,
         );
-        $this->mercadopago_adapter = new MercadoPagoAdapter();
+        $this->mercadopago_adapter = $mercadopago_adapter ?? app(MercadoPagoGateway::class);
     }
 
     /**
