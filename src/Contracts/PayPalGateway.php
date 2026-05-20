@@ -13,6 +13,8 @@ interface PayPalGateway
 
     public function getOrderDetails(string $orderId): object;
 
+    public function getCaptureDetails(string $captureId): object;
+
     public function getRefund(string $orderId, float $amount): object;
 
     public function captureOrder(string $orderId): object;

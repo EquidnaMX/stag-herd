@@ -151,6 +151,30 @@ class PayPalAdapter implements PayPalGateway
         return (object) $response->json();
     }
 
+    public function getCaptureDetails(string $captureId): object
+    {
+        $token = $this->getAccessToken();
+
+        $response = Http::withToken($token)
+            ->timeout(15)
+            ->retry(2, 200)
+            ->get(
+                $this->apiUrl . '/v2/payments/captures/' . $captureId,
+            );
+
+        if (!$response->successful()) {
+            Log::channel(config('stag-herd.audit_log_channel', 'stack'))->error('Failed to get PayPal capture details', [
+                'status' => $response->status(),
+                'capture_id' => $captureId,
+                'body' => $response->json(),
+            ]);
+
+            throw new UnprocessableEntityException('Failed to get PayPal capture details');
+        }
+
+        return (object) $response->json();
+    }
+
     public function getRefund(
         string $orderId,
         float $amount,
