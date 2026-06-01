@@ -5,7 +5,7 @@ namespace Equidna\StagHerd\Contracts;
 interface PayPalGateway
 {
     public function requestPayment(
-        float $amount,
+        int $amount,
         string $description,
         ?string $returnUrl = null,
         ?string $cancelUrl = null,
@@ -15,7 +15,7 @@ interface PayPalGateway
 
     public function getCaptureDetails(string $captureId): object;
 
-    public function getRefund(string $orderId, float $amount): object;
+    public function getRefund(string $orderId, int $amount): object;
 
     public function captureOrder(string $orderId): object;
 }
