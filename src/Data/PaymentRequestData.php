@@ -28,17 +28,31 @@ final readonly class PaymentRequestData
     public static function fromArray(array $data): self
     {
         return new self(
-            amount: (float) $data['amount'],
+            amount: (int) $data['amount'],
             currency: strtoupper((string) $data['currency']),
-            method: (string) $data['method'],
-            provider: (string) $data['provider'],
-            externalReference: $data['external_reference'] ?? null,
-            payerReference: $data['payer_reference'] ?? null,
-            payerEmail: $data['payer_email'] ?? null,
-            description: $data['description'] ?? null,
-            returnUrl: $data['return_url'] ?? null,
-            cancelUrl: $data['cancel_url'] ?? null,
-            metadata: $data['metadata'] ?? [],
+            method: strtolower((string) $data['method']),
+            provider: strtolower((string) $data['provider']),
+            externalReference: isset($data['external_reference'])
+                ? (string) $data['external_reference']
+                : null,
+            payerReference: isset($data['payer_reference'])
+                ? (string) $data['payer_reference']
+                : null,
+            payerEmail: isset($data['payer_email'])
+                ? (string) $data['payer_email']
+                : null,
+            description: isset($data['description'])
+                ? (string) $data['description']
+                : null,
+            returnUrl: isset($data['return_url'])
+                ? (string) $data['return_url']
+                : null,
+            cancelUrl: isset($data['cancel_url'])
+                ? (string) $data['cancel_url']
+                : null,
+            metadata: isset($data['metadata']) && is_array($data['metadata'])
+                ? $data['metadata']
+                : [],
         );
     }
 

@@ -1,17 +1,40 @@
 <?php
 
-namespace Equidna\StagHerd\Contracts;
+namespace Equidna\StagHerd\Contracts\Gateways;
 
 interface MercadoPagoGateway
 {
     /**
      * @param array<string, mixed> $payload
+     * @return array<string, mixed>
      */
-    public function requestPayment(int $amount, string $description, array $payload = []): object;
+    public function createPayment(
+        array $payload,
+        ?string $idempotencyKey = null,
+    ): array;
 
-    public function getPaymentDetails(string $paymentId): object;
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPayment(string $providerPaymentId): array;
 
-    public function getOrderDetails(string $orderId): object;
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    public function searchPayments(array $filters = []): array;
 
-    public function getRefund(string $paymentId, int $amount): object;
+    /**
+     * @return array<string, mixed>
+     */
+    public function cancelPayment(string $providerPaymentId): array;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function refundPayment(
+        string $providerPaymentId,
+        ?int $amount = null,
+        ?string $idempotencyKey = null,
+    ): array;
 }

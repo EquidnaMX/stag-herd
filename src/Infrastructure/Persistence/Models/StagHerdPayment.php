@@ -11,7 +11,7 @@ class StagHerdPayment extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'amount' => 'decimal:2',
+        'amount' => 'integer',
         'metadata' => 'array',
         'raw_payload' => 'array',
     ];

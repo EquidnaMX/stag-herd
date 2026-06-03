@@ -1,201 +1,91 @@
 <?php
 
-/**
- * Laravel service provider for StagHerd payment processing package.
- *
- * Registers configuration, routes, payment handlers, and binds the PaymentRepository implementation.
- *
- * PHP 8.1+
- *
- * @package   Equidna\StagHerd
- *
- * @author    Gabriel Ruelas <gruelas@gruelas.com>
- * @license   https://opensource.org/licenses/MIT MIT License
- */
-
 namespace Equidna\StagHerd;
 
-use Equidna\StagHerd\Adapters\ClipAdapter;
-use Equidna\StagHerd\Adapters\ConektaAdapter;
-use Equidna\StagHerd\Adapters\MercadoPagoAdapter;
-use Equidna\StagHerd\Adapters\OpenPayAdapter;
-use Equidna\StagHerd\Adapters\PayPalAdapter;
-use Equidna\StagHerd\Adapters\StripeAdapter;
-use Equidna\StagHerd\Console\Commands\PaymentsCleanupCommand;
-use Equidna\StagHerd\Contracts\ClipGateway;
-use Equidna\StagHerd\Contracts\ConektaGateway;
-use Equidna\StagHerd\Contracts\MercadoPagoGateway;
-use Equidna\StagHerd\Contracts\OpenpayGateway;
-use Equidna\StagHerd\Contracts\PaymentContextProvider;
+use Equidna\StagHerd\Application\PaymentService;
+use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
 use Equidna\StagHerd\Contracts\PaymentRepository;
-use Equidna\StagHerd\Contracts\PayPalGateway;
-use Equidna\StagHerd\Contracts\StripeGateway;
-use Equidna\StagHerd\Payment\Handlers\ClipHandler;
-use Equidna\StagHerd\Payment\Handlers\ConektaHandler;
-use Equidna\StagHerd\Payment\Handlers\GooglePayHandler;
-use Equidna\StagHerd\Payment\Handlers\MercadoPagoHandler;
-use Equidna\StagHerd\Payment\Handlers\OpenpayHandler;
-use Equidna\StagHerd\Payment\Handlers\PayPalHandler;
-use Equidna\StagHerd\Repositories\EloquentPaymentRepository;
-use Equidna\StagHerd\Support\DefaultPaymentContextProvider;
-use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Support\Facades\RateLimiter;
+use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentRepository;
+use Equidna\StagHerd\Infrastructure\Providers\Cash\CashProvider;
+use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoApiAdapter;
+use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoProvider;
+use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Support\ServiceProvider;
 
 class StagHerdServiceProvider extends ServiceProvider
 {
-    public function boot(): void
-    {
-        $this->publishes(
-            [
-                __DIR__ . '/../config/stag-herd.php' => config_path('stag-herd.php'),
-            ],
-            'stag-herd-config',
-        );
-
-        $this->loadRoutesFrom(__DIR__ . '/../routes/webhooks.php');
-
-        // Configure webhook rate limiter
-        RateLimiter::for(
-            'webhook',
-            function () {
-                return Limit::perMinute(config('stag-herd.webhook_rate_limit', 60))
-                    ->by(request()->ip())
-                    ->response(fn () => response()->json(['error' => 'Too many requests'], 429));
-            },
-        );
-
-        if ($this->app->runningInConsole()) {
-            $this->commands([
-                PaymentsCleanupCommand::class,
-            ]);
-
-            $this->scheduleCleanup();
-        }
-    }
-
     public function register(): void
     {
         $this->mergeConfigFrom(
             __DIR__ . '/../config/stag-herd.php',
-            'stag-herd',
+            'stag-herd'
         );
 
-        // Register package-provided payment handlers after config is merged
-        $this->registerPackageHandlers();
+        $this->registerRepositories();
+        $this->registerGateways();
+        $this->registerProviders();
+        $this->registerServices();
+    }
 
-        // Bind provider gateways behind contracts
-        $this->registerGatewayContracts();
-
-        // Merge custom handlers from config
-        $this->mergeCustomHandlers();
-
-        // Bind PaymentContextProvider - only if not already bound by host
-        $this->app->bindIf(
-            PaymentContextProvider::class,
-            DefaultPaymentContextProvider::class,
-        );
-
-        // Bind PaymentRepository - only if not already bound by host
-        $this->app->bindIf(
-            PaymentRepository::class,
-            EloquentPaymentRepository::class,
+    private function registerGateways(): void
+    {
+        $this->app->bind(
+            MercadoPagoGateway::class,
+            MercadoPagoApiAdapter::class,
         );
     }
 
-    /**
-     * Register gateway adapters behind contracts for container injection.
-     */
-    private function registerGatewayContracts(): void
+    public function boot(): void
     {
-        $this->app->bindIf(ClipGateway::class, ClipAdapter::class);
-        $this->app->bindIf(ConektaGateway::class, ConektaAdapter::class);
-        $this->app->bindIf(MercadoPagoGateway::class, MercadoPagoAdapter::class);
-        $this->app->bindIf(OpenpayGateway::class, OpenPayAdapter::class);
-        $this->app->bindIf(PayPalGateway::class, PayPalAdapter::class);
-        $this->app->bindIf(StripeGateway::class, StripeAdapter::class);
+        $this->publishes([
+            __DIR__ . '/../config/stag-herd.php' => config_path('stag-herd.php'),
+        ], 'stag-herd-config');
+
+        $this->publishes([
+            __DIR__ . '/../database/migrations' => database_path('migrations'),
+        ], 'stag-herd-migrations');
+
+        $this->publishes([
+            __DIR__ . '/../resources/views' => resource_path('views/vendor/stag-herd'),
+        ], 'stag-herd-views');
+
+        $this->publishes([
+            __DIR__ . '/../resources/js' => resource_path('js/vendor/stag-herd'),
+        ], 'stag-herd-assets');
     }
 
-    /**
-     * Register payment handlers provided by the package.
-     */
-    private function registerPackageHandlers(): void
+    private function registerRepositories(): void
     {
-        $packageHandlers = [
-            'PAYPAL' => [
-                'handler' => PayPalHandler::class,
-                'description' => 'PayPal',
-                'enabled' => config('stag-herd.paypal.enabled', true),
-                'fee' => config('stag-herd.paypal.fee', ['fixed' => 0, 'variable' => 0]),
-            ],
-            'MERCADOPAGO' => [
-                'handler' => MercadoPagoHandler::class,
-                'description' => 'Mercado pago',
-                'enabled' => config('stag-herd.mercadopago.enabled', false),
-                'fee' => config('stag-herd.mercadopago.fee', ['fixed' => 0, 'variable' => 0]),
-            ],
-            'OPENPAY' => [
-                'handler' => OpenpayHandler::class,
-                'description' => 'Openpay',
-                'enabled' => config('stag-herd.openpay.enabled', false),
-                'fee' => config('stag-herd.openpay.fee', ['fixed' => 0, 'variable' => 0]),
-            ],
-            'CLIP' => [
-                'handler' => ClipHandler::class,
-                'description' => 'Clip',
-                'enabled' => config('stag-herd.clip.enabled', false),
-                'fee' => config('stag-herd.clip.fee', ['fixed' => 0, 'variable' => 0]),
-            ],
-            'GOOGLEPAY' => [
-                'handler' => GooglePayHandler::class,
-                'description' => 'Google Pay',
-                'enabled' => config('stag-herd.stripe.enabled', true),
-                'fee' => config('stag-herd.stripe.fee', ['fixed' => 0, 'variable' => 0]),
-            ],
-            'CONEKTA' => [
-                'handler' => ConektaHandler::class,
-                'description' => 'Conekta (OXXO)',
-                'enabled' => config('stag-herd.conekta.enabled', false),
-                'fee' => config('stag-herd.conekta.fee', ['fixed' => 0, 'variable' => 0]),
-            ],
-        ];
+        $this->app->bind(PaymentRepository::class, function ($app) {
+            $repository = config('stag-herd.repositories.payments');
 
-        config(['stag-herd.methods' => $packageHandlers]);
-    }
+            if ($repository) {
+                return $app->make($repository);
+            }
 
-    /**
-     * Merge custom payment handlers defined in config.
-     */
-    private function mergeCustomHandlers(): void
-    {
-        $customHandlers = config('stag-herd.custom_methods', []);
-
-        if (!empty($customHandlers)) {
-            $methods = config('stag-herd.methods', []);
-            $mergedMethods = array_merge(
-                $methods,
-                $customHandlers,
-            );
-            config(['stag-herd.methods' => $mergedMethods]);
-        }
-    }
-
-    /**
-     * Registers the package scheduler for cleanup routines.
-     */
-    private function scheduleCleanup(): void
-    {
-        if (!config('stag-herd.cleanup.enabled', true)) {
-            return;
-        }
-
-        $this->app->booted(function () {
-            $schedule = $this->app->make(Schedule::class);
-
-            $schedule->command('stag-herd:payments:clean')
-                ->cron(config('stag-herd.cleanup.cron', '0 0 * * *'))
-                ->runInBackground();
+            return $app->make(EloquentPaymentRepository::class);
         });
+    }
+
+    private function registerProviders(): void
+    {
+        $this->app->singleton(ProviderRegistry::class, function ($app) {
+            $registry = new ProviderRegistry();
+
+            if (config('stag-herd.providers.cash.enabled', true)) {
+                $registry->register($app->make(CashProvider::class));
+            }
+
+            if (config('stag-herd.providers.mercado_pago.enabled', false)) {
+                $registry->register($app->make(MercadoPagoProvider::class));
+            }
+
+            return $registry;
+        });
+    }
+
+    private function registerServices(): void
+    {
+        $this->app->singleton(PaymentService::class);
     }
 }

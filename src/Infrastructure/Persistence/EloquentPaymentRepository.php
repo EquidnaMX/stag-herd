@@ -144,7 +144,7 @@ class EloquentPaymentRepository implements PaymentRepository
             id: (string) $model->id,
             provider: $model->provider,
             method: $model->method,
-            amount: (float) $model->amount,
+            amount: (int) $model->amount,
             currency: $model->currency,
             status: PaymentStatusEnum::from($model->status),
             providerStatus: $model->provider_status,

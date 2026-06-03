@@ -7,17 +7,17 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Dispatched when a payment is refunded.
+ * Dispatched when a payment is pending.
  */
-class PaymentRefunded
+class PaymentPending
 {
     use Dispatchable;
     use SerializesModels;
 
     /**
-     * Creates a new PaymentRefunded event.
+     * Creates a new PaymentPending event.
      *
-     * @param Payment $payment The refunded payment.
+     * @param Payment $payment The pending payment.
      */
     public function __construct(public Payment $payment)
     {

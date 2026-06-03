@@ -13,7 +13,7 @@
 
 namespace Equidna\StagHerd\Events;
 
-use Equidna\StagHerd\Payment\Payment;
+use Equidna\StagHerd\Domain\Payment;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 

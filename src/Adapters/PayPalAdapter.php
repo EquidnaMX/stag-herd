@@ -15,7 +15,7 @@
 
 namespace Equidna\StagHerd\Adapters;
 
-use Equidna\StagHerd\Contracts\PayPalGateway;
+use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\Toolkit\Exceptions\UnprocessableEntityException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -80,53 +80,9 @@ class PayPalAdapter implements PayPalGateway
         );
     }
 
-    public function requestPayment(
-        float $amount,
-        string $description,
-        ?string $returnUrl = null,
-        ?string $cancelUrl = null,
-    ): object {
-        $token = $this->getAccessToken();
-
-        $finalReturnUrl = $returnUrl ?? url('/');
-        $finalCancelUrl = $cancelUrl ?? url('/');
-
-        $response = Http::withToken($token)
-            ->timeout(15)
-            ->retry(2, 200)
-            ->post(
-                $this->apiUrl . '/v2/checkout/orders',
-                [
-                    'intent' => 'CAPTURE',
-                    'purchase_units' => [
-                        [
-                            'amount' => [
-                                'currency_code' => 'MXN',
-                                'value' => number_format(
-                                    $amount,
-                                    2,
-                                    '.',
-                                    '',
-                                ),
-                            ],
-                            'description' => $description,
-                        ],
-                    ],
-                    'application_context' => [
-                        'return_url' => $finalReturnUrl,
-                        'cancel_url' => $finalCancelUrl,
-                    ],
-                ],
-            );
-        if (!$response->successful()) {
-            Log::channel(config('stag-herd.audit_log_channel', 'stack'))->error('PayPal order creation failed', [
-                'status' => $response->status(),
-            ]);
-
-            throw new UnprocessableEntityException('PayPal order creation failed');
-        }
-
-        return (object) $response->json();
+    public function requestPayment()
+    {
+        return null;
     }
 
     public function getOrderDetails(string $orderId): object

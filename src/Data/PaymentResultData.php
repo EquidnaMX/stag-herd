@@ -57,7 +57,7 @@ final readonly class PaymentResultData
         string $method,
         ?string $providerStatus = null,
         ?ProviderReferencesData $references = null,
-        ?float $amount = null,
+        ?int $amount = null,
         ?string $currency = null,
         ?NextActionData $nextAction = null,
         ?string $reason = null,
