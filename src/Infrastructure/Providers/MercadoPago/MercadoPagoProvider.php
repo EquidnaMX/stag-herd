@@ -47,26 +47,35 @@ class MercadoPagoProvider implements PaymentProvider
 
     public function lookupPayment(PaymentLookupData $request): PaymentResultData
     {
-        $providerPaymentId = $this->resolveProviderPaymentId(
-            providerPaymentId: $request->providerPaymentId,
-            metadata: $request->metadata,
-        );
+        if ($request->providerPaymentId) {
+            $response = $this->gateway->getPayment($request->providerPaymentId);
 
-        $response = $this->gateway->getPayment($providerPaymentId);
+            return $this->mapPaymentResponseToResultFromOperation(
+                method: (string) ($request->metadata['method'] ?? 'unknown'),
+                response: $response,
+            );
+        }
 
-        return $this->mapPaymentResponseToResultFromOperation(
-            method: (string) ($request->metadata['method'] ?? 'unknown'),
-            response: $response,
-        );
-    }
+        if ($request->externalReference) {
+            $response = $this->gateway->searchPayments([
+                'external_reference' => $request->externalReference,
+            ]);
 
-    public function confirmPayment(PaymentConfirmationData $request): PaymentResultData
-    {
-        /*
-     * Para esta fase, confirmación en Mercado Pago se maneja como consulta
-     * del estado real del pago. Si después implementas captura separada,
-     * aquí se puede cambiar a capture.
-     */
+            $payment = $this->firstPaymentFromSearchResponse($response);
+
+            if (! $payment) {
+                throw \Equidna\StagHerd\Exceptions\PaymentNotFoundException::withProviderReference(
+                    $this->getName(),
+                    $request->externalReference,
+                );
+            }
+
+            return $this->mapPaymentResponseToResultFromOperation(
+                method: (string) ($request->metadata['method'] ?? 'unknown'),
+                response: $payment,
+            );
+        }
+
         $providerPaymentId = $this->resolveProviderPaymentId(
             providerPaymentId: $request->providerPaymentId,
             metadata: $request->metadata,
@@ -349,6 +358,23 @@ class MercadoPagoProvider implements PaymentProvider
             ]),
             rawPayload: $response,
         );
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     * @return array<string, mixed>|null
+     */
+    private function firstPaymentFromSearchResponse(array $response): ?array
+    {
+        $results = Arr::get($response, 'results', []);
+
+        if (! is_array($results) || $results === []) {
+            return null;
+        }
+
+        $payment = $results[0] ?? null;
+
+        return is_array($payment) ? $payment : null;
     }
 
     private function nullableString(mixed $value): ?string

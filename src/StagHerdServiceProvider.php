@@ -27,16 +27,12 @@ class StagHerdServiceProvider extends ServiceProvider
         $this->registerServices();
     }
 
-    private function registerGateways(): void
-    {
-        $this->app->bind(
-            MercadoPagoGateway::class,
-            MercadoPagoApiAdapter::class,
-        );
-    }
-
     public function boot(): void
     {
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'stag-herd');
+
+        $this->loadRoutesFrom(__DIR__ . '/../routes/payments.php');
+
         $this->publishes([
             __DIR__ . '/../config/stag-herd.php' => config_path('stag-herd.php'),
         ], 'stag-herd-config');
@@ -50,7 +46,7 @@ class StagHerdServiceProvider extends ServiceProvider
         ], 'stag-herd-views');
 
         $this->publishes([
-            __DIR__ . '/../resources/js' => resource_path('js/vendor/stag-herd'),
+            __DIR__ . '/../resources/js' => resource_path('js/stag-herd'),
         ], 'stag-herd-assets');
     }
 
@@ -65,6 +61,14 @@ class StagHerdServiceProvider extends ServiceProvider
 
             return $app->make(EloquentPaymentRepository::class);
         });
+    }
+
+    private function registerGateways(): void
+    {
+        $this->app->bind(
+            MercadoPagoGateway::class,
+            MercadoPagoApiAdapter::class,
+        );
     }
 
     private function registerProviders(): void

@@ -72,22 +72,6 @@ final class CashProvider implements PaymentProvider
         );
     }
 
-    public function confirmPayment(PaymentConfirmationData $request): PaymentResultData
-    {
-        return PaymentResultData::approved(
-            provider: $this->getName(),
-            method: 'cash',
-            providerStatus: 'approved',
-            references: new ProviderReferencesData(
-                providerPaymentId: $request->providerPaymentId,
-            ),
-            metadata: [
-                'source' => 'cash_confirm',
-                'external_reference' => $request->externalReference,
-            ],
-        );
-    }
-
     public function cancelPayment(PaymentCancellationData $request): PaymentResultData
     {
         return new PaymentResultData(

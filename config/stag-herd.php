@@ -18,10 +18,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | UI de prueba
+    |--------------------------------------------------------------------------
+    |
+    | Vistas simples para probar el paquete desde un proyecto host fresh.
+    | No son parte del checkout final del host, solo ayudan a validar acciones.
+    |
+    */
+
+    'ui' => [
+        'prefix' => env('STAG_HERD_UI_PREFIX', 'stag-herd/payments'),
+        'middleware' => ['web'],
+        'payments_limit' => 25,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Providers
     |--------------------------------------------------------------------------
     |
-    | Para Fase 1 solo necesitamos cash.
+    | Aquí se configuran los proveedores de pago disponibles. Cada proveedor puede tener múltiples métodos de pago.
     |
     */
 

@@ -31,7 +31,9 @@ class EloquentPaymentRepository implements PaymentRepository
             'status' => $result->status->value,
             'provider_status' => $result->providerStatus,
 
-            'external_reference' => $request->externalReference,
+            'external_reference' => $request->externalReference
+                ?? ($result->metadata['external_reference'] ?? null),
+
             'payer_reference' => $request->payerReference,
             'payer_email' => $request->payerEmail,
 
@@ -40,7 +42,11 @@ class EloquentPaymentRepository implements PaymentRepository
             'provider_transaction_id' => $references?->providerTransactionId,
             'provider_refund_id' => $references?->providerRefundId,
 
-            'metadata' => $result->metadata ?: $request->metadata,
+            'metadata' => array_merge(
+                $request->metadata,
+                $result->metadata,
+            ),
+
             'raw_payload' => $result->rawPayload,
         ]);
 
@@ -105,6 +111,43 @@ class EloquentPaymentRepository implements PaymentRepository
     }
 
     /**
+     * Find a payment by any known reference.
+     *
+     * @param array<string, mixed> $references
+     */
+    public function findByAnyProviderReference(
+        string $provider,
+        array $references,
+    ): ?Payment {
+        $values = $this->cleanReferenceValues($references);
+
+        if ($values === []) {
+            return null;
+        }
+
+        $model = StagHerdPayment::query()
+            ->where('provider', $provider)
+            ->where(function ($query) use ($values) {
+                foreach ($values as $value) {
+                    $query
+                        ->orWhere('provider_payment_id', $value)
+                        ->orWhere('provider_order_id', $value)
+                        ->orWhere('provider_transaction_id', $value)
+                        ->orWhere('provider_refund_id', $value)
+                        ->orWhere('external_reference', $value);
+                }
+            })
+            ->latest('id')
+            ->first();
+
+        if (! $model) {
+            return null;
+        }
+
+        return $this->mapToDomain($model);
+    }
+
+    /**
      * Update a payment from a provider result.
      */
     public function updateFromResult(
@@ -120,6 +163,9 @@ class EloquentPaymentRepository implements PaymentRepository
         $references = $result->references;
 
         $model->update([
+            'amount' => $result->amount ?? $model->amount,
+            'currency' => $result->currency ?? $model->currency,
+
             'status' => $result->status->value,
             'provider_status' => $result->providerStatus,
 
@@ -128,7 +174,14 @@ class EloquentPaymentRepository implements PaymentRepository
             'provider_transaction_id' => $references?->providerTransactionId ?? $model->provider_transaction_id,
             'provider_refund_id' => $references?->providerRefundId ?? $model->provider_refund_id,
 
-            'metadata' => array_merge($model->metadata ?? [], $result->metadata),
+            'external_reference' => $result->metadata['external_reference']
+                ?? $model->external_reference,
+
+            'metadata' => array_merge(
+                $model->metadata ?? [],
+                $result->metadata,
+            ),
+
             'raw_payload' => $result->rawPayload ?: $model->raw_payload,
         ]);
 
@@ -159,5 +212,19 @@ class EloquentPaymentRepository implements PaymentRepository
             ),
             metadata: $model->metadata ?? [],
         );
+    }
+
+    /**
+     * @param array<string, mixed> $references
+     * @return array<int, string>
+     */
+    private function cleanReferenceValues(array $references): array
+    {
+        return collect($references)
+            ->filter(fn($value) => $value !== null && $value !== '')
+            ->map(fn($value) => (string) $value)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

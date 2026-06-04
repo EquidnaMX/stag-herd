@@ -17,8 +17,6 @@ interface PaymentProvider
 
     public function lookupPayment(PaymentLookupData $request): PaymentResultData;
 
-    public function confirmPayment(PaymentConfirmationData $request): PaymentResultData;
-
     public function cancelPayment(PaymentCancellationData $request): PaymentResultData;
 
     public function refundPayment(RefundRequestData $request): PaymentResultData;
