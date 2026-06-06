@@ -586,12 +586,12 @@
                                         <td>
                                             <div class="actions">
                                                 <a class="button secondary"
-                                                    href="{{ route('stag-herd.payments.show', $payment) }}">
+                                                    href="{{ route('stag-herd.payments.show', $payment->id) }}">
                                                     Ver local
                                                 </a>
 
                                                 <form method="POST"
-                                                    action="{{ route('stag-herd.payments.sync', $payment) }}">
+                                                    action="{{ route('stag-herd.payments.sync', $payment->id) }}">
                                                     @csrf
                                                     <button class="success" type="submit">
                                                         Sync
@@ -599,7 +599,7 @@
                                                 </form>
 
                                                 <form method="POST"
-                                                    action="{{ route('stag-herd.payments.cancel', $payment) }}">
+                                                    action="{{ route('stag-herd.payments.cancel', $payment->id) }}">
                                                     @csrf
                                                     <button class="warning" type="submit">
                                                         Cancelar
@@ -607,7 +607,7 @@
                                                 </form>
 
                                                 <form method="POST"
-                                                    action="{{ route('stag-herd.payments.refund', $payment) }}">
+                                                    action="{{ route('stag-herd.payments.refund', $payment->id) }}">
                                                     @csrf
                                                     <button class="danger" type="submit">
                                                         Reembolsar
