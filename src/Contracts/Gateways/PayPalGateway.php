@@ -4,18 +4,40 @@ namespace Equidna\StagHerd\Contracts\Gateways;
 
 interface PayPalGateway
 {
-    // public function requestPayment(
-    //     int $amount,
-    //     string $description,
-    //     ?string $returnUrl = null,
-    //     ?string $cancelUrl = null,
-    // ): object;
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function createOrder(
+        array $payload,
+        ?string $idempotencyKey = null,
+    ): array;
 
-    public function getOrderDetails(string $orderId): object;
+    /**
+     * @return array<string, mixed>
+     */
+    public function getOrder(string $orderId): array;
 
-    public function getCaptureDetails(string $captureId): object;
+    /**
+     * @return array<string, mixed>
+     */
+    public function captureOrder(
+        string $orderId,
+        ?string $idempotencyKey = null,
+    ): array;
 
-    // public function getRefund(string $orderId, int $amount): object;
+    /**
+     * @return array<string, mixed>
+     */
+    public function getCapture(string $captureId): array;
 
-    public function captureOrder(string $orderId): object;
+    /**
+     * @return array<string, mixed>
+     */
+    public function refundCapture(
+        string $captureId,
+        ?int $amount = null,
+        ?string $currency = null,
+        ?string $idempotencyKey = null,
+    ): array;
 }

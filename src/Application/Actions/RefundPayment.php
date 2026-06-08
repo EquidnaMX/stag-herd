@@ -9,6 +9,7 @@ use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
+use Equidna\StagHerd\Support\PaymentEventDispatcher;
 use Equidna\StagHerd\Support\ProviderRegistry;
 
 final readonly class RefundPayment
@@ -51,32 +52,20 @@ final readonly class RefundPayment
             )
         );
 
-        return $this->payments->updateFromResult($payment, $result);
+        $updatedPayment = $this->payments->updateFromResult($payment, $result);
+
+        PaymentEventDispatcher::dispatchForPayment(
+            payment: $updatedPayment,
+            previousPayment: $payment,
+        );
+
+        return $updatedPayment;
     }
 
     private function resolveLocalPayment(RefundRequestData $request): Payment
     {
         if ($request->paymentId) {
             $payment = $this->payments->find($request->paymentId);
-
-            if ($payment) {
-                return $payment;
-            }
-        }
-
-        if ($request->externalReference) {
-            $payment = $this->payments->findByExternalReference($request->externalReference);
-
-            if ($payment) {
-                return $payment;
-            }
-        }
-
-        if ($request->providerPaymentId) {
-            $payment = $this->payments->findByProviderReference(
-                $request->provider,
-                $request->providerPaymentId,
-            );
 
             if ($payment) {
                 return $payment;

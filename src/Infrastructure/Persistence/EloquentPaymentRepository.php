@@ -87,6 +87,20 @@ class EloquentPaymentRepository implements PaymentRepository
         return $model ? $this->mapToDomain($model) : null;
     }
 
+    public function findByProviderPaymentId(
+        string $provider,
+        string $providerPaymentId,
+    ): ?Payment {
+        $model = StagHerdPayment::query()
+            ->where('provider', $provider)
+            ->where('provider_payment_id', $providerPaymentId)
+            ->latest('id')
+            ->first();
+
+        return $model ? $this->mapToDomain($model) : null;
+    }
+
+
     public function findByAnyProviderReference(
         string $provider,
         array $references,
@@ -170,13 +184,10 @@ class EloquentPaymentRepository implements PaymentRepository
                         ->orWhere('provider', 'like', "%{$search}%")
                         ->orWhere('method', 'like', "%{$search}%")
                         ->orWhere('status', 'like', "%{$search}%")
-                        ->orWhere('external_reference', 'like', "%{$search}%")
                         ->orWhere('payer_reference', 'like', "%{$search}%")
                         ->orWhere('payer_email', 'like', "%{$search}%")
                         ->orWhere('provider_payment_id', 'like', "%{$search}%")
-                        ->orWhere('provider_order_id', 'like', "%{$search}%")
-                        ->orWhere('provider_transaction_id', 'like', "%{$search}%")
-                        ->orWhere('provider_refund_id', 'like', "%{$search}%");
+                        ->orWhere('provider_order_id', 'like', "%{$search}%");
                 });
             })
             ->latest('id')

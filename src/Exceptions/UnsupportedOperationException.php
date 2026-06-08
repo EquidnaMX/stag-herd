@@ -39,4 +39,9 @@ class UnsupportedOperationException extends BadRequestException
             ],
         );
     }
+
+    public static function forOperation(string $operation, string $message): self
+    {
+        return new self("Unsupported operation [{$operation}]: {$message}");
+    }
 }

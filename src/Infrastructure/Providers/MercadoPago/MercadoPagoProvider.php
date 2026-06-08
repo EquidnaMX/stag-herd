@@ -9,10 +9,11 @@ use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\ProviderReferencesData;
 use Equidna\StagHerd\Data\PaymentCancellationData;
-use Equidna\StagHerd\Data\PaymentConfirmationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\RefundRequestData;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
+use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
+use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Support\MoneyFormatter;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -47,46 +48,66 @@ class MercadoPagoProvider implements PaymentProvider
 
     public function lookupPayment(PaymentLookupData $request): PaymentResultData
     {
-        if ($request->providerPaymentId) {
-            $response = $this->gateway->getPayment($request->providerPaymentId);
+        return match ($request->lookupType()) {
+            'provider_payment_id' => $this->lookupByProviderPaymentId($request),
+            'provider_order_id' => $this->lookupByProviderOrderId($request),
 
-            return $this->mapPaymentResponseToResultFromOperation(
-                method: (string) ($request->metadata['method'] ?? 'unknown'),
-                response: $response,
-            );
-        }
+            default => throw UnsupportedOperationException::forOperation(
+                'lookup',
+                'Mercado Pago lookup requires providerPaymentId or providerOrderId.'
+            ),
+        };
+    }
 
-        if ($request->externalReference) {
-            $response = $this->gateway->searchPayments([
-                'external_reference' => $request->externalReference,
-            ]);
-
-            $payment = $this->firstPaymentFromSearchResponse($response);
-
-            if (! $payment) {
-                throw \Equidna\StagHerd\Exceptions\PaymentNotFoundException::withProviderReference(
-                    $this->getName(),
-                    $request->externalReference,
-                );
-            }
-
-            return $this->mapPaymentResponseToResultFromOperation(
-                method: (string) ($request->metadata['method'] ?? 'unknown'),
-                response: $payment,
-            );
-        }
-
-        $providerPaymentId = $this->resolveProviderPaymentId(
-            providerPaymentId: $request->providerPaymentId,
-            metadata: $request->metadata,
-        );
-
-        $response = $this->gateway->getPayment($providerPaymentId);
+    private function lookupByProviderPaymentId(PaymentLookupData $request): PaymentResultData
+    {
+        $response = $this->gateway->getPayment($request->providerPaymentId);
 
         return $this->mapPaymentResponseToResultFromOperation(
-            method: (string) ($request->metadata['method'] ?? 'unknown'),
+            method: 'unknown',
             response: $response,
         );
+    }
+
+    private function lookupByProviderOrderId(PaymentLookupData $request): PaymentResultData
+    {
+        $response = $this->gateway->searchPayments([
+            'order.id' => $request->providerOrderId,
+        ]);
+
+        $payment = $this->resolveFirstPaymentFromSearchResponse($response);
+
+        if (! $payment) {
+            throw PaymentNotFoundException::withProviderReference(
+                $this->getName(),
+                $request->providerOrderId,
+            );
+        }
+
+        return $this->mapPaymentResponseToResultFromOperation(
+            method: 'unknown',
+            response: $payment,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     * @return array<string, mixed>|null
+     */
+    private function resolveFirstPaymentFromSearchResponse(array $response): ?array
+    {
+        $results = $response['results'] ?? [];
+
+        if (! is_array($results) || $results === []) {
+            return null;
+        }
+
+        usort($results, function (array $a, array $b) {
+            return strtotime((string) ($b['date_created'] ?? '')) <=>
+                strtotime((string) ($a['date_created'] ?? ''));
+        });
+
+        return $results[0] ?? null;
     }
 
     public function cancelPayment(PaymentCancellationData $request): PaymentResultData

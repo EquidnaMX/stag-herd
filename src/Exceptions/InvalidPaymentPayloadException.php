@@ -58,4 +58,9 @@ class InvalidPaymentPayloadException extends UnprocessableEntityException
             ],
         );
     }
+
+    public static function invalidField(string $field, string $message): self
+    {
+        return new self("Invalid field [{$field}]: {$message}");
+    }
 }

@@ -5,6 +5,7 @@ namespace Equidna\StagHerd\Application\Actions;
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Domain\Payment;
+use Equidna\StagHerd\Support\PaymentEventDispatcher;
 use Equidna\StagHerd\Support\ProviderRegistry;
 
 final readonly class CreatePayment
@@ -25,9 +26,13 @@ final readonly class CreatePayment
 
         $result = $provider->createPayment($request);
 
-        return $this->payments->storeFromResult(
+        $payment = $this->payments->storeFromResult(
             request: $request,
             result: $result,
         );
+
+        PaymentEventDispatcher::dispatchForPayment($payment);
+
+        return $payment;
     }
 }

@@ -11,6 +11,7 @@ use Equidna\StagHerd\Data\PaymentCancellationData;
 use Equidna\StagHerd\Data\PaymentConfirmationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\RefundRequestData;
+use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 
 final class CashProvider implements PaymentProvider
 {
@@ -58,17 +59,9 @@ final class CashProvider implements PaymentProvider
 
     public function lookupPayment(PaymentLookupData $request): PaymentResultData
     {
-        return PaymentResultData::pending(
-            provider: $this->getName(),
-            method: 'cash',
-            providerStatus: 'pending',
-            references: new ProviderReferencesData(
-                providerPaymentId: $request->providerPaymentId,
-            ),
-            metadata: [
-                'source' => 'cash_lookup',
-                'external_reference' => $request->externalReference,
-            ],
+        throw UnsupportedOperationException::forOperation(
+            'lookup',
+            'Cash provider does not support remote lookup.'
         );
     }
 

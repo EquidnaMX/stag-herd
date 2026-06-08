@@ -14,18 +14,17 @@ interface PaymentRepository
         PaymentResultData $result,
     ): Payment;
 
+    /**
+     * Busca por el ID interno del pago.
+     */
     public function find(int|string $id): ?Payment;
 
-    public function findByExternalReference(string $externalReference): ?Payment;
-
-    public function findByProviderReference(
+    /**
+     * Busca por el ID del pago generado por el provider.
+     */
+    public function findByProviderPaymentId(
         string $provider,
-        string $reference,
-    ): ?Payment;
-
-    public function findByAnyProviderReference(
-        string $provider,
-        array $references,
+        string $providerPaymentId,
     ): ?Payment;
 
     public function updateFromResult(

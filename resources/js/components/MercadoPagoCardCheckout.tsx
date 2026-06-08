@@ -14,10 +14,49 @@ type Props = {
 
 type CheckoutStatus = "idle" | "loading" | "success" | "error";
 
+type MetadataValue = string | number | boolean | null;
+type Metadata = Record<string, MetadataValue>;
+
 declare global {
   interface Window {
     MercadoPago?: any;
   }
+}
+
+function readInputValue(id: string): string {
+  const element = document.getElementById(id) as
+    | HTMLInputElement
+    | HTMLTextAreaElement
+    | HTMLSelectElement
+    | null;
+
+  return element?.value?.trim() ?? "";
+}
+
+function readMetadataFromPage(): Metadata {
+  const metadata: Metadata = {};
+
+  const elements = document.querySelectorAll<
+    HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+  >("[data-stag-herd-metadata]");
+
+  elements.forEach((element) => {
+    const key = element.dataset.stagHerdMetadata;
+
+    if (!key) {
+      return;
+    }
+
+    const value = element.value?.trim();
+
+    if (value === undefined || value === null || value === "") {
+      return;
+    }
+
+    metadata[key] = value;
+  });
+
+  return metadata;
 }
 
 export function MercadoPagoCardCheckout({
@@ -116,18 +155,50 @@ export function MercadoPagoCardCheckout({
               setMessage("Procesando pago...");
               setResponsePayload(null);
 
+              /*
+               * Estos campos son de la demo visual.
+               *
+               * No son parte del contrato específico de ningún host.
+               * Los leemos justo al enviar porque React no se vuelve a renderizar
+               * automáticamente cuando el Blade cambia data-*.
+               */
+              const currentAmount = Number(readInputValue("amount") || amount);
+              const currentCurrency = readInputValue("currency") || currency;
+
+              const currentExternalReference =
+                readInputValue("external_reference") ||
+                externalReference ||
+                `BRICK-${Date.now()}`;
+
+              const currentDescription =
+                readInputValue("description") || description;
+
               const resolvedPayerEmail =
-                cardFormData?.payer?.email || payerEmail || "cliente@test.com";
+                cardFormData?.payer?.email ||
+                readInputValue("payer_email") ||
+                payerEmail ||
+                "cliente@test.com";
+
+              /*
+               * Metadata genérica.
+               *
+               * El componente NO sabe qué es id_order, id_client, invoice_id, etc.
+               * Solo lee inputs marcados con data-stag-herd-metadata.
+               */
+              const metadata = readMetadataFromPage();
 
               const payload = {
                 provider: "mercado_pago",
                 method: "card",
 
-                amount,
-                currency,
-                external_reference: externalReference,
+                amount: currentAmount,
+                currency: currentCurrency,
+
+                external_reference: currentExternalReference,
                 payer_email: resolvedPayerEmail,
-                description,
+                description: currentDescription,
+
+                metadata,
 
                 mercado_pago: {
                   token: cardFormData?.token,
@@ -242,7 +313,8 @@ export function MercadoPagoCardCheckout({
   return (
     <section>
       <div style={{ marginBottom: 16 }}>
-        <strong>Referencia:</strong> {externalReference || "Sin referencia"}
+        <strong>Referencia:</strong>{" "}
+        {externalReference || "Se tomará del formulario"}
         <br />
         <strong>Monto:</strong> ${amount.toFixed(2)} {currency}
         <br />

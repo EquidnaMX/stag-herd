@@ -4,11 +4,14 @@ namespace Equidna\StagHerd;
 
 use Equidna\StagHerd\Application\PaymentService;
 use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
+use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentRepository;
 use Equidna\StagHerd\Infrastructure\Providers\Cash\CashProvider;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoApiAdapter;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoProvider;
+use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalApiAdapter;
+use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalProvider;
 use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Support\ServiceProvider;
 
@@ -69,6 +72,11 @@ class StagHerdServiceProvider extends ServiceProvider
             MercadoPagoGateway::class,
             MercadoPagoApiAdapter::class,
         );
+
+        $this->app->bind(
+            PayPalGateway::class,
+            PayPalApiAdapter::class,
+        );
     }
 
     private function registerProviders(): void
@@ -82,6 +90,10 @@ class StagHerdServiceProvider extends ServiceProvider
 
             if (config('stag-herd.providers.mercado_pago.enabled', false)) {
                 $registry->register($app->make(MercadoPagoProvider::class));
+            }
+
+            if (config('stag-herd.providers.paypal.enabled', false)) {
+                $registry->register($app->make(PayPalProvider::class));
             }
 
             return $registry;

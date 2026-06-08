@@ -51,6 +51,16 @@ class PaymentDemoController extends Controller
             'method' => ['required', 'string'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'currency' => ['required', 'string', 'size:3'],
+
+            /*
+         * Metadata genérica.
+         *
+         * Aquí puede venir cualquier cosa que el host necesite:
+         * - Fresh: metadata[id_order], metadata[id_client]
+         * - Otro host: metadata[invoice_id], metadata[booking_id], etc.
+         */
+            'metadata' => ['nullable', 'array'],
+
             'external_reference' => ['nullable', 'string', 'max:255'],
             'payer_reference' => ['nullable', 'string', 'max:255'],
             'payer_email' => ['nullable', 'email', 'max:255'],
@@ -69,9 +79,27 @@ class PaymentDemoController extends Controller
         $provider = strtolower($data['provider']);
         $method = strtolower($data['method']);
 
-        $metadata = [
+        $externalReference = $data['external_reference'] ?? null;
+        $payerReference = $data['payer_reference'] ?? null;
+        $payerEmail = $data['payer_email'] ?? null;
+        $description = $data['description'] ?? null;
+        $returnUrl = $data['return_url'] ?? null;
+        $cancelUrl = $data['cancel_url'] ?? null;
+
+        $metadata = $this->cleanMetadata($data['metadata'] ?? []);
+
+        /*
+     * Metadata del propio demo.
+     *
+     * Esto no acopla el paquete a Fresh. Solo marca de dónde salió la prueba.
+     */
+        $metadata = array_replace_recursive($metadata, [
             'source' => 'stag-herd-default-ui',
-        ];
+        ]);
+
+        if (! empty($externalReference)) {
+            $metadata['external_reference'] = $externalReference;
+        }
 
         if ($provider === 'cash') {
             $metadata['cash_status'] = $data['cash_status'] ?? 'approved';
@@ -88,18 +116,32 @@ class PaymentDemoController extends Controller
             ], fn($value) => $value !== null && $value !== '');
         }
 
+        $resolvedExternalReference = ! empty($externalReference)
+            ? $externalReference
+            : 'ORDER-DEMO-' . now()->format('YmdHis');
+
         try {
             $payment = StagHerd::createPayment(new PaymentRequestData(
                 amount: MoneyFormatter::fromDecimal($data['amount']),
                 currency: strtoupper($data['currency']),
                 method: $method,
                 provider: $provider,
-                externalReference: $data['external_reference'] ?: 'ORDER-DEMO-' . now()->format('YmdHis'),
-                payerReference: $data['payer_reference'] ?: null,
-                payerEmail: $data['payer_email'] ?: null,
-                description: $data['description'] ?: 'Pago creado desde Stag Herd UI',
-                returnUrl: $data['return_url'] ?: null,
-                cancelUrl: $data['cancel_url'] ?: null,
+                externalReference: $resolvedExternalReference,
+                payerReference: ! empty($payerReference)
+                    ? $payerReference
+                    : null,
+                payerEmail: ! empty($payerEmail)
+                    ? $payerEmail
+                    : null,
+                description: ! empty($description)
+                    ? $description
+                    : 'Pago creado desde Stag Herd UI',
+                returnUrl: ! empty($returnUrl)
+                    ? $returnUrl
+                    : null,
+                cancelUrl: ! empty($cancelUrl)
+                    ? $cancelUrl
+                    : null,
                 metadata: $metadata,
             ));
 
@@ -147,15 +189,17 @@ class PaymentDemoController extends Controller
                 throw new \RuntimeException("No se encontró el pago {$payment}.");
             }
 
+            /*
+             * Aquí solo mandamos paymentId.
+             *
+             * LookupPayment se encarga de:
+             * - buscar localmente el pago
+             * - si tiene provider_payment_id, consultar al provider
+             * - si no tiene provider_payment_id, devolver el pago local
+             */
             $updated = StagHerd::lookupPayment(new PaymentLookupData(
                 provider: $model->provider,
                 paymentId: (string) $model->id,
-                providerPaymentId: $model->provider_payment_id ?? null,
-                externalReference: $model->external_reference ?? null,
-                metadata: [
-                    'method' => $model->method,
-                    'source' => 'stag-herd-local-lookup-ui',
-                ],
             ));
 
             return $this->redirectWithResult('lookup', $updated->toArray());
@@ -173,11 +217,13 @@ class PaymentDemoController extends Controller
                 throw new \RuntimeException("No se encontró el pago {$payment}.");
             }
 
+            /*
+             * Igual que lookup: para acciones desde la UI local basta con paymentId.
+             * La acción de cancel internamente puede resolver provider_payment_id.
+             */
             $updated = StagHerd::cancelPayment(new PaymentCancellationData(
                 provider: $model->provider,
                 paymentId: (string) $model->id,
-                providerPaymentId: $model->provider_payment_id ?? null,
-                externalReference: $model->external_reference ?? null,
                 reason: $request->string('reason')->toString() ?: 'Cancelado desde Stag Herd UI',
             ));
 
@@ -198,11 +244,12 @@ class PaymentDemoController extends Controller
 
             $amount = $request->input('amount');
 
+            /*
+             * Igual: desde la UI local usamos paymentId.
+             */
             $updated = StagHerd::refundPayment(new RefundRequestData(
                 provider: $model->provider,
                 paymentId: (string) $model->id,
-                providerPaymentId: $model->provider_payment_id ?? null,
-                externalReference: $model->external_reference ?? null,
                 amount: $amount !== null && $amount !== ''
                     ? MoneyFormatter::fromDecimal($amount)
                     : null,
@@ -224,15 +271,18 @@ class PaymentDemoController extends Controller
                 throw new \RuntimeException("No se encontró el pago {$payment}.");
             }
 
+            /*
+             * Sync local: solo mandamos paymentId.
+             *
+             * SyncPayment:
+             * - busca el pago local
+             * - si tiene provider_payment_id, consulta provider
+             * - actualiza el pago local
+             * - si no tiene provider_payment_id, devuelve el pago local
+             */
             $lookup = new PaymentLookupData(
                 provider: $model->provider,
                 paymentId: (string) $model->id,
-                providerPaymentId: $model->provider_payment_id ?? null,
-                externalReference: $model->external_reference ?? null,
-                metadata: [
-                    'method' => $model->method,
-                    'source' => 'stag-herd-local-sync-ui',
-                ],
             );
 
             $fallbackRequest = new PaymentRequestData(
@@ -240,7 +290,7 @@ class PaymentDemoController extends Controller
                 currency: $model->currency,
                 method: $model->method,
                 provider: $model->provider,
-                externalReference: $model->external_reference,
+                externalReference: $this->resolveExternalReference($model),
                 payerReference: $model->payer_reference,
                 payerEmail: $model->payer_email,
                 description: 'Pago sincronizado desde registro local',
@@ -269,6 +319,19 @@ class PaymentDemoController extends Controller
                 'external_reference' => ['nullable', 'string', 'max:255'],
                 'payer_email' => ['nullable', 'email', 'max:255'],
                 'description' => ['nullable', 'string', 'max:255'],
+
+                /*
+             * Metadata genérica.
+             *
+             * Aquí Fresh puede mandar:
+             * metadata: {
+             *   id_order: 589,
+             *   id_client: "CLIENTE"
+             * }
+             *
+             * Pero el paquete no sabe ni le importa qué significan esos campos.
+             */
+                'metadata' => ['nullable', 'array'],
 
                 'mercado_pago' => ['nullable', 'array'],
                 'mercado_pago.token' => ['nullable', 'string'],
@@ -325,32 +388,51 @@ class PaymentDemoController extends Controller
                 ], 422);
             }
 
+            $externalReference = $data['external_reference']
+                ?? 'BRICK-' . now()->format('YmdHis');
+
+            /*
+         * Metadata genérica recibida desde el frontend.
+         *
+         * FreshPaymentRepository podrá leer:
+         * $request->metadata['id_order']
+         *
+         * Pero stag-herd no tiene columna id_order ni lo trata como campo especial.
+         */
+            $metadata = $this->cleanMetadata($data['metadata'] ?? []);
+
+            $metadata = array_replace_recursive($metadata, [
+                'source' => 'stag-herd-brick-ui',
+
+                'external_reference' => $externalReference,
+
+                'mercado_pago' => array_filter([
+                    'token' => $token,
+                    'payment_method_id' => $paymentMethodId,
+                    'issuer_id' => $issuerId,
+                    'installments' => (int) $installments,
+                    'payer' => array_merge(
+                        is_array($payerFromMercadoPago) ? $payerFromMercadoPago : [],
+                        is_array($payerFromRoot) ? $payerFromRoot : [],
+                        ['email' => $payerEmail],
+                    ),
+                ], fn($value) => $value !== null && $value !== ''),
+
+                'raw_form_data' => $data['raw_form_data'] ?? null,
+            ]);
+
+            $metadata = $this->cleanMetadata($metadata);
+
             $payment = StagHerd::createPayment(new PaymentRequestData(
                 amount: MoneyFormatter::fromDecimal($data['amount']),
                 currency: strtoupper($data['currency']),
                 method: strtolower($data['method'] ?? 'card'),
                 provider: strtolower($data['provider'] ?? 'mercado_pago'),
-                externalReference: $data['external_reference'] ?? 'ORDER-BRICK-' . now()->format('YmdHis'),
+                externalReference: $externalReference,
                 payerReference: null,
                 payerEmail: $payerEmail,
                 description: $data['description'] ?? 'Pago desde Mercado Pago Brick',
-                metadata: [
-                    'source' => 'stag-herd-brick-ui',
-
-                    'mercado_pago' => array_filter([
-                        'token' => $token,
-                        'payment_method_id' => $paymentMethodId,
-                        'issuer_id' => $issuerId,
-                        'installments' => (int) $installments,
-                        'payer' => array_merge(
-                            is_array($payerFromMercadoPago) ? $payerFromMercadoPago : [],
-                            is_array($payerFromRoot) ? $payerFromRoot : [],
-                            ['email' => $payerEmail],
-                        ),
-                    ], fn($value) => $value !== null && $value !== ''),
-
-                    'raw_form_data' => $data['raw_form_data'] ?? null,
-                ],
+                metadata: $metadata,
             ));
 
             return response()->json([
@@ -373,7 +455,7 @@ class PaymentDemoController extends Controller
     {
         $data = $request->validate([
             'provider' => ['required', 'string'],
-            'search_type' => ['required', 'string'],
+            'search_type' => ['required', 'string', 'in:provider_payment_id,provider_order_id'],
             'search_value' => ['required', 'string', 'max:255'],
         ]);
 
@@ -393,9 +475,13 @@ class PaymentDemoController extends Controller
             $response = match ($searchType) {
                 'provider_payment_id' => $gateway->getPayment($searchValue),
 
-                'external_reference',
+                /*
+                 * Aquí ya no usamos external_reference.
+                 * Si el usuario te manda el order id que ve en Mercado Pago,
+                 * buscamos por order.id.
+                 */
                 'provider_order_id' => $gateway->searchPayments([
-                    'external_reference' => $searchValue,
+                    'order.id' => $searchValue,
                 ]),
 
                 default => throw new \InvalidArgumentException(
@@ -421,12 +507,18 @@ class PaymentDemoController extends Controller
     {
         $data = $request->validate([
             'provider' => ['required', 'string'],
-            'search_type' => ['required', 'string'],
+            'search_type' => ['required', 'string', 'in:provider_payment_id,provider_order_id'],
             'search_value' => ['required', 'string', 'max:255'],
 
             'method' => ['required', 'string'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'currency' => ['required', 'string', 'size:3'],
+
+            /*
+         * Metadata genérica para cuando el sync tenga que crear el pago local.
+         */
+            'metadata' => ['nullable', 'array'],
+
             'external_reference' => ['nullable', 'string', 'max:255'],
             'payer_reference' => ['nullable', 'string', 'max:255'],
             'payer_email' => ['nullable', 'email', 'max:255'],
@@ -437,33 +529,52 @@ class PaymentDemoController extends Controller
         $searchType = $data['search_type'];
         $searchValue = trim($data['search_value']);
 
+        $externalReference = ! empty($data['external_reference'])
+            ? $data['external_reference']
+            : null;
+
         try {
+            /*
+         * Aquí solo permitimos:
+         * - provider_payment_id
+         * - provider_order_id
+         *
+         * Nada de external_reference como búsqueda directa al provider.
+         */
             $lookup = new PaymentLookupData(
                 provider: $provider,
                 providerPaymentId: $searchType === 'provider_payment_id' ? $searchValue : null,
-                externalReference: $searchType === 'external_reference' ? $searchValue : null,
-                metadata: [
-                    'method' => strtolower($data['method']),
-                    'source' => 'stag-herd-provider-sync-ui',
-                ],
+                providerOrderId: $searchType === 'provider_order_id' ? $searchValue : null,
             );
+
+            $metadata = $this->cleanMetadata($data['metadata'] ?? []);
+
+            $metadata = array_replace_recursive($metadata, [
+                'source' => 'stag-herd-provider-sync-ui',
+                'sync_reference_type' => $searchType,
+                'sync_reference_value' => $searchValue,
+            ]);
+
+            if ($externalReference) {
+                $metadata['external_reference'] = $externalReference;
+            }
+
+            $metadata = $this->cleanMetadata($metadata);
 
             $fallbackRequest = new PaymentRequestData(
                 amount: MoneyFormatter::fromDecimal($data['amount']),
                 currency: strtoupper($data['currency']),
                 method: strtolower($data['method']),
                 provider: $provider,
-                externalReference: $data['external_reference'] ?: (
-                    $searchType === 'external_reference' ? $searchValue : null
-                ),
-                payerReference: $data['payer_reference'] ?: null,
-                payerEmail: $data['payer_email'] ?: null,
-                description: $data['description'] ?: 'Pago sincronizado desde provider',
-                metadata: [
-                    'source' => 'stag-herd-provider-sync-ui',
-                    'sync_reference_type' => $searchType,
-                    'sync_reference_value' => $searchValue,
-                ],
+                externalReference: $externalReference,
+                payerReference: ! empty($data['payer_reference'])
+                    ? $data['payer_reference']
+                    : null,
+                payerEmail: ! empty($data['payer_email']) ? $data['payer_email'] : null,
+                description: ! empty($data['description'])
+                    ? $data['description']
+                    : 'Pago sincronizado desde provider',
+                metadata: $metadata,
             );
 
             $payment = StagHerd::syncPayment($lookup, $fallbackRequest);
@@ -503,6 +614,38 @@ class PaymentDemoController extends Controller
             ?? data_get($payload, 'init_point')
             ?? data_get($payload, 'sandbox_init_point')
             ?? ($payment->link ?? null);
+    }
+
+    private function resolveExternalReference(object $payment): ?string
+    {
+        return data_get($payment->metadata ?? [], 'external_reference');
+    }
+
+    private function cleanMetadata(array $metadata): array
+    {
+        $clean = [];
+
+        foreach ($metadata as $key => $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            if (is_array($value)) {
+                $nested = $this->cleanMetadata($value);
+
+                if ($nested === []) {
+                    continue;
+                }
+
+                $clean[$key] = $nested;
+
+                continue;
+            }
+
+            $clean[$key] = $value;
+        }
+
+        return $clean;
     }
 
     private function displayPaymentToArray(object $payment): array

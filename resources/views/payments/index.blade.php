@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     @viteReactRefresh
-    @vite(['resources/js/stag-herd/checkout.tsx'])
+    @vite(['resources/js/checkout.tsx'])
 
     <style>
         body {
@@ -18,7 +18,7 @@
         }
 
         main {
-            max-width: 1240px;
+            max-width: 1500px;
             margin: 32px auto;
             padding: 0 18px;
         }
@@ -38,9 +38,15 @@
 
         .grid {
             display: grid;
-            grid-template-columns: minmax(320px, 440px) 1fr;
+            grid-template-columns: 420px minmax(0, 1fr);
             gap: 18px;
             align-items: start;
+        }
+
+        .grid>aside,
+        .grid>section,
+        .card {
+            min-width: 0;
         }
 
         .card {
@@ -81,6 +87,8 @@
             text-decoration: none;
             cursor: pointer;
             font: inherit;
+            text-align: center;
+            box-sizing: border-box;
         }
 
         button.secondary,
@@ -110,8 +118,20 @@
 
         .actions {
             display: flex;
-            flex-wrap: wrap;
+            flex-direction: column;
             gap: 8px;
+            min-width: 160px;
+        }
+
+        .actions form {
+            margin: 0;
+        }
+
+        .actions button,
+        .actions .button {
+            width: 100%;
+            font-size: 13px;
+            padding: 8px 10px;
         }
 
         .two {
@@ -155,12 +175,22 @@
             padding: 14px;
             border-radius: 12px;
             font-size: 12px;
+            max-width: 100%;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
         }
 
         table {
             width: 100%;
+            min-width: 900px;
             border-collapse: collapse;
             font-size: 14px;
+            table-layout: auto;
         }
 
         th,
@@ -175,6 +205,46 @@
             color: #475569;
             font-size: 12px;
             text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        td {
+            overflow-wrap: normal;
+            word-break: normal;
+        }
+
+        th:nth-child(1),
+        td:nth-child(1) {
+            width: 80px;
+            white-space: nowrap;
+        }
+
+        th:nth-child(2),
+        td:nth-child(2) {
+            width: 150px;
+        }
+
+        th:nth-child(3),
+        td:nth-child(3) {
+            width: 110px;
+            white-space: nowrap;
+        }
+
+        th:nth-child(4),
+        td:nth-child(4) {
+            width: 160px;
+        }
+
+        th:nth-child(5),
+        td:nth-child(5) {
+            min-width: 240px;
+            max-width: 340px;
+            overflow-wrap: anywhere;
+        }
+
+        th:nth-child(6),
+        td:nth-child(6) {
+            width: 180px;
         }
 
         .pill {
@@ -184,6 +254,7 @@
             background: #e2e8f0;
             font-size: 12px;
             font-weight: bold;
+            white-space: nowrap;
         }
 
         .pill.APPROVED,
@@ -192,23 +263,29 @@
             color: #166534;
         }
 
-        .pill.PENDING {
+        .pill.PENDING,
+        .pill.PROCESSING {
             background: #fef3c7;
             color: #92400e;
         }
 
         .pill.REJECTED,
         .pill.FAILED,
-        .pill.CANCELED {
+        .pill.CANCELED,
+        .pill.CANCELLED {
             background: #fee2e2;
             color: #991b1b;
         }
 
         .search {
             display: grid;
-            grid-template-columns: 1fr auto;
+            grid-template-columns: minmax(0, 1fr) auto;
             gap: 10px;
             margin-bottom: 14px;
+        }
+
+        .search button {
+            white-space: nowrap;
         }
 
         .note {
@@ -218,12 +295,40 @@
             padding: 12px;
         }
 
+        small {
+            display: block;
+            margin-top: 6px;
+        }
+
+        code {
+            background: #f1f5f9;
+            border-radius: 6px;
+            padding: 2px 5px;
+        }
+
+        @media (max-width: 1100px) {
+            main {
+                max-width: 100%;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                min-width: 900px;
+            }
+        }
+
         @media (max-width: 900px) {
 
-            .grid,
             .two,
             .search {
                 grid-template-columns: 1fr;
+            }
+
+            .actions {
+                min-width: 150px;
             }
         }
     </style>
@@ -292,7 +397,8 @@
 
                     <p class="muted">
                         Para <strong>cash</strong> usa el formulario simple.
-                        Para <strong>Mercado Pago card</strong>, usa el Brick de abajo.
+                        Para <strong>Mercado Pago card</strong>, selecciona provider mercado_pago y usa el Brick de
+                        abajo.
                     </p>
 
                     <form method="POST" action="{{ route('stag-herd.payments.store') }}">
@@ -327,9 +433,41 @@
                             </div>
                         </div>
 
-                        <label for="external_reference">External reference / Order ID host</label>
-                        <input id="external_reference" name="external_reference"
-                            value="{{ old('external_reference', 'ORDER-DEMO-' . now()->format('YmdHis')) }}">
+                        <div class="two">
+                            <div>
+                                <label for="metadata_id_order">Metadata: id_order</label>
+                                <input id="metadata_id_order" name="metadata[id_order]" type="number"
+                                    data-stag-herd-metadata="id_order" value="{{ old('metadata.id_order') }}"
+                                    placeholder="Ej. 589 si usas Fresh">
+
+                                <small class="muted">
+                                    Aquí va la orden real de Fresh. El paquete no la trata como columna propia; solo
+                                    viaja en metadata.
+                                </small>
+                            </div>
+
+                            <div>
+                                <label for="metadata_id_client">Metadata: id_client</label>
+                                <input id="metadata_id_client" name="metadata[id_client]"
+                                    data-stag-herd-metadata="id_client"
+                                    value="{{ old('metadata.id_client', 'CLIENT-DEMO') }}"
+                                    placeholder="Ej. cliente Fresh">
+
+                                <small class="muted">
+                                    Campo genérico dentro de metadata. Fresh lo puede usar para Payments.id_client.
+                                </small>
+                            </div>
+                        </div>
+
+                        <label for="external_reference">External reference</label>
+                        <input type="text" name="external_reference" id="external_reference"
+                            value="{{ old('external_reference') }}"
+                            placeholder="Ej. ORDER-589, CHECKOUT-ABC o referencia del host">
+
+                        <small class="muted">
+                            Referencia de negocio. No es la orden obligatoria de Fresh; la orden de Fresh va en
+                            metadata[id_order].
+                        </small>
 
                         <div class="two">
                             <div>
@@ -396,12 +534,21 @@
 
                     <p class="muted">
                         Este bloque renderiza el Card Payment Brick y manda el token al backend del paquete.
+                        Si usas Fresh, escribe primero la orden en <strong>Metadata: id_order</strong> arriba.
                     </p>
+
+                    <div class="note mb">
+                        <strong>¿Dónde meto la orden?</strong>
+                        <br>
+                        En el campo de arriba llamado <strong>Metadata: id_order</strong>.
+                        El Brick lee todos los inputs que tengan <code>data-stag-herd-metadata</code> y los manda dentro
+                        de
+                        <code>metadata</code>.
+                    </div>
 
                     <div data-stag-herd-checkout="mercado-pago-card"
                         data-public-key="{{ config('stag-herd.providers.mercado_pago.credentials.public_key') }}"
-                        data-amount="120.00" data-currency="MXN"
-                        data-external-reference="ORDER-BRICK-{{ now()->format('YmdHis') }}"
+                        data-amount="120.00" data-currency="MXN" data-external-reference=""
                         data-payer-email="cliente@test.com" data-description="Pago desde Mercado Pago Card Brick"
                         data-process-url="{{ route('stag-herd.payments.brick.process') }}"
                         data-csrf-token="{{ csrf_token() }}"></div>
@@ -422,12 +569,12 @@
                         <label for="provider_lookup_type">Buscar por</label>
                         <select id="provider_lookup_type" name="search_type">
                             <option value="provider_payment_id">provider_payment_id</option>
-                            <option value="external_reference">external_reference</option>
+                            <option value="provider_order_id">provider_order_id</option>
                         </select>
 
                         <label for="provider_lookup_value">Valor</label>
                         <input id="provider_lookup_value" name="search_value"
-                            placeholder="Ej. ID de Mercado Pago u ORDER-DEMO-..." required>
+                            placeholder="Ej. payment id u order id visible del provider" required>
 
                         <button class="provider mt" type="submit">
                             Lookup provider
@@ -450,12 +597,12 @@
                         <label for="sync_search_type">Buscar en provider por</label>
                         <select id="sync_search_type" name="search_type">
                             <option value="provider_payment_id">provider_payment_id</option>
-                            <option value="external_reference">external_reference</option>
+                            <option value="provider_order_id">provider_order_id</option>
                         </select>
 
                         <label for="sync_search_value">Valor</label>
                         <input id="sync_search_value" name="search_value"
-                            placeholder="Ej. ID de Mercado Pago u ORDER-DEMO-..." required>
+                            placeholder="Ej. payment id u order id visible del provider" required>
 
                         <div class="two">
                             <div>
@@ -476,9 +623,26 @@
                         <input id="sync_amount" name="amount" type="number" step="0.01" min="0.01"
                             value="120.00">
 
+                        <div class="two">
+                            <div>
+                                <label for="sync_metadata_id_order">Metadata fallback: id_order</label>
+                                <input id="sync_metadata_id_order" name="metadata[id_order]" type="number"
+                                    placeholder="Ej. 589 si usas Fresh">
+
+                                <small class="muted">
+                                    Necesario si el sync tiene que crear un pago local en Fresh.
+                                </small>
+                            </div>
+
+                            <div>
+                                <label for="sync_metadata_id_client">Metadata fallback: id_client</label>
+                                <input id="sync_metadata_id_client" name="metadata[id_client]"
+                                    placeholder="Ej. cliente Fresh">
+                            </div>
+                        </div>
+
                         <label for="sync_external_reference">External reference fallback</label>
-                        <input id="sync_external_reference" name="external_reference"
-                            placeholder="Ej. ORDER-DEMO-123">
+                        <input id="sync_external_reference" name="external_reference" placeholder="Ej. ORDER-589">
 
                         <div class="two">
                             <div>
@@ -508,13 +672,13 @@
                     <h2>Pagos locales</h2>
 
                     <p class="muted">
-                        Esta tabla muestra tu persistencia local. El botón Sync consulta provider y crea/actualiza
-                        local.
+                        Esta tabla muestra tu persistencia local. El botón Sync/Actualizar consulta provider y actualiza
+                        local si aplica.
                     </p>
 
                     <form class="search" method="GET" action="{{ route('stag-herd.payments.index') }}">
                         <input name="search" value="{{ $search ?? '' }}"
-                            placeholder="Buscar local por id, external_reference, provider_payment_id, provider_order_id...">
+                            placeholder="Buscar local por id, metadata.id_order, provider_payment_id, provider_order_id...">
 
                         <button type="submit">Buscar local</button>
                     </form>
@@ -529,96 +693,121 @@
                     @if ($payments->isEmpty())
                         <p class="muted">No hay pagos locales para mostrar.</p>
                     @else
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>ID local</th>
-                                    <th>Provider</th>
-                                    <th>Monto</th>
-                                    <th>Estado</th>
-                                    <th>Referencias</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                @foreach ($payments as $payment)
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
                                     <tr>
-                                        <td>#{{ $payment->id }}</td>
+                                        <th>ID local</th>
+                                        <th>Provider</th>
+                                        <th>Monto</th>
+                                        <th>Estado</th>
+                                        <th>Referencias</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
 
-                                        <td>
-                                            {{ $payment->provider }}
-                                            <br>
-                                            <span class="muted">{{ $payment->method }}</span>
-                                        </td>
+                                <tbody>
+                                    @foreach ($payments as $payment)
+                                        @php
+                                            $paymentId = data_get($payment, 'id');
+                                            $provider = data_get($payment, 'provider', '—');
+                                            $method = data_get($payment, 'method', '—');
+                                            $amount = (int) data_get($payment, 'amount', 0);
+                                            $currency = data_get($payment, 'currency', 'MXN');
+                                            $status = data_get($payment, 'status', 'PENDING');
+                                            $providerStatus = data_get($payment, 'provider_status');
+                                            $metadata = data_get($payment, 'metadata', []);
+                                            $hostOrderId =
+                                                data_get($metadata, 'id_order') ?? data_get($payment, 'id_order');
+                                            $externalReference = data_get($payment, 'external_reference');
+                                            $providerPaymentId = data_get($payment, 'provider_payment_id');
+                                            $providerOrderId = data_get($payment, 'provider_order_id');
+                                        @endphp
 
-                                        <td>
-                                            ${{ number_format($payment->amount / 100, 2) }} {{ $payment->currency }}
-                                        </td>
+                                        <tr>
+                                            <td>#{{ $paymentId }}</td>
 
-                                        <td>
-                                            <span class="pill {{ $payment->status }}">
-                                                {{ $payment->status }}
-                                            </span>
-                                            <br>
-                                            <span class="muted">
-                                                provider_status: {{ $payment->provider_status ?: '—' }}
-                                            </span>
+                                            <td>
+                                                {{ $provider }}
+                                                <br>
+                                                <span class="muted">{{ $method }}</span>
 
-                                            @if (!empty($payment->metadata['mercado_pago_refund_status']))
+                                                @if (!empty($hostOrderId))
+                                                    <br>
+                                                    <span class="muted">metadata.id_order:
+                                                        #{{ $hostOrderId }}</span>
+                                                @endif
+                                            </td>
+
+                                            <td>
+                                                ${{ number_format($amount / 100, 2) }} {{ $currency }}
+                                            </td>
+
+                                            <td>
+                                                <span class="pill {{ $status }}">
+                                                    {{ $status }}
+                                                </span>
                                                 <br>
                                                 <span class="muted">
-                                                    refund_status:
-                                                    {{ $payment->metadata['mercado_pago_refund_status'] }}
+                                                    provider_status: {{ $providerStatus ?: '—' }}
                                                 </span>
-                                            @endif
-                                        </td>
 
-                                        <td>
-                                            <strong>external:</strong> {{ $payment->external_reference ?: '—' }}
-                                            <br>
-                                            <strong>provider payment:</strong>
-                                            {{ $payment->provider_payment_id ?: '—' }}
-                                            <br>
-                                            <strong>provider order:</strong> {{ $payment->provider_order_id ?: '—' }}
-                                        </td>
+                                                @if (!empty($metadata['mercado_pago_refund_status']))
+                                                    <br>
+                                                    <span class="muted">
+                                                        refund_status:
+                                                        {{ $metadata['mercado_pago_refund_status'] }}
+                                                    </span>
+                                                @endif
+                                            </td>
 
-                                        <td>
-                                            <div class="actions">
-                                                <a class="button secondary"
-                                                    href="{{ route('stag-herd.payments.show', $payment->id) }}">
-                                                    Ver local
-                                                </a>
+                                            <td>
+                                                <strong>external:</strong> {{ $externalReference ?: '—' }}
+                                                <br>
+                                                <strong>provider payment:</strong>
+                                                {{ $providerPaymentId ?: '—' }}
+                                                <br>
+                                                <strong>provider order:</strong>
+                                                {{ $providerOrderId ?: '—' }}
+                                            </td>
 
-                                                <form method="POST"
-                                                    action="{{ route('stag-herd.payments.sync', $payment->id) }}">
-                                                    @csrf
-                                                    <button class="success" type="submit">
-                                                        Sync
-                                                    </button>
-                                                </form>
+                                            <td>
+                                                <div class="actions">
+                                                    <a class="button secondary"
+                                                        href="{{ route('stag-herd.payments.show', $paymentId) }}">
+                                                        Ver local
+                                                    </a>
 
-                                                <form method="POST"
-                                                    action="{{ route('stag-herd.payments.cancel', $payment->id) }}">
-                                                    @csrf
-                                                    <button class="warning" type="submit">
-                                                        Cancelar
-                                                    </button>
-                                                </form>
+                                                    <form method="POST"
+                                                        action="{{ route('stag-herd.payments.sync', $paymentId) }}">
+                                                        @csrf
+                                                        <button class="success" type="submit">
+                                                            Actualizar
+                                                        </button>
+                                                    </form>
 
-                                                <form method="POST"
-                                                    action="{{ route('stag-herd.payments.refund', $payment->id) }}">
-                                                    @csrf
-                                                    <button class="danger" type="submit">
-                                                        Reembolsar
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                                                    <form method="POST"
+                                                        action="{{ route('stag-herd.payments.cancel', $paymentId) }}">
+                                                        @csrf
+                                                        <button class="warning" type="submit">
+                                                            Cancelar
+                                                        </button>
+                                                    </form>
+
+                                                    <form method="POST"
+                                                        action="{{ route('stag-herd.payments.refund', $paymentId) }}">
+                                                        @csrf
+                                                        <button class="danger" type="submit">
+                                                            Reembolsar
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
 
                         <div class="mt">
                             {{ $payments->links() }}
@@ -634,7 +823,9 @@
                             Esto no consulta Mercado Pago. Solo muestra lo guardado localmente.
                         </p>
 
-                        <pre>{{ json_encode($selectedPayment, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+                        <div class="table-wrap">
+                            <pre>{{ json_encode($selectedPayment, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+                        </div>
                     </section>
                 @endif
             </section>
@@ -652,6 +843,7 @@
         const currencyInput = document.getElementById('currency');
         const externalReferenceInput = document.getElementById('external_reference');
         const payerEmailInput = document.getElementById('payer_email');
+        const descriptionInput = document.getElementById('description');
 
         const checkoutRoot = document.querySelector("[data-stag-herd-checkout='mercado-pago-card']");
 
@@ -705,10 +897,11 @@
                 return;
             }
 
-            checkoutRoot.dataset.amount = amountInput.value || '120.00';
-            checkoutRoot.dataset.currency = currencyInput.value || 'MXN';
-            checkoutRoot.dataset.externalReference = externalReferenceInput.value || '';
-            checkoutRoot.dataset.payerEmail = payerEmailInput.value || '';
+            checkoutRoot.dataset.amount = amountInput?.value || '120.00';
+            checkoutRoot.dataset.currency = currencyInput?.value || 'MXN';
+            checkoutRoot.dataset.externalReference = externalReferenceInput?.value || '';
+            checkoutRoot.dataset.payerEmail = payerEmailInput?.value || 'cliente@test.com';
+            checkoutRoot.dataset.description = descriptionInput?.value || 'Pago desde Mercado Pago Card Brick';
         }
 
         providerSelect.addEventListener('change', () => {
@@ -718,7 +911,17 @@
 
         methodSelect.addEventListener('change', toggleProviderFields);
 
-        [amountInput, currencyInput, externalReferenceInput, payerEmailInput].forEach((input) => {
+        [
+            amountInput,
+            currencyInput,
+            externalReferenceInput,
+            payerEmailInput,
+            descriptionInput,
+        ].forEach((input) => {
+            if (!input) {
+                return;
+            }
+
             input.addEventListener('input', syncCheckoutDataset);
             input.addEventListener('change', syncCheckoutDataset);
         });

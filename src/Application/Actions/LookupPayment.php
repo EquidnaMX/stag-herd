@@ -6,6 +6,8 @@ use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Domain\Payment;
 use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
+use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
+use Equidna\StagHerd\Support\PaymentEventDispatcher;
 use Equidna\StagHerd\Support\ProviderRegistry;
 
 final readonly class LookupPayment
@@ -17,59 +19,111 @@ final readonly class LookupPayment
         //
     }
 
-    public function handle(PaymentLookupData $request): Payment
+    public function handle(PaymentLookupData $lookup): Payment
     {
-        $payment = $this->resolveLocalPayment($request);
+        return match ($lookup->lookupType()) {
+            'payment_id' => $this->lookupByLocalPaymentId($lookup),
+            'provider_payment_id' => $this->lookupByProviderPaymentId($lookup),
+            'provider_order_id' => $this->lookupByProviderOrderId($lookup),
 
-        $provider = $this->providers->get($request->provider);
+            default => throw UnsupportedOperationException::forOperation(
+                'lookup',
+                "Unsupported lookup type [{$lookup->lookupType()}]."
+            ),
+        };
+    }
+
+    private function lookupByLocalPaymentId(PaymentLookupData $lookup): Payment
+    {
+        $payment = $this->payments->find($lookup->paymentId);
+
+        if (! $payment) {
+            throw PaymentNotFoundException::withId($lookup->paymentId);
+        }
+
+        $providerPaymentId = $payment->references?->providerPaymentId;
+
+        if (! $providerPaymentId) {
+            return $payment;
+        }
+
+        $provider = $this->providers->get($payment->provider);
 
         $result = $provider->lookupPayment(
             new PaymentLookupData(
-                provider: $request->provider,
-                paymentId: $payment->id,
-                providerPaymentId: $payment->references?->providerPaymentId ?? $request->providerPaymentId,
-                externalReference: $payment->externalReference ?? $request->externalReference,
-                metadata: array_merge($payment->metadata, $request->metadata, [
-                    'method' => $payment->method,
-                ]),
+                provider: $payment->provider,
+                providerPaymentId: $providerPaymentId,
             )
         );
+
+        $updatedPayment = $this->payments->updateFromResult($payment, $result);
+
+        PaymentEventDispatcher::dispatchForPayment(
+            payment: $updatedPayment,
+            previousPayment: $payment,
+        );
+
+        return $updatedPayment;
+    }
+
+    private function lookupByProviderPaymentId(PaymentLookupData $lookup): Payment
+    {
+        $provider = $this->providers->get($lookup->provider);
+
+        $result = $provider->lookupPayment($lookup);
+
+        $providerPaymentId = $result->references?->providerPaymentId
+            ?? $lookup->providerPaymentId;
+
+        if (! $providerPaymentId) {
+            throw PaymentNotFoundException::withProviderReference(
+                $lookup->provider,
+                $lookup->lookupValue(),
+            );
+        }
+
+        $payment = $this->payments->findByProviderPaymentId(
+            $lookup->provider,
+            $providerPaymentId,
+        );
+
+        if (! $payment) {
+            throw PaymentNotFoundException::withProviderReference(
+                $lookup->provider,
+                $providerPaymentId,
+            );
+        }
 
         return $this->payments->updateFromResult($payment, $result);
     }
 
-    private function resolveLocalPayment(PaymentLookupData $request): Payment
+    private function lookupByProviderOrderId(PaymentLookupData $lookup): Payment
     {
-        if ($request->paymentId) {
-            $payment = $this->payments->find($request->paymentId);
+        $provider = $this->providers->get($lookup->provider);
 
-            if ($payment) {
-                return $payment;
-            }
-        }
+        $result = $provider->lookupPayment($lookup);
 
-        if ($request->externalReference) {
-            $payment = $this->payments->findByExternalReference($request->externalReference);
+        $providerPaymentId = $result->references?->providerPaymentId;
 
-            if ($payment) {
-                return $payment;
-            }
-        }
-
-        if ($request->providerPaymentId) {
-            $payment = $this->payments->findByProviderReference(
-                $request->provider,
-                $request->providerPaymentId,
+        if (! $providerPaymentId) {
+            throw PaymentNotFoundException::withProviderReference(
+                $lookup->provider,
+                $lookup->providerOrderId,
             );
-
-            if ($payment) {
-                return $payment;
-            }
         }
 
-        throw PaymentNotFoundException::withProviderReference(
-            $request->provider,
-            $request->providerPaymentId ?? $request->externalReference ?? (string) $request->paymentId,
+        $payment = $this->payments->findByProviderPaymentId(
+            $lookup->provider,
+            $providerPaymentId,
         );
+
+        if (! $payment) {
+            throw PaymentNotFoundException::withProviderReference(
+                $lookup->provider,
+                $providerPaymentId,
+            );
+        }
+
+        return $this->payments->updateFromResult($payment, $result);
     }
 }
