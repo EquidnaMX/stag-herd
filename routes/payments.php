@@ -14,6 +14,12 @@ Route::middleware(config('stag-herd.ui.middleware', ['web']))
         Route::post('/brick/process', [PaymentDemoController::class, 'processBrick'])
             ->name('brick.process');
 
+        Route::post('/paypal/create', [PaymentDemoController::class, 'processPayPalCreate'])
+            ->name('paypal.create');
+
+        Route::post('/paypal/capture', [PaymentDemoController::class, 'processPayPalCapture'])
+            ->name('paypal.capture.json');
+
         Route::post('/provider/lookup', [PaymentDemoController::class, 'providerLookup'])
             ->name('provider.lookup');
 

@@ -258,21 +258,29 @@
         }
 
         .pill.APPROVED,
-        .pill.REFUNDED {
+        .pill.approved,
+        .pill.REFUNDED,
+        .pill.refunded {
             background: #dcfce7;
             color: #166534;
         }
 
         .pill.PENDING,
-        .pill.PROCESSING {
+        .pill.pending,
+        .pill.PROCESSING,
+        .pill.processing {
             background: #fef3c7;
             color: #92400e;
         }
 
         .pill.REJECTED,
+        .pill.rejected,
         .pill.FAILED,
+        .pill.failed,
         .pill.CANCELED,
-        .pill.CANCELLED {
+        .pill.canceled,
+        .pill.CANCELLED,
+        .pill.cancelled {
             background: #fee2e2;
             color: #991b1b;
         }
@@ -340,8 +348,8 @@
             <h1>Stag Herd Payments Demo</h1>
 
             <p class="muted">
-                Panel simple para probar creación, lookup directo al provider, sync provider, cancelación, reembolso y
-                pagos locales.
+                Panel simple para probar creación, checkout, lookup directo al provider, sync provider, cancelación,
+                reembolso y pagos locales.
             </p>
         </header>
 
@@ -350,7 +358,7 @@
                 <strong>Acción ejecutada:</strong> {{ $result['action'] ?? 'unknown' }}
 
                 @if (!empty($result['checkout_url']))
-                    <p>Mercado Pago regresó una URL de checkout:</p>
+                    <p>El provider regresó una URL de checkout:</p>
 
                     <a class="button provider" href="{{ $result['checkout_url'] }}" target="_blank" rel="noopener">
                         Abrir checkout
@@ -397,8 +405,8 @@
 
                     <p class="muted">
                         Para <strong>cash</strong> usa el formulario simple.
-                        Para <strong>Mercado Pago card</strong>, selecciona provider mercado_pago y usa el Brick de
-                        abajo.
+                        Para <strong>Mercado Pago</strong> usa el Brick.
+                        Para <strong>PayPal</strong> usa el botón de PayPal.
                     </p>
 
                     <form method="POST" action="{{ route('stag-herd.payments.store') }}">
@@ -410,6 +418,7 @@
                                 <select id="provider" name="provider">
                                     <option value="cash">cash</option>
                                     <option value="mercado_pago">mercado_pago</option>
+                                    <option value="paypal">paypal</option>
                                 </select>
                             </div>
 
@@ -525,6 +534,52 @@
                             </div>
                         </div>
 
+                        <div class="paypal-fields hidden">
+                            <div class="note mt">
+                                Para PayPal puedes crear una order desde este formulario y luego aprobar/capturar con
+                                el botón embebido de abajo.
+                            </div>
+
+                            <div class="two">
+                                <div>
+                                    <label for="paypal_brand_name">PayPal brand name</label>
+                                    <input id="paypal_brand_name" name="paypal_brand_name"
+                                        value="{{ old('paypal_brand_name', config('app.name')) }}">
+                                </div>
+
+                                <div>
+                                    <label for="paypal_invoice_id">PayPal invoice id</label>
+                                    <input id="paypal_invoice_id" name="paypal_invoice_id" placeholder="Opcional">
+                                </div>
+                            </div>
+
+                            <div class="two">
+                                <div>
+                                    <label for="paypal_landing_page">Landing page</label>
+                                    <select id="paypal_landing_page" name="paypal_landing_page">
+                                        <option value="LOGIN">LOGIN</option>
+                                        <option value="BILLING">BILLING</option>
+                                        <option value="NO_PREFERENCE">NO_PREFERENCE</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="paypal_user_action">User action</label>
+                                    <select id="paypal_user_action" name="paypal_user_action">
+                                        <option value="PAY_NOW">PAY_NOW</option>
+                                        <option value="CONTINUE">CONTINUE</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <label for="paypal_shipping_preference">Shipping preference</label>
+                            <select id="paypal_shipping_preference" name="paypal_shipping_preference">
+                                <option value="NO_SHIPPING">NO_SHIPPING</option>
+                                <option value="GET_FROM_FILE">GET_FROM_FILE</option>
+                                <option value="SET_PROVIDED_ADDRESS">SET_PROVIDED_ADDRESS</option>
+                            </select>
+                        </div>
+
                         <button class="mt" type="submit">Crear pago</button>
                     </form>
                 </section>
@@ -542,8 +597,7 @@
                         <br>
                         En el campo de arriba llamado <strong>Metadata: id_order</strong>.
                         El Brick lee todos los inputs que tengan <code>data-stag-herd-metadata</code> y los manda dentro
-                        de
-                        <code>metadata</code>.
+                        de <code>metadata</code>.
                     </div>
 
                     <div data-stag-herd-checkout="mercado-pago-card"
@@ -554,27 +608,55 @@
                         data-csrf-token="{{ csrf_token() }}"></div>
                 </section>
 
+                <section class="card paypal-fields hidden">
+                    <h2>Checkout PayPal</h2>
+
+                    <p class="muted">
+                        Este bloque renderiza el botón oficial de PayPal. Crea la order en el backend, abre el popup de
+                        PayPal y después captura la order automáticamente.
+                    </p>
+
+                    <div class="note mb">
+                        <strong>Importante para Fresh:</strong>
+                        <br>
+                        Antes de pagar, llena <strong>Metadata: id_order</strong> con una orden real. Tu
+                        <code>FreshPaymentRepository</code> la necesita para insertar en <code>Payments</code>.
+                    </div>
+
+                    <div data-stag-herd-checkout="paypal"
+                        data-client-id="{{ config('stag-herd.providers.paypal.credentials.client_id') }}"
+                        data-amount="120.00" data-currency="MXN" data-external-reference=""
+                        data-payer-email="cliente@test.com" data-description="Pago desde PayPal Checkout"
+                        data-create-order-url="{{ route('stag-herd.payments.paypal.create') }}"
+                        data-capture-order-url="{{ route('stag-herd.payments.paypal.capture.json') }}"
+                        data-csrf-token="{{ csrf_token() }}"></div>
+                </section>
+
                 <section class="card">
                     <h2>Lookup directo en provider</h2>
 
                     <p class="muted">
-                        Consulta Mercado Pago directamente. No guarda ni actualiza tu base local.
+                        Consulta Mercado Pago o PayPal directamente. No guarda ni actualiza tu base local.
                     </p>
 
                     <form method="POST" action="{{ route('stag-herd.payments.provider.lookup') }}">
                         @csrf
 
-                        <input type="hidden" name="provider" value="mercado_pago">
+                        <label for="provider_lookup_provider">Provider</label>
+                        <select id="provider_lookup_provider" name="provider">
+                            <option value="mercado_pago">mercado_pago</option>
+                            <option value="paypal">paypal</option>
+                        </select>
 
                         <label for="provider_lookup_type">Buscar por</label>
                         <select id="provider_lookup_type" name="search_type">
-                            <option value="provider_payment_id">provider_payment_id</option>
-                            <option value="provider_order_id">provider_order_id</option>
+                            <option value="provider_payment_id">provider_payment_id / capture_id</option>
+                            <option value="provider_order_id">provider_order_id / order_id</option>
                         </select>
 
                         <label for="provider_lookup_value">Valor</label>
                         <input id="provider_lookup_value" name="search_value"
-                            placeholder="Ej. payment id u order id visible del provider" required>
+                            placeholder="Ej. payment id, capture id u order id visible del provider" required>
 
                         <button class="provider mt" type="submit">
                             Lookup provider
@@ -586,23 +668,28 @@
                     <h2>Sync desde provider</h2>
 
                     <p class="muted">
-                        Consulta Mercado Pago. Si el pago existe localmente, lo actualiza. Si no existe, lo crea.
+                        Consulta Mercado Pago o PayPal. Si el pago existe localmente, lo actualiza. Si no existe, lo
+                        crea usando la metadata fallback.
                     </p>
 
                     <form method="POST" action="{{ route('stag-herd.payments.provider.sync') }}">
                         @csrf
 
-                        <input type="hidden" name="provider" value="mercado_pago">
+                        <label for="sync_provider">Provider</label>
+                        <select id="sync_provider" name="provider">
+                            <option value="mercado_pago">mercado_pago</option>
+                            <option value="paypal">paypal</option>
+                        </select>
 
                         <label for="sync_search_type">Buscar en provider por</label>
                         <select id="sync_search_type" name="search_type">
-                            <option value="provider_payment_id">provider_payment_id</option>
-                            <option value="provider_order_id">provider_order_id</option>
+                            <option value="provider_payment_id">provider_payment_id / capture_id</option>
+                            <option value="provider_order_id">provider_order_id / order_id</option>
                         </select>
 
                         <label for="sync_search_value">Valor</label>
                         <input id="sync_search_value" name="search_value"
-                            placeholder="Ej. payment id u order id visible del provider" required>
+                            placeholder="Ej. payment id, capture id u order id visible del provider" required>
 
                         <div class="two">
                             <div>
@@ -610,6 +697,7 @@
                                 <select id="sync_method" name="method">
                                     <option value="card">card</option>
                                     <option value="wallet">wallet</option>
+                                    <option value="paypal">paypal</option>
                                 </select>
                             </div>
 
@@ -658,7 +746,7 @@
                         </div>
 
                         <label for="sync_description">Descripción</label>
-                        <input id="sync_description" name="description" value="Pago sincronizado desde Mercado Pago">
+                        <input id="sync_description" name="description" value="Pago sincronizado desde provider">
 
                         <button class="success mt" type="submit">
                             Sync provider
@@ -672,7 +760,7 @@
                     <h2>Pagos locales</h2>
 
                     <p class="muted">
-                        Esta tabla muestra tu persistencia local. El botón Sync/Actualizar consulta provider y actualiza
+                        Esta tabla muestra tu persistencia local. El botón Actualizar consulta provider y actualiza
                         local si aplica.
                     </p>
 
@@ -722,6 +810,8 @@
                                             $externalReference = data_get($payment, 'external_reference');
                                             $providerPaymentId = data_get($payment, 'provider_payment_id');
                                             $providerOrderId = data_get($payment, 'provider_order_id');
+                                            $checkoutUrl =
+                                                data_get($payment, 'checkout_url') ?? data_get($payment, 'link');
                                         @endphp
 
                                         <tr>
@@ -759,6 +849,14 @@
                                                         {{ $metadata['mercado_pago_refund_status'] }}
                                                     </span>
                                                 @endif
+
+                                                @if (!empty($metadata['paypal_refund_status']))
+                                                    <br>
+                                                    <span class="muted">
+                                                        paypal_refund_status:
+                                                        {{ $metadata['paypal_refund_status'] }}
+                                                    </span>
+                                                @endif
                                             </td>
 
                                             <td>
@@ -777,6 +875,26 @@
                                                         href="{{ route('stag-herd.payments.show', $paymentId) }}">
                                                         Ver local
                                                     </a>
+
+                                                    @if (!empty($checkoutUrl))
+                                                        <a class="button provider" href="{{ $checkoutUrl }}"
+                                                            target="_blank" rel="noopener">
+                                                            Abrir checkout
+                                                        </a>
+                                                    @endif
+
+                                                    @if (
+                                                        $provider === 'paypal' &&
+                                                            !empty($providerOrderId) &&
+                                                            !in_array(strtoupper((string) $status), ['APPROVED', 'REFUNDED'], true))
+                                                        <form method="POST"
+                                                            action="{{ route('stag-herd.payments.paypal.capture', $paymentId) }}">
+                                                            @csrf
+                                                            <button class="provider" type="submit">
+                                                                Capture PayPal
+                                                            </button>
+                                                        </form>
+                                                    @endif
 
                                                     <form method="POST"
                                                         action="{{ route('stag-herd.payments.sync', $paymentId) }}">
@@ -820,7 +938,7 @@
                         <h2>Detalle local del pago</h2>
 
                         <p class="muted">
-                            Esto no consulta Mercado Pago. Solo muestra lo guardado localmente.
+                            Esto no consulta provider. Solo muestra lo guardado localmente.
                         </p>
 
                         <div class="table-wrap">
@@ -838,6 +956,7 @@
 
         const cashFields = document.querySelectorAll('.cash-fields');
         const mercadoPagoFields = document.querySelectorAll('.mercado-pago-fields');
+        const paypalFields = document.querySelectorAll('.paypal-fields');
 
         const amountInput = document.getElementById('amount');
         const currencyInput = document.getElementById('currency');
@@ -845,13 +964,14 @@
         const payerEmailInput = document.getElementById('payer_email');
         const descriptionInput = document.getElementById('description');
 
-        const checkoutRoot = document.querySelector("[data-stag-herd-checkout='mercado-pago-card']");
+        const mercadoPagoCheckoutRoot = document.querySelector("[data-stag-herd-checkout='mercado-pago-card']");
+        const paypalCheckoutRoot = document.querySelector("[data-stag-herd-checkout='paypal']");
 
         const methodsByProvider = {
             cash: [{
                 value: 'cash',
                 label: 'cash'
-            }, ],
+            }],
             mercado_pago: [{
                     value: 'card',
                     label: 'card / Payment Brick'
@@ -861,6 +981,10 @@
                     label: 'wallet / account_money'
                 },
             ],
+            paypal: [{
+                value: 'paypal',
+                label: 'paypal / PayPal Buttons'
+            }],
         };
 
         function fillMethods(provider) {
@@ -889,19 +1013,35 @@
                 element.classList.toggle('hidden', provider !== 'mercado_pago');
             });
 
+            paypalFields.forEach((element) => {
+                element.classList.toggle('hidden', provider !== 'paypal');
+            });
+
             syncCheckoutDataset();
         }
 
         function syncCheckoutDataset() {
-            if (!checkoutRoot) {
-                return;
+            const amount = amountInput?.value || '120.00';
+            const currency = currencyInput?.value || 'MXN';
+            const externalReference = externalReferenceInput?.value || '';
+            const payerEmail = payerEmailInput?.value || 'cliente@test.com';
+            const description = descriptionInput?.value || 'Pago desde Stag Herd UI';
+
+            if (mercadoPagoCheckoutRoot) {
+                mercadoPagoCheckoutRoot.dataset.amount = amount;
+                mercadoPagoCheckoutRoot.dataset.currency = currency;
+                mercadoPagoCheckoutRoot.dataset.externalReference = externalReference;
+                mercadoPagoCheckoutRoot.dataset.payerEmail = payerEmail;
+                mercadoPagoCheckoutRoot.dataset.description = description || 'Pago desde Mercado Pago Card Brick';
             }
 
-            checkoutRoot.dataset.amount = amountInput?.value || '120.00';
-            checkoutRoot.dataset.currency = currencyInput?.value || 'MXN';
-            checkoutRoot.dataset.externalReference = externalReferenceInput?.value || '';
-            checkoutRoot.dataset.payerEmail = payerEmailInput?.value || 'cliente@test.com';
-            checkoutRoot.dataset.description = descriptionInput?.value || 'Pago desde Mercado Pago Card Brick';
+            if (paypalCheckoutRoot) {
+                paypalCheckoutRoot.dataset.amount = amount;
+                paypalCheckoutRoot.dataset.currency = currency;
+                paypalCheckoutRoot.dataset.externalReference = externalReference;
+                paypalCheckoutRoot.dataset.payerEmail = payerEmail;
+                paypalCheckoutRoot.dataset.description = description || 'Pago desde PayPal Checkout';
+            }
         }
 
         providerSelect.addEventListener('change', () => {

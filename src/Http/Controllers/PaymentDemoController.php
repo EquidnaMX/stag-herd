@@ -3,13 +3,17 @@
 namespace Equidna\StagHerd\Http\Controllers;
 
 use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
+use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Data\PaymentCancellationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\RefundRequestData;
 use Equidna\StagHerd\Facades\StagHerd;
+use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalProvider;
 use Equidna\StagHerd\Support\MoneyFormatter;
+use Equidna\StagHerd\Support\PaymentEventDispatcher;
+use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -53,12 +57,12 @@ class PaymentDemoController extends Controller
             'currency' => ['required', 'string', 'size:3'],
 
             /*
-         * Metadata genérica.
-         *
-         * Aquí puede venir cualquier cosa que el host necesite:
-         * - Fresh: metadata[id_order], metadata[id_client]
-         * - Otro host: metadata[invoice_id], metadata[booking_id], etc.
-         */
+             * Metadata genérica.
+             *
+             * Aquí puede venir cualquier cosa que el host necesite:
+             * - Fresh: metadata[id_order], metadata[id_client]
+             * - Otro host: metadata[invoice_id], metadata[booking_id], etc.
+             */
             'metadata' => ['nullable', 'array'],
 
             'external_reference' => ['nullable', 'string', 'max:255'],
@@ -68,12 +72,27 @@ class PaymentDemoController extends Controller
             'return_url' => ['nullable', 'url', 'max:500'],
             'cancel_url' => ['nullable', 'url', 'max:500'],
 
+            /*
+             * Cash.
+             */
             'cash_status' => ['nullable', 'string', 'max:255'],
 
+            /*
+             * Mercado Pago.
+             */
             'mercado_pago_token' => ['nullable', 'string', 'max:500'],
             'mercado_pago_payment_method_id' => ['nullable', 'string', 'max:255'],
             'mercado_pago_issuer_id' => ['nullable', 'string', 'max:255'],
             'mercado_pago_installments' => ['nullable', 'integer', 'min:1'],
+
+            /*
+             * PayPal.
+             */
+            'paypal_brand_name' => ['nullable', 'string', 'max:127'],
+            'paypal_landing_page' => ['nullable', 'string', 'max:50'],
+            'paypal_user_action' => ['nullable', 'string', 'max:50'],
+            'paypal_shipping_preference' => ['nullable', 'string', 'max:50'],
+            'paypal_invoice_id' => ['nullable', 'string', 'max:127'],
         ]);
 
         $provider = strtolower($data['provider']);
@@ -89,10 +108,10 @@ class PaymentDemoController extends Controller
         $metadata = $this->cleanMetadata($data['metadata'] ?? []);
 
         /*
-     * Metadata del propio demo.
-     *
-     * Esto no acopla el paquete a Fresh. Solo marca de dónde salió la prueba.
-     */
+         * Metadata del propio demo.
+         *
+         * Esto no acopla el paquete a Fresh. Solo marca de dónde salió la prueba.
+         */
         $metadata = array_replace_recursive($metadata, [
             'source' => 'stag-herd-default-ui',
         ]);
@@ -116,9 +135,29 @@ class PaymentDemoController extends Controller
             ], fn($value) => $value !== null && $value !== '');
         }
 
+        if ($provider === 'paypal') {
+            $metadata['paypal'] = array_filter([
+                'intent' => 'CAPTURE',
+                'brand_name' => $data['paypal_brand_name'] ?? config('app.name'),
+                'landing_page' => $data['paypal_landing_page'] ?? 'LOGIN',
+                'user_action' => $data['paypal_user_action'] ?? 'PAY_NOW',
+                'shipping_preference' => $data['paypal_shipping_preference'] ?? 'NO_SHIPPING',
+                'invoice_id' => $data['paypal_invoice_id'] ?? null,
+            ], fn($value) => $value !== null && $value !== '');
+        }
+
         $resolvedExternalReference = ! empty($externalReference)
             ? $externalReference
-            : 'ORDER-DEMO-' . now()->format('YmdHis');
+            : strtoupper($provider) . '-DEMO-' . now()->format('YmdHis');
+
+        /*
+         * Para PayPal sí conviene tener return_url y cancel_url.
+         * Si no los llenas desde la UI, usamos la misma demo.
+         */
+        if ($provider === 'paypal') {
+            $returnUrl = $returnUrl ?: route('stag-herd.payments.index');
+            $cancelUrl = $cancelUrl ?: route('stag-herd.payments.index');
+        }
 
         try {
             $payment = StagHerd::createPayment(new PaymentRequestData(
@@ -189,14 +228,6 @@ class PaymentDemoController extends Controller
                 throw new \RuntimeException("No se encontró el pago {$payment}.");
             }
 
-            /*
-             * Aquí solo mandamos paymentId.
-             *
-             * LookupPayment se encarga de:
-             * - buscar localmente el pago
-             * - si tiene provider_payment_id, consultar al provider
-             * - si no tiene provider_payment_id, devolver el pago local
-             */
             $updated = StagHerd::lookupPayment(new PaymentLookupData(
                 provider: $model->provider,
                 paymentId: (string) $model->id,
@@ -217,10 +248,6 @@ class PaymentDemoController extends Controller
                 throw new \RuntimeException("No se encontró el pago {$payment}.");
             }
 
-            /*
-             * Igual que lookup: para acciones desde la UI local basta con paymentId.
-             * La acción de cancel internamente puede resolver provider_payment_id.
-             */
             $updated = StagHerd::cancelPayment(new PaymentCancellationData(
                 provider: $model->provider,
                 paymentId: (string) $model->id,
@@ -244,9 +271,6 @@ class PaymentDemoController extends Controller
 
             $amount = $request->input('amount');
 
-            /*
-             * Igual: desde la UI local usamos paymentId.
-             */
             $updated = StagHerd::refundPayment(new RefundRequestData(
                 provider: $model->provider,
                 paymentId: (string) $model->id,
@@ -271,15 +295,6 @@ class PaymentDemoController extends Controller
                 throw new \RuntimeException("No se encontró el pago {$payment}.");
             }
 
-            /*
-             * Sync local: solo mandamos paymentId.
-             *
-             * SyncPayment:
-             * - busca el pago local
-             * - si tiene provider_payment_id, consulta provider
-             * - actualiza el pago local
-             * - si no tiene provider_payment_id, devuelve el pago local
-             */
             $lookup = new PaymentLookupData(
                 provider: $model->provider,
                 paymentId: (string) $model->id,
@@ -307,6 +322,223 @@ class PaymentDemoController extends Controller
         }
     }
 
+    public function capturePayPal(int|string $payment): RedirectResponse
+    {
+        try {
+            $model = $this->payments->findForDisplay($payment);
+
+            if (! $model) {
+                throw new \RuntimeException("No se encontró el pago {$payment}.");
+            }
+
+            if (($model->provider ?? null) !== 'paypal') {
+                throw new \RuntimeException('Este pago no pertenece al provider paypal.');
+            }
+
+            $providerOrderId = $model->provider_order_id
+                ?? data_get($model->raw_payload ?? [], 'id')
+                ?? data_get($model->metadata ?? [], 'paypal_order_id')
+                ?? data_get($model->metadata ?? [], 'paypal.paypal_order_id');
+
+            if (! $providerOrderId) {
+                throw new \RuntimeException(
+                    'No se encontró provider_order_id para capturar la orden de PayPal.'
+                );
+            }
+
+            $provider = app(ProviderRegistry::class)->get('paypal');
+
+            if (! $provider instanceof PayPalProvider) {
+                throw new \RuntimeException('El provider paypal no está registrado correctamente.');
+            }
+
+            $result = $provider->captureOrder(
+                providerOrderId: (string) $providerOrderId,
+                method: $model->method ?? 'paypal',
+                metadata: [
+                    'payment_id' => (string) $model->id,
+                    'idempotency_key' => 'stag-herd-paypal-capture-' . $providerOrderId,
+                ],
+            );
+
+            $localPayment = $this->payments->find((string) $model->id);
+
+            if (! $localPayment) {
+                throw new \RuntimeException("No se encontró el pago local {$payment}.");
+            }
+
+            $updated = $this->payments->updateFromResult(
+                payment: $localPayment,
+                result: $result,
+            );
+
+            /*
+             * Como aquí capturamos directo desde la demo y no desde una action,
+             * disparamos el evento manualmente para que tu listener guarde en Events.
+             */
+            PaymentEventDispatcher::dispatchForPayment(
+                payment: $updated,
+                previousPayment: $localPayment,
+            );
+
+            return $this->redirectWithResult('paypal_capture', $updated->toArray());
+        } catch (Throwable $exception) {
+            return $this->redirectWithError($exception);
+        }
+    }
+
+    public function processPayPalCreate(Request $request): JsonResponse
+    {
+        try {
+            $data = $request->validate([
+                'provider' => ['nullable', 'string'],
+                'method' => ['nullable', 'string'],
+
+                'amount' => ['required', 'numeric', 'min:0.01'],
+                'currency' => ['required', 'string', 'size:3'],
+                'external_reference' => ['nullable', 'string', 'max:255'],
+                'payer_email' => ['nullable', 'email', 'max:255'],
+                'description' => ['nullable', 'string', 'max:255'],
+
+                'metadata' => ['nullable', 'array'],
+
+                'paypal' => ['nullable', 'array'],
+                'paypal.intent' => ['nullable', 'string'],
+                'paypal.brand_name' => ['nullable', 'string'],
+                'paypal.landing_page' => ['nullable', 'string'],
+                'paypal.user_action' => ['nullable', 'string'],
+                'paypal.shipping_preference' => ['nullable', 'string'],
+                'paypal.invoice_id' => ['nullable', 'string'],
+            ]);
+
+            $externalReference = $data['external_reference']
+                ?? 'PAYPAL-' . now()->format('YmdHis');
+
+            $metadata = $this->cleanMetadata($data['metadata'] ?? []);
+
+            $metadata = array_replace_recursive($metadata, [
+                'source' => 'stag-herd-paypal-buttons-ui',
+                'external_reference' => $externalReference,
+
+                'paypal' => array_filter([
+                    'intent' => data_get($data, 'paypal.intent', 'CAPTURE'),
+                    'brand_name' => data_get($data, 'paypal.brand_name', config('app.name')),
+                    'landing_page' => data_get($data, 'paypal.landing_page', 'LOGIN'),
+                    'user_action' => data_get($data, 'paypal.user_action', 'PAY_NOW'),
+                    'shipping_preference' => data_get($data, 'paypal.shipping_preference', 'NO_SHIPPING'),
+                    'invoice_id' => data_get($data, 'paypal.invoice_id'),
+                ], fn($value) => $value !== null && $value !== ''),
+            ]);
+
+            $metadata = $this->cleanMetadata($metadata);
+
+            $payment = StagHerd::createPayment(new PaymentRequestData(
+                amount: MoneyFormatter::fromDecimal($data['amount']),
+                currency: strtoupper($data['currency']),
+                method: strtolower($data['method'] ?? 'paypal'),
+                provider: strtolower($data['provider'] ?? 'paypal'),
+                externalReference: $externalReference,
+                payerReference: null,
+                payerEmail: $data['payer_email'] ?? 'cliente@test.com',
+                description: $data['description'] ?? 'Pago desde PayPal Buttons',
+                returnUrl: route('stag-herd.payments.index'),
+                cancelUrl: route('stag-herd.payments.index'),
+                metadata: $metadata,
+            ));
+
+            $providerOrderId = $payment->references?->providerOrderId;
+
+            if (! $providerOrderId) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'PayPal no regresó provider_order_id.',
+                    'payment' => $payment->toArray(),
+                ], 422);
+            }
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Orden PayPal creada correctamente.',
+                'payment_id' => $payment->id,
+                'provider_order_id' => $providerOrderId,
+                'payment' => $payment->toArray(),
+            ]);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
+            ], 422);
+        }
+    }
+
+    public function processPayPalCapture(Request $request): JsonResponse
+    {
+        try {
+            $data = $request->validate([
+                'payment_id' => ['required'],
+                'provider_order_id' => ['required', 'string', 'max:255'],
+            ]);
+
+            $paymentId = $data['payment_id'];
+            $providerOrderId = $data['provider_order_id'];
+
+            $localPayment = $this->payments->find($paymentId);
+
+            if (! $localPayment) {
+                throw new \RuntimeException(
+                    "No se encontró pago local con id [{$paymentId}]."
+                );
+            }
+
+            if ($localPayment->provider !== 'paypal') {
+                throw new \RuntimeException(
+                    "El pago local [{$paymentId}] no pertenece al provider paypal."
+                );
+            }
+
+            $provider = app(ProviderRegistry::class)->get('paypal');
+
+            if (! $provider instanceof PayPalProvider) {
+                throw new \RuntimeException('El provider paypal no está registrado correctamente.');
+            }
+
+            $result = $provider->captureOrder(
+                providerOrderId: $providerOrderId,
+                method: $localPayment->method ?? 'paypal',
+                metadata: [
+                    'payment_id' => (string) $paymentId,
+                    'idempotency_key' => 'stag-herd-paypal-capture-' . $providerOrderId,
+                ],
+            );
+
+            $updated = $this->payments->updateFromResult(
+                payment: $localPayment,
+                result: $result,
+            );
+
+            PaymentEventDispatcher::dispatchForPayment(
+                payment: $updated,
+                previousPayment: $localPayment,
+            );
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Orden PayPal capturada correctamente.',
+                'payment' => $updated->toArray(),
+            ]);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
+            ], 422);
+        }
+    }
     public function processBrick(Request $request): JsonResponse
     {
         try {
@@ -321,16 +553,14 @@ class PaymentDemoController extends Controller
                 'description' => ['nullable', 'string', 'max:255'],
 
                 /*
-             * Metadata genérica.
-             *
-             * Aquí Fresh puede mandar:
-             * metadata: {
-             *   id_order: 589,
-             *   id_client: "CLIENTE"
-             * }
-             *
-             * Pero el paquete no sabe ni le importa qué significan esos campos.
-             */
+                 * Metadata genérica.
+                 *
+                 * Aquí Fresh puede mandar:
+                 * metadata: {
+                 *   id_order: 589,
+                 *   id_client: "CLIENTE"
+                 * }
+                 */
                 'metadata' => ['nullable', 'array'],
 
                 'mercado_pago' => ['nullable', 'array'],
@@ -391,14 +621,6 @@ class PaymentDemoController extends Controller
             $externalReference = $data['external_reference']
                 ?? 'BRICK-' . now()->format('YmdHis');
 
-            /*
-         * Metadata genérica recibida desde el frontend.
-         *
-         * FreshPaymentRepository podrá leer:
-         * $request->metadata['id_order']
-         *
-         * Pero stag-herd no tiene columna id_order ni lo trata como campo especial.
-         */
             $metadata = $this->cleanMetadata($data['metadata'] ?? []);
 
             $metadata = array_replace_recursive($metadata, [
@@ -464,28 +686,41 @@ class PaymentDemoController extends Controller
         $searchValue = trim($data['search_value']);
 
         try {
-            if ($provider !== 'mercado_pago') {
-                throw new \InvalidArgumentException(
-                    'Por ahora la búsqueda directa al provider solo está implementada para mercado_pago.'
-                );
-            }
+            $response = match ($provider) {
+                'mercado_pago' => match ($searchType) {
+                    'provider_payment_id' => app(MercadoPagoGateway::class)
+                        ->getPayment($searchValue),
 
-            $gateway = app(MercadoPagoGateway::class);
+                    'provider_order_id' => app(MercadoPagoGateway::class)
+                        ->searchPayments([
+                            'order.id' => $searchValue,
+                        ]),
 
-            $response = match ($searchType) {
-                'provider_payment_id' => $gateway->getPayment($searchValue),
+                    default => throw new \InvalidArgumentException(
+                        "Tipo de búsqueda no soportado: {$searchType}"
+                    ),
+                },
 
-                /*
-                 * Aquí ya no usamos external_reference.
-                 * Si el usuario te manda el order id que ve en Mercado Pago,
-                 * buscamos por order.id.
-                 */
-                'provider_order_id' => $gateway->searchPayments([
-                    'order.id' => $searchValue,
-                ]),
+                'paypal' => match ($searchType) {
+                    /*
+                     * En PayPal provider_payment_id = capture_id.
+                     */
+                    'provider_payment_id' => app(PayPalGateway::class)
+                        ->getCapture($searchValue),
+
+                    /*
+                     * En PayPal provider_order_id = order_id.
+                     */
+                    'provider_order_id' => app(PayPalGateway::class)
+                        ->getOrder($searchValue),
+
+                    default => throw new \InvalidArgumentException(
+                        "Tipo de búsqueda no soportado: {$searchType}"
+                    ),
+                },
 
                 default => throw new \InvalidArgumentException(
-                    "Tipo de búsqueda no soportado: {$searchType}"
+                    "Provider no soportado para búsqueda directa: {$provider}"
                 ),
             };
 
@@ -515,8 +750,8 @@ class PaymentDemoController extends Controller
             'currency' => ['required', 'string', 'size:3'],
 
             /*
-         * Metadata genérica para cuando el sync tenga que crear el pago local.
-         */
+             * Metadata genérica para cuando el sync tenga que crear el pago local.
+             */
             'metadata' => ['nullable', 'array'],
 
             'external_reference' => ['nullable', 'string', 'max:255'],
@@ -534,13 +769,6 @@ class PaymentDemoController extends Controller
             : null;
 
         try {
-            /*
-         * Aquí solo permitimos:
-         * - provider_payment_id
-         * - provider_order_id
-         *
-         * Nada de external_reference como búsqueda directa al provider.
-         */
             $lookup = new PaymentLookupData(
                 provider: $provider,
                 providerPaymentId: $searchType === 'provider_payment_id' ? $searchValue : null,
@@ -609,16 +837,67 @@ class PaymentDemoController extends Controller
     {
         $payload = $payment->raw_payload ?? [];
 
-        return data_get($payload, 'point_of_interaction.transaction_data.ticket_url')
+        /*
+         * Mercado Pago.
+         */
+        $mercadoPagoUrl = data_get($payload, 'point_of_interaction.transaction_data.ticket_url')
             ?? data_get($payload, 'transaction_details.external_resource_url')
             ?? data_get($payload, 'init_point')
-            ?? data_get($payload, 'sandbox_init_point')
-            ?? ($payment->link ?? null);
+            ?? data_get($payload, 'sandbox_init_point');
+
+        if ($mercadoPagoUrl) {
+            return $mercadoPagoUrl;
+        }
+
+        /*
+         * PayPal.
+         *
+         * PayPal regresa links:
+         * - self
+         * - approve
+         * - update
+         * - capture
+         */
+        $paypalApproveUrl = $this->resolvePaypalLink($payload, 'approve');
+
+        if ($paypalApproveUrl) {
+            return $paypalApproveUrl;
+        }
+
+        /*
+         * next_action del paquete.
+         */
+        $nextActionUrl = data_get($payment->next_action ?? [], 'url');
+
+        if ($nextActionUrl) {
+            return $nextActionUrl;
+        }
+
+        return $payment->link ?? null;
+    }
+
+    private function resolvePaypalLink(array $payload, string $rel): ?string
+    {
+        $links = data_get($payload, 'links', []);
+
+        if (! is_array($links)) {
+            return null;
+        }
+
+        foreach ($links as $link) {
+            if (($link['rel'] ?? null) === $rel && ! empty($link['href'])) {
+                return (string) $link['href'];
+            }
+        }
+
+        return null;
     }
 
     private function resolveExternalReference(object $payment): ?string
     {
-        return data_get($payment->metadata ?? [], 'external_reference');
+        return data_get($payment->metadata ?? [], 'external_reference')
+            ?? data_get($payment->raw_payload ?? [], 'external_reference')
+            ?? data_get($payment->raw_payload ?? [], 'purchase_units.0.reference_id');
     }
 
     private function cleanMetadata(array $metadata): array

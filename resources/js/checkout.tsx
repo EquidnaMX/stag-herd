@@ -1,12 +1,13 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { MercadoPagoCardCheckout } from "./components/MercadoPagoCardCheckout";
+import { PayPalCheckout } from "./components/PayPalCheckout";
 
-const elements = document.querySelectorAll<HTMLElement>(
+const mercadoPagoElements = document.querySelectorAll<HTMLElement>(
   "[data-stag-herd-checkout='mercado-pago-card']",
 );
 
-elements.forEach((element) => {
+mercadoPagoElements.forEach((element) => {
   createRoot(element).render(
     <MercadoPagoCardCheckout
       publicKey={element.dataset.publicKey ?? ""}
@@ -19,6 +20,26 @@ elements.forEach((element) => {
       description={
         element.dataset.description ?? "Pago desde Mercado Pago Card Brick"
       }
+    />,
+  );
+});
+
+const paypalElements = document.querySelectorAll<HTMLElement>(
+  "[data-stag-herd-checkout='paypal']",
+);
+
+paypalElements.forEach((element) => {
+  createRoot(element).render(
+    <PayPalCheckout
+      clientId={element.dataset.clientId ?? ""}
+      amount={Number(element.dataset.amount ?? 0)}
+      currency={element.dataset.currency ?? "MXN"}
+      externalReference={element.dataset.externalReference ?? ""}
+      payerEmail={element.dataset.payerEmail ?? "cliente@test.com"}
+      description={element.dataset.description ?? "Pago desde PayPal Checkout"}
+      createOrderUrl={element.dataset.createOrderUrl ?? ""}
+      captureOrderUrl={element.dataset.captureOrderUrl ?? ""}
+      csrfToken={element.dataset.csrfToken ?? ""}
     />,
   );
 });
