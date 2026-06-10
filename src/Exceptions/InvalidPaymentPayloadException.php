@@ -61,6 +61,71 @@ class InvalidPaymentPayloadException extends UnprocessableEntityException
 
     public static function invalidField(string $field, string $message): self
     {
-        return new self("Invalid field [{$field}]: {$message}");
+        return new self(
+            message: "Invalid field [{$field}]: {$message}",
+            errors: [
+                'field' => $field,
+            ],
+        );
+    }
+
+    public static function amountMissingFromProvider(
+        string $provider,
+        ?string $reference = null,
+    ): self {
+        return new self(
+            message: sprintf(
+                'Provider [%s] did not return a payment amount. The payment result cannot be persisted safely.',
+                $provider,
+            ),
+            errors: [
+                'provider' => $provider,
+                'reference' => $reference,
+            ],
+        );
+    }
+
+    public static function amountMismatch(
+        int $expectedAmount,
+        int $providerAmount,
+        string $provider,
+        ?string $reference = null,
+    ): self {
+        return new self(
+            message: sprintf(
+                'Payment amount mismatch for provider [%s]. Expected [%d], provider returned [%d].',
+                $provider,
+                $expectedAmount,
+                $providerAmount,
+            ),
+            errors: [
+                'provider' => $provider,
+                'reference' => $reference,
+                'expected_amount' => $expectedAmount,
+                'provider_amount' => $providerAmount,
+            ],
+        );
+    }
+
+    public static function currencyMismatch(
+        string $expectedCurrency,
+        string $providerCurrency,
+        string $provider,
+        ?string $reference = null,
+    ): self {
+        return new self(
+            message: sprintf(
+                'Payment currency mismatch for provider [%s]. Expected [%s], provider returned [%s].',
+                $provider,
+                strtoupper($expectedCurrency),
+                strtoupper($providerCurrency),
+            ),
+            errors: [
+                'provider' => $provider,
+                'reference' => $reference,
+                'expected_currency' => strtoupper($expectedCurrency),
+                'provider_currency' => strtoupper($providerCurrency),
+            ],
+        );
     }
 }

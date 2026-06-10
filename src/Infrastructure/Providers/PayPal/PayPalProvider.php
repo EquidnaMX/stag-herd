@@ -34,19 +34,19 @@ class PayPalProvider implements PaymentProvider
 
     public function createPayment(PaymentRequestData $request): PaymentResultData
     {
-        if ($request->providerOrderId) {
-            return $this->captureOrder(
-                providerOrderId: $request->providerOrderId,
-                method: $request->method,
-                metadata: [
-                    ...$request->metadata,
-                    'idempotency_key' => $request->metadata['idempotency_key']
-                        ?? 'stag-herd-paypal-capture-' . $request->providerOrderId,
-                ],
-            );
-        } else {
+        if (! $request->providerOrderId) {
             throw InvalidPaymentPayloadException::missingField('provider_order_id');
         }
+
+        return $this->captureOrder(
+            providerOrderId: $request->providerOrderId,
+            method: $request->method,
+            metadata: [
+                ...$request->metadata,
+                'idempotency_key' => $request->metadata['idempotency_key']
+                    ?? 'stag-herd-paypal-capture-' . $request->providerOrderId,
+            ],
+        );
     }
 
     public function lookupPayment(PaymentLookupData $request): PaymentResultData
@@ -97,12 +97,6 @@ class PayPalProvider implements PaymentProvider
         );
     }
 
-    /**
-     * Método usado por la demo para capturar una PayPal Order.
-     *
-     * Este método NO guarda en base de datos.
-     * Solo llama a PayPal y devuelve PaymentResultData.
-     */
     public function captureOrder(
         string $providerOrderId,
         string $method = 'paypal',
@@ -116,74 +110,8 @@ class PayPalProvider implements PaymentProvider
         return $this->mapCapturedOrderResponseToResult(
             method: $method,
             response: $response,
+            fallbackOrderId: $providerOrderId,
         );
-    }
-
-    private function validateCreatePaymentRequest(PaymentRequestData $request): void
-    {
-        if ($request->amount <= 0) {
-            throw InvalidPaymentPayloadException::invalidAmount($request->amount);
-        }
-
-        if ($request->currency === '') {
-            throw InvalidPaymentPayloadException::invalidCurrency($request->currency);
-        }
-
-        if (! $request->returnUrl) {
-            throw InvalidPaymentPayloadException::missingField('return_url');
-        }
-
-        if (! $request->cancelUrl) {
-            throw InvalidPaymentPayloadException::missingField('cancel_url');
-        }
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function buildCreateOrderPayload(PaymentRequestData $request): array
-    {
-        $paypal = $request->metadata['paypal'] ?? [];
-
-        $payload = [
-            'intent' => strtoupper((string) ($paypal['intent'] ?? 'CAPTURE')),
-
-            'purchase_units' => [
-                array_filter([
-                    'reference_id' => $request->externalReference,
-                    'description' => $request->description ?? $request->externalReference ?? 'Payment',
-                    'custom_id' => $request->payerReference,
-                    'invoice_id' => $paypal['invoice_id'] ?? null,
-
-                    'amount' => [
-                        'currency_code' => strtoupper($request->currency),
-                        'value' => MoneyFormatter::toDecimal($request->amount),
-                    ],
-                ], fn($value) => $value !== null && $value !== ''),
-            ],
-
-            'application_context' => array_filter([
-                'return_url' => $request->returnUrl,
-                'cancel_url' => $request->cancelUrl,
-                'brand_name' => $paypal['brand_name'] ?? config('app.name'),
-                'landing_page' => $paypal['landing_page'] ?? 'LOGIN',
-                'user_action' => $paypal['user_action'] ?? 'PAY_NOW',
-                'shipping_preference' => $paypal['shipping_preference'] ?? 'NO_SHIPPING',
-            ], fn($value) => $value !== null && $value !== ''),
-        ];
-
-        if (isset($paypal['purchase_units']) && is_array($paypal['purchase_units'])) {
-            $payload['purchase_units'] = $paypal['purchase_units'];
-        }
-
-        if (isset($paypal['application_context']) && is_array($paypal['application_context'])) {
-            $payload['application_context'] = array_replace_recursive(
-                $payload['application_context'],
-                $paypal['application_context'],
-            );
-        }
-
-        return $payload;
     }
 
     private function lookupByOrderId(PaymentLookupData $request): PaymentResultData
@@ -193,6 +121,7 @@ class PayPalProvider implements PaymentProvider
         return $this->mapOrderResponseToResultFromOperation(
             method: 'paypal',
             response: $response,
+            fallbackOrderId: $request->providerOrderId,
         );
     }
 
@@ -203,38 +132,8 @@ class PayPalProvider implements PaymentProvider
         return $this->mapCaptureResponseToResult(
             method: 'paypal',
             response: $response,
-        );
-    }
-
-    /**
-     * @param array<string, mixed> $response
-     */
-    private function mapOrderResponseToResult(
-        PaymentRequestData $request,
-        array $response,
-    ): PaymentResultData {
-        $providerStatus = $this->nullableString(Arr::get($response, 'status'));
-
-        return new PaymentResultData(
-            provider: $this->getName(),
-            method: $request->method,
-            status: $this->statusMapper->map($providerStatus),
-            providerStatus: $providerStatus,
-            references: new ProviderReferencesData(
-                providerPaymentId: $this->resolveCaptureIdFromOrder($response),
-                providerOrderId: $this->nullableString(Arr::get($response, 'id')),
-                providerTransactionId: $this->resolveCaptureIdFromOrder($response),
-            ),
-            amount: $request->amount,
-            currency: $request->currency,
-            nextAction: $this->resolveNextAction($response),
-            metadata: array_filter([
-                'external_reference' => $request->externalReference,
-                'paypal_order_id' => Arr::get($response, 'id'),
-                'paypal_status' => Arr::get($response, 'status'),
-                'paypal_capture_id' => $this->resolveCaptureIdFromOrder($response),
-            ]),
-            rawPayload: $response,
+            fallbackCaptureId: $request->providerPaymentId,
+            fallbackOrderId: $request->providerOrderId,
         );
     }
 
@@ -244,8 +143,16 @@ class PayPalProvider implements PaymentProvider
     private function mapOrderResponseToResultFromOperation(
         string $method,
         array $response,
+        ?string $fallbackOrderId = null,
     ): PaymentResultData {
         $providerStatus = $this->nullableString(Arr::get($response, 'status'));
+
+        $orderId = $this->resolveOrderIdFromOrder(
+            response: $response,
+            fallbackOrderId: $fallbackOrderId,
+        );
+
+        $captureId = $this->resolveCaptureIdFromOrder($response);
 
         return new PaymentResultData(
             provider: $this->getName(),
@@ -253,17 +160,17 @@ class PayPalProvider implements PaymentProvider
             status: $this->statusMapper->map($providerStatus),
             providerStatus: $providerStatus,
             references: new ProviderReferencesData(
-                providerPaymentId: $this->resolveCaptureIdFromOrder($response),
-                providerOrderId: $this->nullableString(Arr::get($response, 'id')),
-                providerTransactionId: $this->resolveCaptureIdFromOrder($response),
+                providerPaymentId: $captureId,
+                providerOrderId: $orderId,
+                providerTransactionId: $captureId,
             ),
             amount: $this->resolveAmountFromOrder($response),
             currency: $this->resolveCurrencyFromOrder($response),
             nextAction: $this->resolveNextAction($response),
             metadata: array_filter([
-                'paypal_order_id' => Arr::get($response, 'id'),
-                'paypal_status' => Arr::get($response, 'status'),
-                'paypal_capture_id' => $this->resolveCaptureIdFromOrder($response),
+                'paypal_order_id' => $orderId,
+                'paypal_capture_id' => $captureId,
+                'paypal_status' => $providerStatus,
             ]),
             rawPayload: $response,
         );
@@ -275,7 +182,13 @@ class PayPalProvider implements PaymentProvider
     private function mapCapturedOrderResponseToResult(
         string $method,
         array $response,
+        ?string $fallbackOrderId = null,
     ): PaymentResultData {
+        $orderId = $this->resolveOrderIdFromOrder(
+            response: $response,
+            fallbackOrderId: $fallbackOrderId,
+        );
+
         $captureId = $this->resolveCaptureIdFromOrder($response);
 
         $providerStatus = $this->nullableString(
@@ -290,16 +203,16 @@ class PayPalProvider implements PaymentProvider
             providerStatus: $providerStatus,
             references: new ProviderReferencesData(
                 providerPaymentId: $captureId,
-                providerOrderId: $this->nullableString(Arr::get($response, 'id')),
+                providerOrderId: $orderId,
                 providerTransactionId: $captureId,
             ),
             amount: $this->resolveAmountFromOrder($response),
             currency: $this->resolveCurrencyFromOrder($response),
             nextAction: NextActionData::none(),
             metadata: array_filter([
-                'paypal_order_id' => Arr::get($response, 'id'),
-                'paypal_status' => Arr::get($response, 'status'),
+                'paypal_order_id' => $orderId,
                 'paypal_capture_id' => $captureId,
+                'paypal_status' => $providerStatus,
             ]),
             rawPayload: $response,
         );
@@ -311,8 +224,20 @@ class PayPalProvider implements PaymentProvider
     private function mapCaptureResponseToResult(
         string $method,
         array $response,
+        ?string $fallbackCaptureId = null,
+        ?string $fallbackOrderId = null,
     ): PaymentResultData {
         $providerStatus = $this->nullableString(Arr::get($response, 'status'));
+
+        $captureId = $this->resolveCaptureIdFromCapture(
+            response: $response,
+            fallbackCaptureId: $fallbackCaptureId,
+        );
+
+        $orderId = $this->resolveOrderIdFromCapture(
+            response: $response,
+            fallbackOrderId: $fallbackOrderId,
+        );
 
         return new PaymentResultData(
             provider: $this->getName(),
@@ -320,17 +245,17 @@ class PayPalProvider implements PaymentProvider
             status: $this->statusMapper->map($providerStatus),
             providerStatus: $providerStatus,
             references: new ProviderReferencesData(
-                providerPaymentId: $this->nullableString(Arr::get($response, 'id')),
-                providerTransactionId: $this->nullableString(Arr::get($response, 'id')),
+                providerPaymentId: $captureId,
+                providerOrderId: $orderId,
+                providerTransactionId: $captureId,
             ),
-            amount: Arr::has($response, 'amount.value')
-                ? MoneyFormatter::fromDecimal(Arr::get($response, 'amount.value'))
-                : null,
-            currency: $this->nullableString(Arr::get($response, 'amount.currency_code')),
+            amount: $this->resolveAmountFromCapture($response),
+            currency: $this->resolveCurrencyFromCapture($response),
             nextAction: NextActionData::none(),
             metadata: array_filter([
-                'paypal_capture_id' => Arr::get($response, 'id'),
-                'paypal_status' => Arr::get($response, 'status'),
+                'paypal_order_id' => $orderId,
+                'paypal_capture_id' => $captureId,
+                'paypal_status' => $providerStatus,
             ]),
             rawPayload: $response,
         );
@@ -344,6 +269,12 @@ class PayPalProvider implements PaymentProvider
         string $captureId,
         array $response,
     ): PaymentResultData {
+        $orderId = $this->nullableString(
+            $request->metadata['provider_order_id']
+                ?? $request->metadata['paypal_order_id']
+                ?? null
+        );
+
         return new PaymentResultData(
             provider: $this->getName(),
             method: (string) ($request->metadata['method'] ?? 'paypal'),
@@ -351,15 +282,19 @@ class PayPalProvider implements PaymentProvider
             providerStatus: $this->nullableString(Arr::get($response, 'status')),
             references: new ProviderReferencesData(
                 providerPaymentId: $captureId,
+                providerOrderId: $orderId,
                 providerTransactionId: $captureId,
                 providerRefundId: $this->nullableString(Arr::get($response, 'id')),
             ),
-            amount: $request->amount,
+            amount: null,
             currency: $this->nullableString(Arr::get($response, 'amount.currency_code')),
             reason: $request->reason,
             metadata: array_filter([
+                'paypal_order_id' => $orderId,
                 'paypal_capture_id' => $captureId,
                 'paypal_refund_id' => Arr::get($response, 'id'),
+                'paypal_refund_amount' => Arr::get($response, 'amount.value'),
+                'paypal_refund_currency' => Arr::get($response, 'amount.currency_code'),
                 'paypal_refund_status' => Arr::get($response, 'status'),
             ]),
             rawPayload: $response,
@@ -396,17 +331,56 @@ class PayPalProvider implements PaymentProvider
         return null;
     }
 
+    private function resolveOrderIdFromOrder(
+        array $response,
+        ?string $fallbackOrderId = null,
+    ): ?string {
+        return $this->nullableString(
+            Arr::get($response, 'id')
+                ?? Arr::get($response, 'order_id')
+                ?? Arr::get($response, 'resource.id')
+                ?? $fallbackOrderId
+        );
+    }
+
     private function resolveCaptureIdFromOrder(array $response): ?string
     {
         return $this->nullableString(
             Arr::get($response, 'purchase_units.0.payments.captures.0.id')
+                ?? Arr::get($response, 'resource.purchase_units.0.payments.captures.0.id')
+        );
+    }
+
+    private function resolveOrderIdFromCapture(
+        array $response,
+        ?string $fallbackOrderId = null,
+    ): ?string {
+        return $this->nullableString(
+            Arr::get($response, 'supplementary_data.related_ids.order_id')
+                ?? Arr::get($response, 'resource.supplementary_data.related_ids.order_id')
+                ?? Arr::get($response, 'order_id')
+                ?? $fallbackOrderId
+        );
+    }
+
+    private function resolveCaptureIdFromCapture(
+        array $response,
+        ?string $fallbackCaptureId = null,
+    ): ?string {
+        return $this->nullableString(
+            Arr::get($response, 'id')
+                ?? Arr::get($response, 'resource.id')
+                ?? Arr::get($response, 'capture_id')
+                ?? $fallbackCaptureId
         );
     }
 
     private function resolveAmountFromOrder(array $response): ?int
     {
-        $value = Arr::get($response, 'purchase_units.0.amount.value')
-            ?? Arr::get($response, 'purchase_units.0.payments.captures.0.amount.value');
+        $value = Arr::get($response, 'purchase_units.0.payments.captures.0.amount.value')
+            ?? Arr::get($response, 'purchase_units.0.amount.value')
+            ?? Arr::get($response, 'resource.purchase_units.0.payments.captures.0.amount.value')
+            ?? Arr::get($response, 'resource.purchase_units.0.amount.value');
 
         if ($value === null || $value === '') {
             return null;
@@ -418,8 +392,30 @@ class PayPalProvider implements PaymentProvider
     private function resolveCurrencyFromOrder(array $response): ?string
     {
         return $this->nullableString(
-            Arr::get($response, 'purchase_units.0.amount.currency_code')
-                ?? Arr::get($response, 'purchase_units.0.payments.captures.0.amount.currency_code')
+            Arr::get($response, 'purchase_units.0.payments.captures.0.amount.currency_code')
+                ?? Arr::get($response, 'purchase_units.0.amount.currency_code')
+                ?? Arr::get($response, 'resource.purchase_units.0.payments.captures.0.amount.currency_code')
+                ?? Arr::get($response, 'resource.purchase_units.0.amount.currency_code')
+        );
+    }
+
+    private function resolveAmountFromCapture(array $response): ?int
+    {
+        $value = Arr::get($response, 'amount.value')
+            ?? Arr::get($response, 'resource.amount.value');
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return MoneyFormatter::fromDecimal($value);
+    }
+
+    private function resolveCurrencyFromCapture(array $response): ?string
+    {
+        return $this->nullableString(
+            Arr::get($response, 'amount.currency_code')
+                ?? Arr::get($response, 'resource.amount.currency_code')
         );
     }
 

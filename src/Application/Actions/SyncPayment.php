@@ -7,6 +7,7 @@ use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Domain\Payment;
+use Equidna\StagHerd\Domain\PaymentStateMachine;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
 use Equidna\StagHerd\Support\PaymentEventDispatcher;
@@ -53,20 +54,32 @@ final readonly class SyncPayment
             );
         }
 
+        $externalResult->assertMatchesRequest(
+            request: $fallbackRequest,
+            requireAmount: true,
+        );
+
         $providerPaymentId = $externalResult->references?->providerPaymentId
             ?? $lookup->providerPaymentId;
 
-        if (! $providerPaymentId) {
-            throw PaymentNotFoundException::withProviderReference(
-                $lookup->provider,
-                $this->resolveLookupReference($lookup),
+        $providerOrderId = $externalResult->references?->providerOrderId
+            ?? $lookup->providerOrderId;
+
+        $localPayment = null;
+
+        if ($providerPaymentId) {
+            $localPayment = $this->payments->findByProviderPaymentId(
+                provider: $lookup->provider,
+                providerPaymentId: $providerPaymentId,
             );
         }
 
-        $localPayment = $this->payments->findByProviderPaymentId(
-            provider: $lookup->provider,
-            providerPaymentId: $providerPaymentId,
-        );
+        if (! $localPayment && $providerOrderId) {
+            $localPayment = $this->payments->findByProviderReference(
+                provider: $lookup->provider,
+                reference: $providerOrderId,
+            );
+        }
 
         if (! $localPayment) {
             $payment = $this->payments->storeFromResult(
@@ -78,6 +91,19 @@ final readonly class SyncPayment
 
             return $payment;
         }
+
+        /*
+         * Si ya existía localmente, también debe coincidir con el pago local.
+         */
+        $externalResult->assertMatchesPayment(
+            payment: $localPayment,
+            requireAmount: true,
+        );
+
+        PaymentStateMachine::assertCanApplyProviderResult(
+            payment: $localPayment,
+            providerResultStatus: $externalResult->status,
+        );
 
         $updatedPayment = $this->payments->updateFromResult(
             payment: $localPayment,

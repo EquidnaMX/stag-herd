@@ -25,13 +25,11 @@ class EloquentPaymentDisplayRepository implements PaymentDisplayRepository
                         ->orWhere('provider', 'like', "%{$search}%")
                         ->orWhere('method', 'like', "%{$search}%")
                         ->orWhere('status', 'like', "%{$search}%")
+                        ->orWhere('provider_status', 'like', "%{$search}%")
                         ->orWhere('payer_reference', 'like', "%{$search}%")
                         ->orWhere('payer_email', 'like', "%{$search}%")
                         ->orWhere('provider_payment_id', 'like', "%{$search}%")
-                        ->orWhere('provider_order_id', 'like', "%{$search}%")
-                        ->orWhere('provider_transaction_id', 'like', "%{$search}%")
-                        ->orWhere('provider_refund_id', 'like', "%{$search}%")
-                        ->orWhere('external_reference', 'like', "%{$search}%");
+                        ->orWhere('provider_order_id', 'like', "%{$search}%");
                 });
             })
             ->latest('id')

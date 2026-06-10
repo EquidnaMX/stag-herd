@@ -1,423 +1,399 @@
-# StagHerd Payment Processing
+# Stag Herd
 
-Multi-provider payment webhook verification and processing for Laravel applications.
+`stag-herd` es un paquete Laravel para manejar pagos de forma desacoplada del dominio del sistema host.
 
-## Features
+El objetivo del paquete es ofrecer un core de pagos reutilizable, con providers configurables, respuestas normalizadas, persistencia interna por defecto y posibilidad de reemplazar repositorios cuando el host necesite usar sus propias tablas.
 
-- **Multi-Provider Support**: PayPal, Stripe (Google Pay), Mercado Pago, Openpay, Clip, Conekta
-- **Webhook Verification**: Cryptographic signature validation for all providers
-- **Idempotency**: Prevents duplicate webhook processing
-- **Event-Driven**: Dispatches Laravel events for payment state changes
-- **Configurable**: Extensible handler system via configuration
-- **Decoupled**: Clean contracts for integration with any Laravel application
+## Estado actual
 
-## Installation
+El paquete se encuentra en evolución hacia una arquitectura más desacoplada.
+
+La fase actual contempla:
+
+- provider interno `cash`;
+- provider externo `mercado_pago`;
+- creación de pagos;
+- consulta de pagos;
+- cancelación;
+- reembolso;
+- persistencia interna por defecto;
+- repositorios reemplazables por configuración;
+- endpoints de webhooks preparados para integración posterior.
+
+Los webhooks entrantes todavía no procesan cambios de estado de forma completa. Esa parte pertenece a la siguiente fase de implementación.
+
+## Instalación
 
 ```bash
 composer require equidna/stag-herd
 ```
 
-## Configuration
-
-Publish the configuration file:
+Publicar configuración:
 
 ```bash
 php artisan vendor:publish --tag=stag-herd-config
 ```
 
-### Environment Variables
+Publicar migraciones:
 
-Use `.env.example` as the package template and see `docs/environment.md` for local, sandbox, and production rollout notes. Add the relevant values to the host application's `.env`:
-
-```env
-STAG_HERD_ROUTE_PREFIX=stag-herd
-STAG_HERD_PAYMENT_MODEL=App\Models\Payment
-
-# Enable/Disable Payment Methods
-STRIPE_ENABLED=true
-PAYPAL_ENABLED=true
-MERCADOPAGO_ENABLED=false
-CONEKTA_ENABLED=false
-OPENPAY_ENABLED=false
-CLIP_ENABLED=false
-
-# Webhook Secrets
-STRIPE_WEBHOOK_SECRET=whsec_...
-PAYPAL_WEBHOOK_ID=...
-MERCADOPAGO_WEBHOOK_SECRET=...
-CONEKTA_WEBHOOK_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----..."
-OPENPAY_WEBHOOK_SECRET=...
-
-# API Credentials
-STRIPE_SECRET=...
-MERCADOPAGO_ACCESS_TOKEN=...
-CONEKTA_API_SECRET=...
-OPENPAY_MERCHANT_ID=...
-OPENPAY_PRIVATE_KEY=...
-OPENPAY_SANDBOX=true
-
-# PayPal Configuration
-PAYPAL_SANDBOX=true
-PAYPAL_CLIENT_ID=...
-PAYPAL_CLIENT_SECRET=...
-
-# Clip Configuration
-CLIP_API_KEY=...
-CLIP_API_BASE_URL=https://api-gw.payclip.com
-CLIP_CURRENCY=MXN
-CLIP_SUCCESS_URL=https://your.app/payments/success
-CLIP_ERROR_URL=https://your.app/payments/error
-CLIP_DEFAULT_URL=https://your.app/payments/cancel
-CLIP_WEBHOOK_URL=https://your.app/stag-herd/clip
+```bash
+php artisan vendor:publish --tag=stag-herd-migrations
 ```
 
-### Payment Model
+Ejecutar migraciones:
 
-Configure your Payment Eloquent model in `config/stag-herd.php`:
-
-```php
-'payment_model' => 'App\Models\Finance\Payment',
+```bash
+php artisan migrate
 ```
 
-### Custom Payment Methods
+## Configuración básica
 
-Payment methods from the package are registered automatically. To add custom handlers, configure them in `config/stag-herd.php`:
+El archivo principal de configuración es:
 
 ```php
-'custom_methods' => [
-    'CLIENT_CREDIT' => [
-        'handler' => 'App\Classes\Payment\Handlers\ClientCreditHandler',
-        'description' => 'Linea de crédito cliente',
+config/stag-herd.php
+```
+
+Por defecto, el paquete usa sus propias tablas internas.
+
+```php
+'repositories' => [
+    'payments' => null,
+    'payment_display' => null,
+    'webhooks' => null,
+],
+```
+
+Si `payments` es `null`, el paquete usa:
+
+```php
+Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentRepository::class
+```
+
+## Tabla interna de pagos
+
+La persistencia interna utiliza la tabla:
+
+```txt
+stag_herd_payments
+```
+
+Columnas principales:
+
+```txt
+id
+provider
+method
+amount
+currency
+status
+provider_status
+payer_reference
+payer_email
+provider_payment_id
+provider_order_id
+metadata
+raw_payload
+created_at
+updated_at
+```
+
+El paquete guarda como columnas principales únicamente:
+
+```txt
+provider_payment_id
+provider_order_id
+```
+
+Otras referencias del provider, como `external_reference`, `provider_transaction_id` o `provider_refund_id`, se conservan en `metadata` o `raw_payload`.
+
+## Providers
+
+Los providers se configuran en:
+
+```php
+'providers' => [
+    'cash' => [
+        'provider' => Equidna\StagHerd\Infrastructure\Providers\Cash\CashProvider::class,
         'enabled' => true,
     ],
-    'GIFT' => [
-        'handler' => 'App\Classes\Payment\Handlers\GiftHandler',
-        'description' => 'Regalo',
-        'enabled' => true,
+
+    'mercado_pago' => [
+        'provider' => Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoProvider::class,
+        'enabled' => false,
     ],
 ],
 ```
 
-## Usage
-
-### Requesting a Payment
+Para activar Mercado Pago:
 
 ```php
-use Equidna\StagHerd\Payment\Payment;
+'mercado_pago' => [
+    'enabled' => true,
 
-$payment = Payment::request(
-    amount: 100.00,
-    method: 'PAYPAL',
-    order: $order, // Must implement PayableOrder contract
-    method_data: (object) ['return_url' => 'https://...']
+    'credentials' => [
+        'access_token' => env('MERCADO_PAGO_ACCESS_TOKEN'),
+        'public_key' => env('MERCADO_PAGO_PUBLIC_KEY'),
+        'webhook_secret' => env('MERCADO_PAGO_WEBHOOK_SECRET'),
+    ],
+],
+```
+
+Variables de entorno:
+
+```env
+MERCADO_PAGO_ACCESS_TOKEN=
+MERCADO_PAGO_PUBLIC_KEY=
+MERCADO_PAGO_WEBHOOK_SECRET=
+```
+
+## Crear un pago
+
+```php
+use Equidna\StagHerd\Data\PaymentRequestData;
+use Equidna\StagHerd\Facades\StagHerd;
+
+$payment = StagHerd::createPayment(
+    new PaymentRequestData(
+        amount: 12000,
+        currency: 'MXN',
+        method: 'cash',
+        provider: 'cash',
+        externalReference: 'ORDER-123',
+        payerEmail: 'cliente@example.com',
+        metadata: [
+            'source' => 'checkout',
+        ],
+    )
 );
-
-// Access payment link
-$paymentLink = $payment->getPaymentModel()->link;
 ```
 
-## Method Data
+El monto se maneja como entero en centavos.
 
-Below are the expected `method_data` fields per provider when creating a payment.
+Ejemplo:
 
-### Mercado Pago
+```txt
+12000 = $120.00 MXN
+```
+
+## Crear un pago con Mercado Pago
 
 ```php
-method_data: (object) [
-    'token' => '<card_token>',
-    'payment_method_id' => 'visa',
-    'payer_email' => 'buyer@email.com', // optional if order has client email
-    'installments' => 1,
-    'issuer_id' => null,
-]
+use Equidna\StagHerd\Data\PaymentRequestData;
+use Equidna\StagHerd\Facades\StagHerd;
+
+$payment = StagHerd::createPayment(
+    new PaymentRequestData(
+        amount: 12000,
+        currency: 'MXN',
+        method: 'card',
+        provider: 'mercado_pago',
+        externalReference: 'ORDER-123',
+        payerEmail: 'cliente@example.com',
+        metadata: [
+            'mercado_pago' => [
+                'token' => $cardToken,
+                'payment_method_id' => 'visa',
+                'installments' => 1,
+            ],
+        ],
+    )
+);
 ```
 
-### Conekta
+## Consultar un pago
+
+Buscar por ID local:
 
 ```php
-// OXXO
-method_data: (object) [
-    'payment_method' => 'oxxo_cash', // or 'oxxo'
-    'payer_email' => 'buyer@email.com',
-    'payer_name' => 'Buyer Name',
-]
+use Equidna\StagHerd\Data\PaymentLookupData;
+use Equidna\StagHerd\Facades\StagHerd;
 
-// Card
-method_data: (object) [
-    'payment_method' => 'card',
-    'token' => '<card_token>',
-    'payer_email' => 'buyer@email.com',
-    'payer_name' => 'Buyer Name',
-]
+$payment = StagHerd::lookupPayment(
+    new PaymentLookupData(
+        provider: 'mercado_pago',
+        paymentId: '1',
+    )
+);
 ```
 
-### PayPal
+Buscar por ID de pago del provider:
 
 ```php
-// Request (order creation)
-method_data: (object) [
-    'return_url' => 'https://your.app/return',
-    'cancel_url' => 'https://your.app/cancel',
-]
-
-// After approval (webhook/validation), the package stores:
-// method_data.capture_id = '<paypal_capture_id>'
-// This capture_id is used for refunds.
+$payment = StagHerd::lookupPayment(
+    new PaymentLookupData(
+        provider: 'mercado_pago',
+        providerPaymentId: '123456789',
+    )
+);
 ```
 
-## Maintenance & Cleanup
-
-Run the scheduled cleanup to remove orphan payments and close stale pending records:
-
-```bash
-php artisan stag-herd:payments:clean
-```
-
-- The package schedules this command daily at 03:00 (cron `0 3 * * *`) when `STAG_HERD_CLEANUP_ENABLED=true`.
-- Use `--revalidate` to force revalidation of recent pending payments; `--skip-revalidate` suppresses revalidation even if enabled in config.
-- Configure behavior via `config/stag-herd.php` (`cleanup` section): cron expression, lookback window for revalidation, and stale pending age (default 14 days).
-
-### Implementing Contracts
-
-Your application must implement the required contracts:
-
-#### PayableOrder
+Buscar por ID de orden del provider:
 
 ```php
-use Equidna\StagHerd\Contracts\PayableOrder;
-
-class Order implements PayableOrder
-{
-    public function getID(): int|string { return $this->id_order; }
-    public function getClient(): PayableClient { return $this->client; }
-    public function getStatus(): string { return $this->status; }
-    public function processPayment($payment): void { /* Update order */ }
-    public static function fromID(int|string $id): static { /* Load order */ }
-}
+$payment = StagHerd::lookupPayment(
+    new PaymentLookupData(
+        provider: 'mercado_pago',
+        providerOrderId: 'ORDER-ID',
+    )
+);
 ```
 
-#### PayableClient
+## Cancelar un pago
 
 ```php
-use Equidna\StagHerd\Contracts\PayableClient;
+use Equidna\StagHerd\Data\PaymentCancellationData;
+use Equidna\StagHerd\Facades\StagHerd;
 
-class Client implements PayableClient
-{
-    public function getID(): int|string { return $this->id_client; }
-    public function getName(): string { return $this->name; }
-    public function getEmail(): string { return $this->email; }
-}
+$payment = StagHerd::cancelPayment(
+    new PaymentCancellationData(
+        provider: 'mercado_pago',
+        providerPaymentId: '123456789',
+        reason: 'Cancelado por el usuario',
+    )
+);
 ```
 
-#### PaymentContextProvider (Optional)
-
-Bind a custom context provider if you need to control `uri_registrar` and `registrar_type` values.
+## Reembolsar un pago
 
 ```php
-use Equidna\StagHerd\Contracts\PaymentContextProvider;
+use Equidna\StagHerd\Data\RefundRequestData;
+use Equidna\StagHerd\Facades\StagHerd;
 
-app()->bind(PaymentContextProvider::class, function () {
-    return new class implements PaymentContextProvider {
-        public function getExecutorUri(): ?string { return request()->fullUrl(); }
-        public function getExecutorType(): ?string { return 'http'; }
-    };
-});
+$payment = StagHerd::refundPayment(
+    new RefundRequestData(
+        provider: 'mercado_pago',
+        providerPaymentId: '123456789',
+        amount: 12000,
+        reason: 'Reembolso solicitado por el cliente',
+    )
+);
 ```
 
-### Custom Payment Handlers
+## Integración recomendada para el host
 
-Extend `PaymentHandler` for custom payment methods:
+La forma recomendada de integración es:
+
+1. El paquete guarda el pago en `stag_herd_payments`.
+2. El host guarda su propia orden, cliente o servicio en sus tablas.
+3. El host relaciona ambos mediante `externalReference`, `payerReference`, `provider_payment_id` o `provider_order_id`.
+4. El host escucha eventos del paquete para actualizar su propio dominio.
+
+De esta forma, el host no necesita implementar un repositorio custom desde el inicio.
+
+## Repositorios custom
+
+Si el host necesita usar sus propias tablas de pagos, puede implementar:
 
 ```php
-namespace App\Payment\Handlers;
-
-use Equidna\StagHerd\Data\PaymentResult;
-use Equidna\StagHerd\Payment\Handlers\PaymentHandler;
-
-class CustomHandler extends PaymentHandler
-{
-    public const PAYMENT_METHOD = 'CUSTOM_METHOD';
-
-    public function requestPayment(): PaymentResult
-    {
-        // Custom logic
-        return PaymentResult::pending(
-            method_id: 'custom-' . uniqid(),
-            reason: 'Always PENDING'
-        );
-    }
-
-    protected function validatePayment($paymentModel): PaymentResult
-    {
-        parent::validatePayment($paymentModel);
-
-        // Validation logic
-        return PaymentResult::success(
-            result: 'APPROVED',
-            method_id: $paymentModel->method_id
-        );
-    }
-}
+Equidna\StagHerd\Contracts\PaymentRepository
 ```
 
-### Gateway Contracts
-
-Provider adapters are bound behind contracts so host applications can replace them for tests, sandbox wrappers, tracing, or custom retry policies:
+Y registrarlo en configuración:
 
 ```php
-use Equidna\StagHerd\Contracts\ClipGateway;
-use App\Payments\InstrumentedClipGateway;
-
-app()->bind(ClipGateway::class, InstrumentedClipGateway::class);
+'repositories' => [
+    'payments' => App\Payments\Repositories\HostPaymentRepository::class,
+],
 ```
 
-Available gateway contracts:
+Si no se configura un repositorio custom, el paquete usa su repositorio interno.
 
-- `ClipGateway`
-- `ConektaGateway`
-- `MercadoPagoGateway`
-- `OpenpayGateway`
-- `PayPalGateway`
-- `StripeGateway`
+## Demo UI
 
-### Payment State Machine
+La demo está apagada por defecto.
 
-`Payment::applyResult()` enforces payment state transitions centrally:
+```php
+'demo' => [
+    'enabled' => false,
+],
+```
 
-- `PENDING` can resolve to `APPROVED`, `REJECTED`, `DECLINED`, `CANCELED`, `REFUNDED`, or `CHARGEBACK`.
-- `APPROVED` can move to `REFUNDED`, `CHARGEBACK`, or `CANCELED`.
-- `REJECTED`, `DECLINED`, `CANCELED`, `REFUNDED`, and `CHARGEBACK` are terminal except for idempotent repeats of the same status.
+Para activarla en un proyecto de pruebas:
 
-Invalid transitions are logged and ignored, for example `REJECTED -> APPROVED`.
+```php
+'demo' => [
+    'enabled' => true,
+    'middleware' => ['web'],
+    'prefix' => 'stag-herd/payments',
+],
+```
 
-## Webhook Routes
+Rutas de demo:
 
-Webhooks are automatically registered with the configured prefix (default: `stag-herd`):
+```txt
+/stag-herd/payments
+```
 
-- `POST /stag-herd/paypal`
-- `POST /stag-herd/mercadopago`
-- `POST /stag-herd/conekta`
-- `POST /stag-herd/openpay`
-- `POST /stag-herd/googlepay`
-- `POST /stag-herd/clip`
+La demo no debe considerarse parte obligatoria del core del paquete.
 
 ## Webhooks
 
-This package verifies webhook signatures for each provider using their official schemes. Ensure you send the raw request body to the verifier and configure secrets.
-
-### Stripe
-
-- Header: `Stripe-Signature: t=<timestamp>,v1=<signature>`
-- Signature: `HMAC-SHA256("<timestamp>.<raw_body>", STRIPE_WEBHOOK_SECRET)`
-- Tolerance: default 300 seconds; events outside tolerance are rejected.
-- Idempotency: the event `id` is deduplicated to prevent reprocessing.
-
-### Mercado Pago
-
-- Headers: `X-Signature`, `X-Request-Id`
-- Signature parts: `ts=<unix_ts>,v1=<signature>`
-- Manifest: `id:<data.id>;request-id:<X-Request-Id>;ts:<ts>;`
-- Signature: `HMAC-SHA256(manifest, MERCADOPAGO_WEBHOOK_SECRET)`
-- `data.id` is taken from query/body JSON `data.id` or `id`.
-
-### Conekta
-
-- Header: `Digest: <base64_rsa_signature>` (the implementation also accepts the `sha-256=<signature>` prefix).
-- Signature: RSA SHA-256 verification of the raw UTF-8 body using the webhook public key generated by Conekta.
-- Public key source: `config('stag-herd.conekta.webhook_public_key')` (populate from `CONEKTA_WEBHOOK_PUBLIC_KEY`).
-- Event id: body JSON `id` when present.
-
-### Clip
-
-- Clip Checkout webhook notifications are reconciled by `payment_request_id`.
-- The webhook payload is not trusted as payment state. The package re-queries Clip Checkout (`GET /checkout/{payment_request_id}`) before applying `APPROVED`, `REJECTED`, `CANCELED`, or `PENDING`.
-- Configure `CLIP_WEBHOOK_URL` or let the package use the `stag-herd.clip` route when creating Checkout links.
-
-### Openpay
-
-- Header: `Verification-Signature: t=<timestamp>,v1=<signature>` (or `Signature-Digest`)
-- Signature: `HMAC-SHA256("<timestamp>.<raw_body>", OPENPAY_WEBHOOK_SECRET)`
-- Event id: body JSON `event_id` or `id`.
-
-### Idempotency
-
-- `WebhookVerifier::checkIdempotency(eventId, provider, ttl)` returns true for duplicates and stores new events via cache.
-- Configure a persistent cache backend in production to retain deduplication keys.
-
-### Examples
-
-```http
-POST /webhook HTTP/1.1
-Stripe-Signature: t=1710000000,v1=abcdef...
-Content-Type: application/json
-
-{"id":"evt_123","type":"charge.succeeded"}
-```
-
-```http
-POST /webhook HTTP/1.1
-X-Signature: ts=1710000000,v1=abcdef...
-X-Request-Id: req-123
-Content-Type: application/json
-
-{"data":{"id":"123"}}
-```
-
-```http
-POST /webhook HTTP/1.1
-Digest: sha-256=abc123base64=
-Content-Type: application/json
-
-{"id":"evt_123","type":"charge.paid"}
-```
-
-```http
-POST /webhook HTTP/1.1
-Verification-Signature: t=1710000000,v1=abcdef...
-Content-Type: application/json
-
-{"event_id":"evt_op","id":"op_123"}
-```
-
-## Events
-
-Listen to payment events in your application:
+Los webhooks se configuran en:
 
 ```php
-use Equidna\StagHerd\Events\PaymentApproved;
-use Equidna\StagHerd\Events\PaymentCanceled;
-use Equidna\StagHerd\Events\PaymentChargeback;
-use Equidna\StagHerd\Events\PaymentLinkCreated;
-use Equidna\StagHerd\Events\PaymentRefunded;
-use Equidna\StagHerd\Events\PaymentRejected;
-use Illuminate\Support\Facades\Event;
-
-Event::listen(PaymentApproved::class, function (PaymentApproved $event) {
-    $payment = $event->payment;
-    // Handle approved payment
-});
-
-Event::listen(PaymentLinkCreated::class, function (PaymentLinkCreated $event) {
-    $payment = $event->payment;
-    $link = $event->link;
-    // Notify client with payment link
-});
+'webhooks' => [
+    'routes' => [
+        'enabled' => true,
+        'prefix' => 'stag-herd/webhooks',
+        'middleware' => ['api'],
+    ],
+],
 ```
 
-## Testing
+Endpoint actual para Mercado Pago:
 
-```bash
-composer test
+```txt
+/stag-herd/webhooks/mercado-pago
 ```
 
-For provider sandbox validation, follow `docs/sandbox-test-matrix.md`.
+En la fase actual, el endpoint queda preparado y sin dependencias de la arquitectura anterior.
 
-## Static Analysis
+El procesamiento completo de webhooks, incluyendo validación, normalización, idempotencia con Redis y actualización de pagos, pertenece a la siguiente fase.
 
-```bash
-composer phpstan
+## Arquitectura general
+
+Estructura principal:
+
+```txt
+src/
+  Application/
+    Actions/
+    PaymentService.php
+
+  Contracts/
+    PaymentProvider.php
+    PaymentRepository.php
+
+  Data/
+    PaymentRequestData.php
+    PaymentResultData.php
+    ProviderReferencesData.php
+
+  Domain/
+    Payment.php
+    PaymentStateMachine.php
+    Enums/
+
+  Infrastructure/
+    Persistence/
+    Providers/
+
+  Events/
+  Exceptions/
+  Http/
+  Support/
 ```
 
-## License
+## Principios del paquete
 
-MIT License. See LICENSE file for details.
+El paquete busca mantener:
+
+- bajo acoplamiento con el host;
+- providers intercambiables;
+- respuestas normalizadas;
+- persistencia interna por defecto;
+- repositorios custom opcionales;
+- separación entre aplicación, dominio e infraestructura;
+- configuración clara desde `config/stag-herd.php`;
+- secretos únicamente en `.env`.

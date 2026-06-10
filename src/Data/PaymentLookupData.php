@@ -8,6 +8,7 @@ final readonly class PaymentLookupData
 {
     public function __construct(
         public string $provider,
+        public ?string $method = null,
         public ?string $paymentId = null,
         public ?string $providerPaymentId = null,
         public ?string $providerOrderId = null,

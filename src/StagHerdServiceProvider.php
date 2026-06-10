@@ -3,17 +3,16 @@
 namespace Equidna\StagHerd;
 
 use Equidna\StagHerd\Application\PaymentService;
+use Equidna\StagHerd\Contracts\CustomPaymentHandler;
 use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentDisplayRepository;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentRepository;
-use Equidna\StagHerd\Infrastructure\Providers\Cash\CashProvider;
+use Equidna\StagHerd\Infrastructure\Providers\Custom\CustomPaymentHandlerRegistry;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoApiAdapter;
-use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoProvider;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalApiAdapter;
-use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalProvider;
 use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Support\ServiceProvider;
 
@@ -29,6 +28,7 @@ class StagHerdServiceProvider extends ServiceProvider
         $this->registerRepositories();
         $this->registerGateways();
         $this->registerProviders();
+        $this->registerCustomPaymentHandlers();
         $this->registerServices();
     }
 
@@ -36,7 +36,13 @@ class StagHerdServiceProvider extends ServiceProvider
     {
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'stag-herd');
 
-        $this->loadRoutesFrom(__DIR__ . '/../routes/payments.php');
+        if (config('stag-herd.demo.enabled', false)) {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/payments.php');
+        }
+
+        if (config('stag-herd.webhooks.routes.enabled', true)) {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/webhooks.php');
+        }
 
         $this->publishes([
             __DIR__ . '/../config/stag-herd.php' => config_path('stag-herd.php'),
@@ -77,6 +83,7 @@ class StagHerdServiceProvider extends ServiceProvider
             return $app->make(EloquentPaymentDisplayRepository::class);
         });
     }
+
     private function registerGateways(): void
     {
         $this->app->bind(
@@ -95,16 +102,56 @@ class StagHerdServiceProvider extends ServiceProvider
         $this->app->singleton(ProviderRegistry::class, function ($app) {
             $registry = new ProviderRegistry();
 
-            if (config('stag-herd.providers.cash.enabled', true)) {
-                $registry->register($app->make(CashProvider::class));
+            foreach (config('stag-herd.providers', []) as $name => $providerConfig) {
+                if (! ($providerConfig['enabled'] ?? false)) {
+                    continue;
+                }
+
+                $providerClass = $providerConfig['provider'] ?? null;
+
+                if (! $providerClass) {
+                    continue;
+                }
+
+                $registry->register($app->make($providerClass));
             }
 
-            if (config('stag-herd.providers.mercado_pago.enabled', false)) {
-                $registry->register($app->make(MercadoPagoProvider::class));
-            }
+            return $registry;
+        });
+    }
 
-            if (config('stag-herd.providers.paypal.enabled', false)) {
-                $registry->register($app->make(PayPalProvider::class));
+    private function registerCustomPaymentHandlers(): void
+    {
+        $this->app->singleton(CustomPaymentHandlerRegistry::class, function ($app) {
+            $registry = new CustomPaymentHandlerRegistry();
+
+            $methods = config('stag-herd.providers.custom.methods', []);
+
+            foreach ($methods as $method => $methodConfig) {
+                if (! ($methodConfig['enabled'] ?? false)) {
+                    continue;
+                }
+
+                $handlerClass = $methodConfig['handler'] ?? null;
+
+                if (! $handlerClass) {
+                    continue;
+                }
+
+                $handler = $app->make($handlerClass);
+
+                if (! $handler instanceof CustomPaymentHandler) {
+                    throw new \RuntimeException(
+                        sprintf(
+                            'Custom payment handler [%s] for method [%s] must implement [%s].',
+                            $handlerClass,
+                            $method,
+                            CustomPaymentHandler::class,
+                        )
+                    );
+                }
+
+                $registry->register($handler);
             }
 
             return $registry;

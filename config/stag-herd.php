@@ -12,49 +12,84 @@ return [
     */
 
     'repositories' => [
-        /*
-     * Repository principal del core.
-     *
-     * Sirve para guardar, buscar y actualizar pagos.
-     */
         'payments' => null,
-
-        /*
-     * Repository usado solamente por la UI/demo.
-     *
-     * Si el host usa tablas propias y quiere que la UI del paquete las muestre,
-     * puede registrar aquí un repository específico para display.
-     */
         'payment_display' => null,
-
-        /*
-     * Para cuando agregues persistencia de webhooks.
-     */
         'webhooks' => null,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Demo UI
+    |--------------------------------------------------------------------------
+    |
+    | La demo queda apagada por defecto para no contaminar al host.
+    | Solo debe prenderse en proyectos de prueba o sandbox.
+    |
+    */
+
+    'demo' => [
+        'enabled' => false,
+        'middleware' => ['web'],
+        'prefix' => 'stag-herd/payments',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Webhooks
+    |--------------------------------------------------------------------------
+    */
+
+    'webhooks' => [
+        'routes' => [
+            'enabled' => true,
+            'prefix' => 'stag-herd/webhooks',
+            'middleware' => ['api'],
+        ],
+
+        'idempotency' => [
+            'driver' => 'redis',
+            'ttl_seconds' => 86400,
+            'prefix' => 'stag-herd:webhooks',
+        ],
     ],
 
     /*
     |--------------------------------------------------------------------------
     | Providers
     |--------------------------------------------------------------------------
-    |
-    | Aquí se configuran los proveedores de pago disponibles. Cada proveedor puede tener múltiples métodos de pago.
-    |
     */
 
     'providers' => [
-        'cash' => [
-            'enabled' => env('STAG_HERD_CASH_ENABLED', true),
+        'custom' => [
+            'provider' => Equidna\StagHerd\Infrastructure\Providers\Custom\CustomProvider::class,
+            'enabled' => false,
+
             'methods' => [
-                'cash' => true,
+                //
+            ],
+        ],
+
+        'cash' => [
+            'provider' => Equidna\StagHerd\Infrastructure\Providers\Cash\CashProvider::class,
+            'enabled' => true,
+
+            'methods' => [
+                'cash' => [
+                    'enabled' => true,
+                    'label' => 'Cash',
+                ],
             ],
         ],
 
         'mercado_pago' => [
-            'enabled' => env('STAG_HERD_MERCADO_PAGO_ENABLED', true),
+            'provider' => Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoProvider::class,
+            'enabled' => false,
 
             'methods' => [
-                'card' => true,
+                'card' => [
+                    'enabled' => true,
+                    'label' => 'Tarjeta',
+                ],
             ],
 
             'credentials' => [
@@ -65,15 +100,19 @@ return [
 
             'http' => [
                 'base_uri' => env('MERCADO_PAGO_BASE_URI', 'https://api.mercadopago.com'),
-                'timeout' => env('MERCADO_PAGO_TIMEOUT', 15),
+                'timeout' => 15,
             ],
         ],
 
         'paypal' => [
-            'enabled' => env('STAG_HERD_PAYPAL_ENABLED', true),
+            'provider' => Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalProvider::class,
+            'enabled' => false,
 
             'methods' => [
-                'paypal' => true,
+                'paypal' => [
+                    'enabled' => true,
+                    'label' => 'PayPal',
+                ],
             ],
 
             'credentials' => [
@@ -83,7 +122,7 @@ return [
 
             'http' => [
                 'base_uri' => env('PAYPAL_BASE_URI', 'https://api-m.sandbox.paypal.com'),
-                'timeout' => env('PAYPAL_TIMEOUT', 15),
+                'timeout' => 15,
             ],
         ],
     ],

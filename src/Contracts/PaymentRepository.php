@@ -27,10 +27,11 @@ interface PaymentRepository
     ): ?Payment;
 
     /**
-     * Busca por cualquier referencia importante del provider.
+     * Busca por las referencias principales persistidas del provider.
      *
-     * Puede ser provider_payment_id, provider_order_id,
-     * provider_transaction_id, provider_refund_id, etc.
+     * En la persistencia interna del paquete solo se buscan:
+     * - provider_payment_id
+     * - provider_order_id
      */
     public function findByProviderReference(
         string $provider,

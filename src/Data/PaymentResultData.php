@@ -3,6 +3,8 @@
 namespace Equidna\StagHerd\Data;
 
 use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
+use Equidna\StagHerd\Domain\Payment;
+use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 
 final readonly class PaymentResultData
 {
@@ -22,9 +24,6 @@ final readonly class PaymentResultData
         //
     }
 
-    /**
-     * Create an approved payment result.
-     */
     public static function approved(
         string $provider,
         string $method,
@@ -49,9 +48,6 @@ final readonly class PaymentResultData
         );
     }
 
-    /**
-     * Create a pending payment result.
-     */
     public static function pending(
         string $provider,
         string $method,
@@ -79,14 +75,14 @@ final readonly class PaymentResultData
         );
     }
 
-    /**
-     * Create a rejected payment result.
-     */
     public static function rejected(
         string $provider,
         string $method,
         ?string $providerStatus = null,
         ?string $reason = null,
+        ?ProviderReferencesData $references = null,
+        ?int $amount = null,
+        ?string $currency = null,
         array $metadata = [],
         array $rawPayload = [],
     ): self {
@@ -95,6 +91,9 @@ final readonly class PaymentResultData
             method: $method,
             status: PaymentStatusEnum::REJECTED,
             providerStatus: $providerStatus,
+            references: $references,
+            amount: $amount,
+            currency: $currency,
             nextAction: NextActionData::none(),
             reason: $reason,
             metadata: $metadata,
@@ -102,11 +101,97 @@ final readonly class PaymentResultData
         );
     }
 
-    /**
-     * Convert the payment result to array.
-     *
-     * @return array<string, mixed>
-     */
+    public function assertMatchesRequest(
+        PaymentRequestData $request,
+        bool $requireAmount = false,
+    ): void {
+        $reference = $this->reference()
+            ?? $request->externalReference
+            ?? $request->providerOrderId
+            ?? $request->payerReference;
+
+        if ($this->amount === null) {
+            if ($requireAmount) {
+                throw InvalidPaymentPayloadException::amountMissingFromProvider(
+                    provider: $request->provider,
+                    reference: $reference,
+                );
+            }
+
+            return;
+        }
+
+        if ((int) $this->amount !== (int) $request->amount) {
+            throw InvalidPaymentPayloadException::amountMismatch(
+                expectedAmount: (int) $request->amount,
+                providerAmount: (int) $this->amount,
+                provider: $request->provider,
+                reference: $reference,
+            );
+        }
+
+        if (
+            $this->currency !== null
+            && strtoupper($this->currency) !== strtoupper($request->currency)
+        ) {
+            throw InvalidPaymentPayloadException::currencyMismatch(
+                expectedCurrency: $request->currency,
+                providerCurrency: $this->currency,
+                provider: $request->provider,
+                reference: $reference,
+            );
+        }
+    }
+
+    public function assertMatchesPayment(
+        Payment $payment,
+        bool $requireAmount = false,
+    ): void {
+        $reference = $this->reference()
+            ?? $payment->references?->providerPaymentId
+            ?? $payment->references?->providerOrderId
+            ?? $payment->externalReference
+            ?? $payment->id;
+
+        if ($this->amount === null) {
+            if ($requireAmount) {
+                throw InvalidPaymentPayloadException::amountMissingFromProvider(
+                    provider: $payment->provider,
+                    reference: $reference,
+                );
+            }
+
+            return;
+        }
+
+        if ((int) $this->amount !== (int) $payment->amount) {
+            throw InvalidPaymentPayloadException::amountMismatch(
+                expectedAmount: (int) $payment->amount,
+                providerAmount: (int) $this->amount,
+                provider: $payment->provider,
+                reference: $reference,
+            );
+        }
+
+        if (
+            $this->currency !== null
+            && strtoupper($this->currency) !== strtoupper($payment->currency)
+        ) {
+            throw InvalidPaymentPayloadException::currencyMismatch(
+                expectedCurrency: $payment->currency,
+                providerCurrency: $this->currency,
+                provider: $payment->provider,
+                reference: $reference,
+            );
+        }
+    }
+
+    public function reference(): ?string
+    {
+        return $this->references?->providerPaymentId
+            ?? $this->references?->providerOrderId;
+    }
+
     public function toArray(): array
     {
         return [

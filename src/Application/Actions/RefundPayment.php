@@ -5,10 +5,9 @@ namespace Equidna\StagHerd\Application\Actions;
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Data\RefundRequestData;
 use Equidna\StagHerd\Domain\Payment;
-use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
+use Equidna\StagHerd\Domain\PaymentStateMachine;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
-use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Support\PaymentEventDispatcher;
 use Equidna\StagHerd\Support\ProviderRegistry;
 
@@ -29,21 +28,19 @@ final readonly class RefundPayment
 
         $payment = $this->resolveLocalPayment($request);
 
-        if ($payment->status !== PaymentStatusEnum::APPROVED) {
-            throw UnsupportedOperationException::forPaymentStatus(
-                'refund',
-                $payment->status->value,
-            );
-        }
+        PaymentStateMachine::assertCanBeRefunded($payment);
 
         $provider = $this->providers->get($request->provider);
 
         $result = $provider->refundPayment(
             new RefundRequestData(
                 provider: $request->provider,
+                method: $payment->method,
                 paymentId: $payment->id,
-                providerPaymentId: $payment->references?->providerPaymentId ?? $request->providerPaymentId,
-                externalReference: $payment->externalReference ?? $request->externalReference,
+                providerPaymentId: $payment->references?->providerPaymentId
+                    ?? $request->providerPaymentId,
+                externalReference: $payment->externalReference
+                    ?? $request->externalReference,
                 amount: $request->amount,
                 reason: $request->reason,
                 metadata: array_merge($payment->metadata, $request->metadata, [
@@ -52,7 +49,20 @@ final readonly class RefundPayment
             )
         );
 
-        $updatedPayment = $this->payments->updateFromResult($payment, $result);
+        $result->assertMatchesPayment(
+            payment: $payment,
+            requireAmount: false,
+        );
+
+        PaymentStateMachine::assertCanApplyProviderResult(
+            payment: $payment,
+            providerResultStatus: $result->status,
+        );
+
+        $updatedPayment = $this->payments->updateFromResult(
+            payment: $payment,
+            result: $result,
+        );
 
         PaymentEventDispatcher::dispatchForPayment(
             payment: $updatedPayment,
@@ -74,7 +84,9 @@ final readonly class RefundPayment
 
         throw PaymentNotFoundException::withProviderReference(
             $request->provider,
-            $request->providerPaymentId ?? $request->externalReference ?? (string) $request->paymentId,
+            $request->providerPaymentId
+                ?? $request->externalReference
+                ?? (string) $request->paymentId,
         );
     }
 }

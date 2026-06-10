@@ -18,6 +18,18 @@ class EloquentPaymentRepository implements PaymentRepository
     ): Payment {
         $references = $result->references;
 
+        $metadata = $this->mergeMetadata(
+            $request->metadata,
+            $result->metadata,
+            [
+                'external_reference' => $request->externalReference
+                    ?? ($result->metadata['external_reference'] ?? null),
+
+                'provider_transaction_id' => $references?->providerTransactionId,
+                'provider_refund_id' => $references?->providerRefundId,
+            ],
+        );
+
         $model = StagHerdPayment::query()->create([
             'provider' => $result->provider,
             'method' => $result->method,
@@ -28,22 +40,14 @@ class EloquentPaymentRepository implements PaymentRepository
             'status' => $result->status->value,
             'provider_status' => $result->providerStatus,
 
-            'external_reference' => $request->externalReference
-                ?? ($result->metadata['external_reference'] ?? null),
-
             'payer_reference' => $request->payerReference,
             'payer_email' => $request->payerEmail,
 
             'provider_payment_id' => $references?->providerPaymentId,
-            'provider_order_id' => $references?->providerOrderId,
-            'provider_transaction_id' => $references?->providerTransactionId,
-            'provider_refund_id' => $references?->providerRefundId,
+            'provider_order_id' => $references?->providerOrderId
+                ?? $request->providerOrderId,
 
-            'metadata' => array_merge(
-                $request->metadata,
-                $result->metadata,
-            ),
-
+            'metadata' => $metadata,
             'raw_payload' => $result->rawPayload,
         ]);
 
@@ -57,10 +61,13 @@ class EloquentPaymentRepository implements PaymentRepository
         return $model ? $this->mapToDomain($model) : null;
     }
 
-    public function findByExternalReference(string $externalReference): ?Payment
-    {
+    public function findByProviderPaymentId(
+        string $provider,
+        string $providerPaymentId,
+    ): ?Payment {
         $model = StagHerdPayment::query()
-            ->where('external_reference', $externalReference)
+            ->where('provider', $provider)
+            ->where('provider_payment_id', $providerPaymentId)
             ->latest('id')
             ->first();
 
@@ -76,23 +83,8 @@ class EloquentPaymentRepository implements PaymentRepository
             ->where(function ($query) use ($reference) {
                 $query
                     ->where('provider_payment_id', $reference)
-                    ->orWhere('provider_order_id', $reference)
-                    ->orWhere('provider_transaction_id', $reference)
-                    ->orWhere('provider_refund_id', $reference);
+                    ->orWhere('provider_order_id', $reference);
             })
-            ->latest('id')
-            ->first();
-
-        return $model ? $this->mapToDomain($model) : null;
-    }
-
-    public function findByProviderPaymentId(
-        string $provider,
-        string $providerPaymentId,
-    ): ?Payment {
-        $model = StagHerdPayment::query()
-            ->where('provider', $provider)
-            ->where('provider_payment_id', $providerPaymentId)
             ->latest('id')
             ->first();
 
@@ -111,27 +103,38 @@ class EloquentPaymentRepository implements PaymentRepository
 
         $references = $result->references;
 
+        $metadata = $this->mergeMetadata(
+            $model->metadata ?? [],
+            $result->metadata,
+            [
+                'external_reference' => $result->metadata['external_reference']
+                    ?? $payment->externalReference,
+
+                'provider_transaction_id' => $references?->providerTransactionId
+                    ?? data_get($model->metadata, 'provider_transaction_id'),
+
+                'provider_refund_id' => $references?->providerRefundId
+                    ?? data_get($model->metadata, 'provider_refund_id'),
+            ],
+        );
+
         $model->update([
             'amount' => $result->amount ?? $model->amount,
             'currency' => $result->currency ?? $model->currency,
 
             'status' => $result->status->value,
-            'provider_status' => $result->providerStatus,
+            'provider_status' => $result->providerStatus ?? $model->provider_status,
 
-            'provider_payment_id' => $references?->providerPaymentId ?? $model->provider_payment_id,
-            'provider_order_id' => $references?->providerOrderId ?? $model->provider_order_id,
-            'provider_transaction_id' => $references?->providerTransactionId ?? $model->provider_transaction_id,
-            'provider_refund_id' => $references?->providerRefundId ?? $model->provider_refund_id,
+            'provider_payment_id' => $references?->providerPaymentId
+                ?? $model->provider_payment_id,
 
-            'external_reference' => $result->metadata['external_reference']
-                ?? $model->external_reference,
+            'provider_order_id' => $references?->providerOrderId
+                ?? $model->provider_order_id,
 
-            'metadata' => array_merge(
-                $model->metadata ?? [],
-                $result->metadata,
-            ),
-
-            'raw_payload' => $result->rawPayload ?: $model->raw_payload,
+            'metadata' => $metadata,
+            'raw_payload' => $result->rawPayload !== []
+                ? $result->rawPayload
+                : $model->raw_payload,
         ]);
 
         return $this->mapToDomain($model->refresh());
@@ -139,6 +142,8 @@ class EloquentPaymentRepository implements PaymentRepository
 
     private function mapToDomain(StagHerdPayment $model): Payment
     {
+        $metadata = $model->metadata ?? [];
+
         return new Payment(
             id: (string) $model->id,
             provider: $model->provider,
@@ -147,16 +152,35 @@ class EloquentPaymentRepository implements PaymentRepository
             currency: $model->currency,
             status: PaymentStatusEnum::from($model->status),
             providerStatus: $model->provider_status,
-            externalReference: $model->external_reference,
+            externalReference: data_get($metadata, 'external_reference'),
             payerReference: $model->payer_reference,
             payerEmail: $model->payer_email,
             references: new ProviderReferencesData(
                 providerPaymentId: $model->provider_payment_id,
                 providerOrderId: $model->provider_order_id,
-                providerTransactionId: $model->provider_transaction_id,
-                providerRefundId: $model->provider_refund_id,
+                providerTransactionId: data_get($metadata, 'provider_transaction_id'),
+                providerRefundId: data_get($metadata, 'provider_refund_id'),
             ),
-            metadata: $model->metadata ?? [],
+            metadata: $metadata,
         );
+    }
+
+    /**
+     * @param array<string, mixed> ...$metadataGroups
+     * @return array<string, mixed>
+     */
+    private function mergeMetadata(array ...$metadataGroups): array
+    {
+        $metadata = [];
+
+        foreach ($metadataGroups as $group) {
+            foreach ($group as $key => $value) {
+                if ($value !== null) {
+                    $metadata[$key] = $value;
+                }
+            }
+        }
+
+        return $metadata;
     }
 }

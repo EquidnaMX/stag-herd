@@ -32,7 +32,7 @@ class PaymentDemoController extends Controller
 
         $payments = $this->payments->paginateForDisplay(
             search: $search,
-            perPage: (int) config('stag-herd.ui.payments_limit', 25),
+            perPage: (int) config('stag-herd.ui.payments_limit', 10),
         );
 
         return view('stag-herd::payments.index', [

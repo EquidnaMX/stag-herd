@@ -3,8 +3,8 @@
 use Equidna\StagHerd\Http\Controllers\PaymentDemoController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(config('stag-herd.ui.middleware', ['web']))
-    ->prefix(config('stag-herd.ui.prefix', 'stag-herd/payments'))
+Route::middleware(config('stag-herd.demo.middleware', ['web']))
+    ->prefix(config('stag-herd.demo.prefix', 'stag-herd/payments'))
     ->name('stag-herd.payments.')
     ->group(function () {
         Route::get('/', [PaymentDemoController::class, 'index'])

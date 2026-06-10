@@ -1,115 +1,59 @@
 <?php
 
-/**
- * Unified Webhook Controller.
- *
- * Handles webhook requests from multiple payment providers by delegating
- * verification and processing to the appropriate PaymentHandlers.
- *
- * PHP 8.1+
- *
- * @package   Equidna\StagHerd\Http\Controllers
- *
- * @author    Gabriel Ruelas <gruelas@gruelas.com>
- * @license   https://opensource.org/licenses/MIT MIT License
- */
-
 namespace Equidna\StagHerd\Http\Controllers;
 
-use Equidna\StagHerd\Payment\Handlers\PaymentHandler;
-use Equidna\StagHerd\Payment\PaymentManager;
-use Equidna\StagHerd\Support\WebhookVerifier;
-use Exception;
+use Equidna\StagHerd\Exceptions\ProviderNotRegisteredException;
+use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-/**
- * Controller for receiving and dispatching webhooks.
- */
 class WebhookController extends Controller
 {
-    /**
-     * Creates a new WebhookController instance.
-     *
-     * @param PaymentManager $paymentManager Payment service.
-     */
     public function __construct(
-        protected PaymentManager $paymentManager,
+        private readonly ProviderRegistry $providers,
     ) {
         //
     }
 
-    /**
-     * Handles incoming webhook requests.
-     *
-     * @param Request $request  The incoming HTTP request.
-     * @param string  $provider The provider key from the route (e.g., 'paypal').
-     *
-     * @return JsonResponse Response indicating success or failure.
-     */
     public function handle(Request $request, string $provider): JsonResponse
     {
-        Log::channel(config('stag-herd.audit_log_channel', 'stack'))->info('StagHerd webhook received', [
+        $provider = strtolower($provider);
+
+        Log::info('StagHerd webhook received', [
             'provider' => $provider,
             'content_sha256' => hash('sha256', $request->getContent()),
-            'request_id' => $request->header('x-request-id') ?? $request->header('paypal-transmission-id'),
+            'request_id' => $request->header('x-request-id')
+                ?? $request->header('x-request-idempotency-key')
+                ?? $request->header('x-signature'),
             'ip_address' => $request->ip(),
         ]);
-        $provider = strtoupper($provider);
 
         try {
-            $handlerClass = $this->paymentManager->getHandlerClass($provider);
-        } catch (Exception $e) {
-            return response()->json(['message' => 'Invalid provider'], 404);
+            $this->providers->get($provider);
+        } catch (ProviderNotRegisteredException) {
+            return response()->json([
+                'message' => 'Provider not registered.',
+                'provider' => $provider,
+            ], 404);
         }
 
-        if (!is_subclass_of($handlerClass, PaymentHandler::class)) {
-            return response()->json(['message' => 'Invalid handler configuration'], 500);
+        try {
+            return response()->json([
+                'message' => 'Webhook received.',
+                'provider' => $provider,
+            ]);
+        } catch (Throwable $exception) {
+            Log::error('StagHerd webhook processing failed', [
+                'provider' => $provider,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Webhook processing failed.',
+            ], 500);
         }
-
-        // Verify Signature
-        if (method_exists($handlerClass, 'verifyWebhook')) {
-            $verification = $handlerClass::verifyWebhook($request);
-
-            if (!$verification['valid']) {
-                return response()->json([
-                    'message' => $verification['reason'] ?? 'Invalid signature',
-                ], 401);
-            }
-
-            // Deduplication
-            $eventId = $verification['eventId'] ?? null;
-            if ($eventId) {
-                $ttl = (int) config('stag-herd.idempotency_ttl', 604800);
-
-                if (
-                    !WebhookVerifier::isIdempotentAndStore(
-                        provider: strtolower($provider),
-                        eventId: (string) $eventId,
-                        ttl: $ttl,
-                    )
-                ) {
-                    return response()->json(['message' => 'OK (Idempotent)']);
-                }
-            }
-
-            // Dispatch/Process
-            if (method_exists($handlerClass, 'processWebhook')) {
-                try {
-                    $handlerClass::processWebhook($request);
-
-                    return response()->json(['message' => 'OK']);
-                } catch (Throwable $e) {
-                    Log::channel(config('stag-herd.audit_log_channel', 'stack'))->error("Webhook error [$provider]: " . $e->getMessage());
-
-                    return response()->json(['message' => 'Error processing'], 500);
-                }
-            }
-        }
-
-        return response()->json(['message' => 'Handler not compatible'], 500);
     }
 }

@@ -17,14 +17,16 @@ final readonly class CreatePayment
         //
     }
 
-    /**
-     * Create a payment using the selected provider.
-     */
     public function handle(PaymentRequestData $request): Payment
     {
         $provider = $this->providers->get($request->provider);
 
         $result = $provider->createPayment($request);
+
+        $result->assertMatchesRequest(
+            request: $request,
+            requireAmount: false,
+        );
 
         $payment = $this->payments->storeFromResult(
             request: $request,

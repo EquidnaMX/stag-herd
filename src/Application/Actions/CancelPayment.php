@@ -5,8 +5,8 @@ namespace Equidna\StagHerd\Application\Actions;
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Data\PaymentCancellationData;
 use Equidna\StagHerd\Domain\Payment;
+use Equidna\StagHerd\Domain\PaymentStateMachine;
 use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
-use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Support\PaymentEventDispatcher;
 use Equidna\StagHerd\Support\ProviderRegistry;
 
@@ -23,21 +23,19 @@ final readonly class CancelPayment
     {
         $payment = $this->resolveLocalPayment($request);
 
-        if ($payment->status->isFinal()) {
-            throw UnsupportedOperationException::forPaymentStatus(
-                'cancel',
-                $payment->status->value,
-            );
-        }
+        PaymentStateMachine::assertCanBeCanceled($payment);
 
         $provider = $this->providers->get($request->provider);
 
         $result = $provider->cancelPayment(
             new PaymentCancellationData(
                 provider: $request->provider,
+                method: $payment->method,
                 paymentId: $payment->id,
-                providerPaymentId: $payment->references?->providerPaymentId ?? $request->providerPaymentId,
-                externalReference: $payment->externalReference ?? $request->externalReference,
+                providerPaymentId: $payment->references?->providerPaymentId
+                    ?? $request->providerPaymentId,
+                externalReference: $payment->externalReference
+                    ?? $request->externalReference,
                 reason: $request->reason,
                 metadata: array_merge($payment->metadata, $request->metadata, [
                     'method' => $payment->method,
@@ -45,7 +43,20 @@ final readonly class CancelPayment
             )
         );
 
-        $updatedPayment = $this->payments->updateFromResult($payment, $result);
+        $result->assertMatchesPayment(
+            payment: $payment,
+            requireAmount: false,
+        );
+
+        PaymentStateMachine::assertCanApplyProviderResult(
+            payment: $payment,
+            providerResultStatus: $result->status,
+        );
+
+        $updatedPayment = $this->payments->updateFromResult(
+            payment: $payment,
+            result: $result,
+        );
 
         PaymentEventDispatcher::dispatchForPayment(
             payment: $updatedPayment,
@@ -67,7 +78,9 @@ final readonly class CancelPayment
 
         throw PaymentNotFoundException::withProviderReference(
             $request->provider,
-            $request->providerPaymentId ?? $request->externalReference ?? (string) $request->paymentId,
+            $request->providerPaymentId
+                ?? $request->externalReference
+                ?? (string) $request->paymentId,
         );
     }
 }
