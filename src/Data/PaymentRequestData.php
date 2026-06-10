@@ -9,6 +9,7 @@ final readonly class PaymentRequestData
         public string $currency,
         public string $method,
         public string $provider,
+        public ?string $providerOrderId = null,
         public ?string $externalReference = null,
         public ?string $payerReference = null,
         public ?string $payerEmail = null,
@@ -32,6 +33,9 @@ final readonly class PaymentRequestData
             currency: strtoupper((string) $data['currency']),
             method: strtolower((string) $data['method']),
             provider: strtolower((string) $data['provider']),
+            providerOrderId: isset($data['providerOrderId'])
+                ? (string) $data['providerOrderId']
+                : null,
             externalReference: isset($data['external_reference'])
                 ? (string) $data['external_reference']
                 : null,
@@ -68,6 +72,7 @@ final readonly class PaymentRequestData
             'currency' => $this->currency,
             'method' => $this->method,
             'provider' => $this->provider,
+            'provider_order_id' => $this->providerOrderId,
             'external_reference' => $this->externalReference,
             'payer_reference' => $this->payerReference,
             'payer_email' => $this->payerEmail,

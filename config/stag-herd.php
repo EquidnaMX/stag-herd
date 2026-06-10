@@ -12,24 +12,25 @@ return [
     */
 
     'repositories' => [
+        /*
+     * Repository principal del core.
+     *
+     * Sirve para guardar, buscar y actualizar pagos.
+     */
         'payments' => null,
+
+        /*
+     * Repository usado solamente por la UI/demo.
+     *
+     * Si el host usa tablas propias y quiere que la UI del paquete las muestre,
+     * puede registrar aquí un repository específico para display.
+     */
+        'payment_display' => null,
+
+        /*
+     * Para cuando agregues persistencia de webhooks.
+     */
         'webhooks' => null,
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | UI de prueba
-    |--------------------------------------------------------------------------
-    |
-    | Vistas simples para probar el paquete desde un proyecto host fresh.
-    | No son parte del checkout final del host, solo ayudan a validar acciones.
-    |
-    */
-
-    'ui' => [
-        'prefix' => env('STAG_HERD_UI_PREFIX', 'stag-herd/payments'),
-        'middleware' => ['web'],
-        'payments_limit' => 25,
     ],
 
     /*

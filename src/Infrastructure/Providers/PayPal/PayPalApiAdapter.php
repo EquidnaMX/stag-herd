@@ -45,7 +45,7 @@ class PayPalApiAdapter implements PayPalGateway
         return $this->send(
             method: 'post',
             endpoint: "/v2/checkout/orders/{$orderId}/capture",
-            payload: [],
+            payload: new \stdClass(),
             idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
         );
     }
@@ -64,12 +64,14 @@ class PayPalApiAdapter implements PayPalGateway
         ?string $currency = null,
         ?string $idempotencyKey = null,
     ): array {
-        $payload = [];
+        $payload = new \stdClass();
 
         if ($amount !== null) {
-            $payload['amount'] = [
-                'value' => MoneyFormatter::toDecimal($amount),
-                'currency_code' => strtoupper($currency ?: 'MXN'),
+            $payload = [
+                'amount' => [
+                    'value' => MoneyFormatter::toDecimal($amount),
+                    'currency_code' => strtoupper($currency ?: 'MXN'),
+                ],
             ];
         }
 
@@ -88,7 +90,7 @@ class PayPalApiAdapter implements PayPalGateway
     private function send(
         string $method,
         string $endpoint,
-        array $payload = [],
+        array|object $payload = [],
         ?string $idempotencyKey = null,
     ): array {
         try {
@@ -115,15 +117,23 @@ class PayPalApiAdapter implements PayPalGateway
             }
 
             if ($response->failed()) {
-                throw ProviderCommunicationException::requestFailed(
-                    self::PROVIDER,
-                    $response->status(),
-                    $response->json() ?? [],
-                );
+                dd([
+                    'provider' => self::PROVIDER,
+                    'status' => $response->status(),
+                    'endpoint' => $endpoint,
+                    'request_payload' => $payload,
+                    'paypal_response_json' => $response->json(),
+                    'paypal_response_body' => $response->body(),
+                    'paypal_headers' => $response->headers(),
+                ]);
             }
 
             return $response->json() ?? [];
-        } catch (ProviderAuthenticationException | ProviderCommunicationException | ProviderNotConfiguredException $exception) {
+        } catch (
+            ProviderAuthenticationException |
+            ProviderCommunicationException |
+            ProviderNotConfiguredException $exception
+        ) {
             throw $exception;
         } catch (RequestException $exception) {
             throw ProviderCommunicationException::connectionFailed(

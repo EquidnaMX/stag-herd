@@ -34,32 +34,25 @@ class PayPalProvider implements PaymentProvider
 
     public function createPayment(PaymentRequestData $request): PaymentResultData
     {
-        $this->validateCreatePaymentRequest($request);
-
-        $payload = $this->buildCreateOrderPayload($request);
-
-        $response = $this->gateway->createOrder(
-            payload: $payload,
-            idempotencyKey: $this->resolveIdempotencyKey($request),
-        );
-
-        return $this->mapOrderResponseToResult(
-            request: $request,
-            response: $response,
-        );
+        if ($request->providerOrderId) {
+            return $this->captureOrder(
+                providerOrderId: $request->providerOrderId,
+                method: $request->method,
+                metadata: [
+                    ...$request->metadata,
+                    'idempotency_key' => $request->metadata['idempotency_key']
+                        ?? 'stag-herd-paypal-capture-' . $request->providerOrderId,
+                ],
+            );
+        } else {
+            throw InvalidPaymentPayloadException::missingField('provider_order_id');
+        }
     }
 
     public function lookupPayment(PaymentLookupData $request): PaymentResultData
     {
         return match ($request->lookupType()) {
-            /*
-             * En PayPal, provider_order_id es la referencia principal antes del capture.
-             */
             'provider_order_id' => $this->lookupByOrderId($request),
-
-            /*
-             * Después del capture, provider_payment_id representa el capture_id.
-             */
             'provider_payment_id' => $this->lookupByCaptureId($request),
 
             default => throw UnsupportedOperationException::forOperation(
@@ -71,10 +64,6 @@ class PayPalProvider implements PaymentProvider
 
     public function cancelPayment(PaymentCancellationData $request): PaymentResultData
     {
-        /*
-         * PayPal Orders v2 no se cancela igual que Mercado Pago.
-         * Para demo lo dejamos como no soportado.
-         */
         throw UnsupportedOperationException::forOperation(
             'cancel',
             'PayPal order cancellation is not implemented in this MVP.'
@@ -109,12 +98,10 @@ class PayPalProvider implements PaymentProvider
     }
 
     /**
-     * Método extra para la demo.
+     * Método usado por la demo para capturar una PayPal Order.
      *
-     * PayPal necesita:
-     * 1. Crear order.
-     * 2. Cliente aprueba en approve_url.
-     * 3. Capturar order.
+     * Este método NO guarda en base de datos.
+     * Solo llama a PayPal y devuelve PaymentResultData.
      */
     public function captureOrder(
         string $providerOrderId,
@@ -158,11 +145,6 @@ class PayPalProvider implements PaymentProvider
     {
         $paypal = $request->metadata['paypal'] ?? [];
 
-        $amount = [
-            'currency_code' => strtoupper($request->currency),
-            'value' => MoneyFormatter::toDecimal($request->amount),
-        ];
-
         $payload = [
             'intent' => strtoupper((string) ($paypal['intent'] ?? 'CAPTURE')),
 
@@ -172,7 +154,11 @@ class PayPalProvider implements PaymentProvider
                     'description' => $request->description ?? $request->externalReference ?? 'Payment',
                     'custom_id' => $request->payerReference,
                     'invoice_id' => $paypal['invoice_id'] ?? null,
-                    'amount' => $amount,
+
+                    'amount' => [
+                        'currency_code' => strtoupper($request->currency),
+                        'value' => MoneyFormatter::toDecimal($request->amount),
+                    ],
                 ], fn($value) => $value !== null && $value !== ''),
             ],
 
@@ -242,7 +228,6 @@ class PayPalProvider implements PaymentProvider
             amount: $request->amount,
             currency: $request->currency,
             nextAction: $this->resolveNextAction($response),
-            reason: null,
             metadata: array_filter([
                 'external_reference' => $request->externalReference,
                 'paypal_order_id' => Arr::get($response, 'id'),
@@ -292,6 +277,7 @@ class PayPalProvider implements PaymentProvider
         array $response,
     ): PaymentResultData {
         $captureId = $this->resolveCaptureIdFromOrder($response);
+
         $providerStatus = $this->nullableString(
             Arr::get($response, 'purchase_units.0.payments.captures.0.status')
                 ?? Arr::get($response, 'status')
@@ -447,7 +433,9 @@ class PayPalProvider implements PaymentProvider
             ?? null;
 
         if (! $resolved) {
-            throw InvalidPaymentPayloadException::missingField('provider_payment_id / paypal_capture_id');
+            throw InvalidPaymentPayloadException::missingField(
+                'provider_payment_id / paypal_capture_id'
+            );
         }
 
         return (string) $resolved;

@@ -10,7 +10,6 @@ Route::group(
         'middleware' => ['api', 'throttle:webhook'],
     ],
     function () {
-        // Unified Webhook Controller for refactored providers
         Route::match(['get', 'post'], '/mercadopago', [WebhookController::class, 'handle'])
             ->defaults('provider', 'mercadopago')
             ->name('stag-herd.mercadopago');
@@ -20,12 +19,6 @@ Route::group(
             ->defaults('provider', 'paypal')
             ->name('stag-herd.paypal');
 
-        Route::get('/paypal/return', [PayPalController::class, 'return'])
-            ->name('stag-herd.paypal.return');
-
-        Route::get('/paypal/cancel', [PayPalController::class, 'cancel'])
-            ->name('stag-herd.paypal.cancel');
-
         Route::match(['get', 'post'], '/googlepay', [WebhookController::class, 'handle'])
             ->defaults('provider', 'googlepay')
             ->name('stag-herd.googlepay');
@@ -34,7 +27,6 @@ Route::group(
             ->defaults('provider', 'clip')
             ->name('stag-herd.clip');
 
-        // Legacy routes now also delegate to unified controller
         Route::match(['get', 'post'], '/openpay', [WebhookController::class, 'handle'])
             ->defaults('provider', 'openpay')
             ->name('stag-herd.openpay');

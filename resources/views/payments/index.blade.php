@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     @viteReactRefresh
-    @vite(['resources/js/checkout.tsx'])
+    @vite(['resources/js/stag-herd/checkout.tsx'])
 
     <style>
         body {
@@ -114,6 +114,11 @@
         button.provider,
         .button.provider {
             background: #2563eb;
+        }
+
+        button:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
         }
 
         .actions {
@@ -401,15 +406,15 @@
         <section class="grid">
             <aside>
                 <section class="card">
-                    <h2>Crear pago de prueba</h2>
+                    <h2>Datos del pago de prueba</h2>
 
                     <p class="muted">
-                        Para <strong>cash</strong> usa el formulario simple.
+                        Para <strong>cash</strong> puedes usar el formulario normal.
                         Para <strong>Mercado Pago</strong> usa el Brick.
-                        Para <strong>PayPal</strong> usa el botón de PayPal.
+                        Para <strong>PayPal</strong> usa el botón PayPal de abajo.
                     </p>
 
-                    <form method="POST" action="{{ route('stag-herd.payments.store') }}">
+                    <form method="POST" action="{{ route('stag-herd.payments.store') }}" id="manual-payment-form">
                         @csrf
 
                         <div class="two">
@@ -450,8 +455,8 @@
                                     placeholder="Ej. 589 si usas Fresh">
 
                                 <small class="muted">
-                                    Aquí va la orden real de Fresh. El paquete no la trata como columna propia; solo
-                                    viaja en metadata.
+                                    Aquí va la orden real de Fresh. Tu repositorio host la usa para insertar en
+                                    <code>Payments.id_order</code>.
                                 </small>
                             </div>
 
@@ -463,7 +468,7 @@
                                     placeholder="Ej. cliente Fresh">
 
                                 <small class="muted">
-                                    Campo genérico dentro de metadata. Fresh lo puede usar para Payments.id_client.
+                                    Fresh lo puede usar para <code>Payments.id_client</code>.
                                 </small>
                             </div>
                         </div>
@@ -474,8 +479,7 @@
                             placeholder="Ej. ORDER-589, CHECKOUT-ABC o referencia del host">
 
                         <small class="muted">
-                            Referencia de negocio. No es la orden obligatoria de Fresh; la orden de Fresh va en
-                            metadata[id_order].
+                            Referencia de negocio. No sustituye a <code>metadata[id_order]</code> para Fresh.
                         </small>
 
                         <div class="two">
@@ -536,8 +540,12 @@
 
                         <div class="paypal-fields hidden">
                             <div class="note mt">
-                                Para PayPal puedes crear una order desde este formulario y luego aprobar/capturar con
-                                el botón embebido de abajo.
+                                PayPal usa el flujo nuevo:
+                                <br>
+                                <strong>1.</strong> El botón crea una PayPal Order sin guardar <code>Payments</code>.
+                                <br>
+                                <strong>2.</strong> Si el cliente aprueba y el capture sale bien, entonces se guarda el
+                                pago local como aprobado.
                             </div>
 
                             <div class="two">
@@ -580,7 +588,14 @@
                             </select>
                         </div>
 
-                        <button class="mt" type="submit">Crear pago</button>
+                        <div id="manual-submit-wrapper" class="mt">
+                            <button type="submit">Crear pago local</button>
+                        </div>
+
+                        <div id="paypal-submit-help" class="note mt hidden">
+                            Para PayPal no uses este submit. Usa el botón de PayPal de abajo para evitar pagos locales
+                            pendientes o abandonados.
+                        </div>
                     </form>
                 </section>
 
@@ -612,15 +627,17 @@
                     <h2>Checkout PayPal</h2>
 
                     <p class="muted">
-                        Este bloque renderiza el botón oficial de PayPal. Crea la order en el backend, abre el popup de
-                        PayPal y después captura la order automáticamente.
+                        Este bloque renderiza el botón oficial de PayPal.
+                        Primero crea la order en PayPal sin guardar Payment local.
+                        Si el cliente aprueba y el capture sale bien, entonces se guarda el Payment local.
                     </p>
 
                     <div class="note mb">
                         <strong>Importante para Fresh:</strong>
                         <br>
-                        Antes de pagar, llena <strong>Metadata: id_order</strong> con una orden real. Tu
-                        <code>FreshPaymentRepository</code> la necesita para insertar en <code>Payments</code>.
+                        Antes de pagar, llena <strong>Metadata: id_order</strong> con una orden real.
+                        Tu <code>FreshPaymentRepository</code> la necesita para insertar en <code>Payments</code>
+                        después del capture exitoso.
                     </div>
 
                     <div data-stag-herd-checkout="paypal"
@@ -760,8 +777,8 @@
                     <h2>Pagos locales</h2>
 
                     <p class="muted">
-                        Esta tabla muestra tu persistencia local. El botón Actualizar consulta provider y actualiza
-                        local si aplica.
+                        Esta tabla muestra tu persistencia local. En el flujo nuevo de PayPal, solo aparecerán pagos
+                        PayPal cuando el cliente apruebe y el capture se complete correctamente.
                     </p>
 
                     <form class="search" method="GET" action="{{ route('stag-herd.payments.index') }}">
@@ -824,8 +841,9 @@
 
                                                 @if (!empty($hostOrderId))
                                                     <br>
-                                                    <span class="muted">metadata.id_order:
-                                                        #{{ $hostOrderId }}</span>
+                                                    <span class="muted">
+                                                        metadata.id_order: #{{ $hostOrderId }}
+                                                    </span>
                                                 @endif
                                             </td>
 
@@ -881,19 +899,6 @@
                                                             target="_blank" rel="noopener">
                                                             Abrir checkout
                                                         </a>
-                                                    @endif
-
-                                                    @if (
-                                                        $provider === 'paypal' &&
-                                                            !empty($providerOrderId) &&
-                                                            !in_array(strtoupper((string) $status), ['APPROVED', 'REFUNDED'], true))
-                                                        <form method="POST"
-                                                            action="{{ route('stag-herd.payments.paypal.capture', $paymentId) }}">
-                                                            @csrf
-                                                            <button class="provider" type="submit">
-                                                                Capture PayPal
-                                                            </button>
-                                                        </form>
                                                     @endif
 
                                                     <form method="POST"
@@ -953,6 +958,8 @@
     <script>
         const providerSelect = document.getElementById('provider');
         const methodSelect = document.getElementById('method');
+        const manualSubmitWrapper = document.getElementById('manual-submit-wrapper');
+        const paypalSubmitHelp = document.getElementById('paypal-submit-help');
 
         const cashFields = document.querySelectorAll('.cash-fields');
         const mercadoPagoFields = document.querySelectorAll('.mercado-pago-fields');
@@ -1016,6 +1023,14 @@
             paypalFields.forEach((element) => {
                 element.classList.toggle('hidden', provider !== 'paypal');
             });
+
+            if (manualSubmitWrapper) {
+                manualSubmitWrapper.classList.toggle('hidden', provider === 'paypal');
+            }
+
+            if (paypalSubmitHelp) {
+                paypalSubmitHelp.classList.toggle('hidden', provider !== 'paypal');
+            }
 
             syncCheckoutDataset();
         }

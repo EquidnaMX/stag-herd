@@ -5,7 +5,6 @@ namespace Equidna\StagHerd\Application\Actions;
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Data\PaymentCancellationData;
 use Equidna\StagHerd\Domain\Payment;
-use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
 use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Support\PaymentEventDispatcher;

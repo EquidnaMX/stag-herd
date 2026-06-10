@@ -3,7 +3,6 @@
 namespace Equidna\StagHerd\Contracts;
 
 use Equidna\StagHerd\Data\PaymentCancellationData;
-use Equidna\StagHerd\Data\PaymentConfirmationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;

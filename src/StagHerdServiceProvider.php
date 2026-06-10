@@ -5,7 +5,9 @@ namespace Equidna\StagHerd;
 use Equidna\StagHerd\Application\PaymentService;
 use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
+use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
 use Equidna\StagHerd\Contracts\PaymentRepository;
+use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentDisplayRepository;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentRepository;
 use Equidna\StagHerd\Infrastructure\Providers\Cash\CashProvider;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoApiAdapter;
@@ -45,7 +47,7 @@ class StagHerdServiceProvider extends ServiceProvider
         ], 'stag-herd-migrations');
 
         $this->publishes([
-            __DIR__ . '/../resources/views' => resource_path('views/vendor/stag-herd'),
+            __DIR__ . '/../resources/views' => resource_path('views/stag-herd'),
         ], 'stag-herd-views');
 
         $this->publishes([
@@ -64,8 +66,17 @@ class StagHerdServiceProvider extends ServiceProvider
 
             return $app->make(EloquentPaymentRepository::class);
         });
-    }
 
+        $this->app->bind(PaymentDisplayRepository::class, function ($app) {
+            $repository = config('stag-herd.repositories.payment_display');
+
+            if ($repository) {
+                return $app->make($repository);
+            }
+
+            return $app->make(EloquentPaymentDisplayRepository::class);
+        });
+    }
     private function registerGateways(): void
     {
         $this->app->bind(

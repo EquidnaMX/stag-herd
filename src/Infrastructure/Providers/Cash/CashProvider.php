@@ -8,9 +8,9 @@ use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\ProviderReferencesData;
 use Equidna\StagHerd\Data\PaymentCancellationData;
-use Equidna\StagHerd\Data\PaymentConfirmationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\RefundRequestData;
+use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 
 final class CashProvider implements PaymentProvider
@@ -70,7 +70,7 @@ final class CashProvider implements PaymentProvider
         return new PaymentResultData(
             provider: $this->getName(),
             method: 'cash',
-            status: \Equidna\StagHerd\Domain\Enums\PaymentStatusEnum::CANCELED,
+            status: PaymentStatusEnum::CANCELED,
             providerStatus: 'canceled',
             references: new ProviderReferencesData(
                 providerPaymentId: $request->providerPaymentId,
@@ -88,7 +88,7 @@ final class CashProvider implements PaymentProvider
         return new PaymentResultData(
             provider: $this->getName(),
             method: 'cash',
-            status: \Equidna\StagHerd\Domain\Enums\PaymentStatusEnum::REFUNDED,
+            status: PaymentStatusEnum::REFUNDED,
             providerStatus: 'refunded',
             references: new ProviderReferencesData(
                 providerPaymentId: $request->providerPaymentId,

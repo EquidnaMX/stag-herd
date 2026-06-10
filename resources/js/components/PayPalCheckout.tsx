@@ -82,6 +82,15 @@ export function PayPalCheckout({
 
   const buttonsRef = useRef<any>(null);
 
+  /*
+   * Aquí guardamos temporalmente los datos que regresó /paypal/create.
+   *
+   * No es un Payment local todavía.
+   * Solo sirve para que /paypal/capture pueda crear el Payment local
+   * después de capturar exitosamente.
+   */
+  const checkoutContextRef = useRef<any>(null);
+
   const [status, setStatus] = useState<CheckoutStatus>("idle");
   const [message, setMessage] = useState<string>("");
   const [responsePayload, setResponsePayload] = useState<unknown>(null);
@@ -159,9 +168,6 @@ export function PayPalCheckout({
           const metadata = readMetadataFromPage();
 
           const payload = {
-            provider: "paypal",
-            method: "paypal",
-
             amount: currentAmount,
             currency: currentCurrency,
 
@@ -205,17 +211,28 @@ export function PayPalCheckout({
           }
 
           const orderId =
-            data?.provider_order_id ||
-            data?.payment?.references?.provider_order_id ||
-            data?.payment?.references?.providerOrderId ||
-            data?.payment?.raw_payload?.id;
+            data?.provider_order_id || data?.paypal_order?.id || data?.id;
 
           if (!orderId) {
             throw new Error("El backend no regresó provider_order_id.");
           }
 
+          /*
+           * IMPORTANTE:
+           * Aquí guardamos lo que después se mandará a /paypal/capture.
+           */
+          checkoutContextRef.current = data?.checkout_context ?? null;
+
+          if (!checkoutContextRef.current) {
+            throw new Error(
+              "El backend creó la orden, pero no regresó checkout_context.",
+            );
+          }
+
           setResponsePayload(data);
-          setMessage(`Orden creada: ${orderId}`);
+          setMessage(
+            `Orden creada en PayPal: ${orderId}. Aún no se guardó Payment local.`,
+          );
 
           return orderId;
         },
@@ -223,6 +240,24 @@ export function PayPalCheckout({
         onApprove: async (data: any) => {
           setStatus("loading");
           setMessage("Capturando orden de PayPal...");
+
+          if (!checkoutContextRef.current) {
+            throw new Error(
+              "No existe checkout_context. No se puede crear el Payment local después del capture.",
+            );
+          }
+
+          const capturePayload = {
+            provider_order_id: data?.orderID,
+            ...checkoutContextRef.current,
+          };
+
+          /*
+           * Debug útil:
+           * revisa en la consola del navegador que aquí ya venga amount,
+           * currency, metadata, etc.
+           */
+          console.log("PayPal capture payload:", capturePayload);
 
           const response = await fetch(captureOrderUrl, {
             method: "POST",
@@ -232,9 +267,7 @@ export function PayPalCheckout({
               "X-CSRF-TOKEN": csrfToken,
               "X-Requested-With": "XMLHttpRequest",
             },
-            body: JSON.stringify({
-              provider_order_id: data?.orderID,
-            }),
+            body: JSON.stringify(capturePayload),
           });
 
           const responseData = await parseJsonResponse(response);
@@ -248,7 +281,7 @@ export function PayPalCheckout({
           }
 
           setStatus("success");
-          setMessage("Pago PayPal capturado correctamente.");
+          setMessage("Pago PayPal capturado y guardado localmente.");
           setResponsePayload(responseData);
 
           return responseData;
@@ -256,7 +289,9 @@ export function PayPalCheckout({
 
         onCancel: (data: any) => {
           setStatus("idle");
-          setMessage("El comprador canceló el flujo de PayPal.");
+          setMessage(
+            "El comprador canceló el flujo de PayPal. No se guardó Payment local.",
+          );
           setResponsePayload(data);
         },
 

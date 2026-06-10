@@ -3,7 +3,6 @@
 namespace Equidna\StagHerd\Application;
 
 use Equidna\StagHerd\Application\Actions\CancelPayment;
-use Equidna\StagHerd\Application\Actions\ConfirmPayment;
 use Equidna\StagHerd\Application\Actions\CreatePayment;
 use Equidna\StagHerd\Application\Actions\LookupPayment;
 use Equidna\StagHerd\Application\Actions\RefundPayment;

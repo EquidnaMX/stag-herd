@@ -11,6 +11,7 @@ use Equidna\StagHerd\Data\ProviderReferencesData;
 use Equidna\StagHerd\Data\PaymentCancellationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\RefundRequestData;
+use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
@@ -364,7 +365,7 @@ class MercadoPagoProvider implements PaymentProvider
         return new PaymentResultData(
             provider: $this->getName(),
             method: (string) ($request->metadata['method'] ?? 'unknown'),
-            status: \Equidna\StagHerd\Domain\Enums\PaymentStatusEnum::REFUNDED,
+            status: PaymentStatusEnum::REFUNDED,
             providerStatus: $providerRefundStatus,
             references: new ProviderReferencesData(
                 providerPaymentId: $request->providerPaymentId ?? $request->metadata['provider_payment_id'] ?? null,

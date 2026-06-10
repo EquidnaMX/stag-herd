@@ -7,9 +7,11 @@ Route::middleware(config('stag-herd.ui.middleware', ['web']))
     ->prefix(config('stag-herd.ui.prefix', 'stag-herd/payments'))
     ->name('stag-herd.payments.')
     ->group(function () {
-        Route::get('/', [PaymentDemoController::class, 'index'])->name('index');
+        Route::get('/', [PaymentDemoController::class, 'index'])
+            ->name('index');
 
-        Route::post('/', [PaymentDemoController::class, 'store'])->name('store');
+        Route::post('/', [PaymentDemoController::class, 'store'])
+            ->name('store');
 
         Route::post('/brick/process', [PaymentDemoController::class, 'processBrick'])
             ->name('brick.process');
@@ -31,6 +33,9 @@ Route::middleware(config('stag-herd.ui.middleware', ['web']))
 
         Route::post('/{payment}/sync', [PaymentDemoController::class, 'sync'])
             ->name('sync');
+
+        Route::post('/{payment}/lookup', [PaymentDemoController::class, 'lookup'])
+            ->name('lookup');
 
         Route::post('/{payment}/cancel', [PaymentDemoController::class, 'cancel'])
             ->name('cancel');

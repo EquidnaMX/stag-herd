@@ -9,7 +9,6 @@ use Equidna\StagHerd\Data\ProviderReferencesData;
 use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
 use Equidna\StagHerd\Domain\Payment;
 use Equidna\StagHerd\Infrastructure\Persistence\Models\StagHerdPayment;
-use Illuminate\Pagination\LengthAwarePaginator;
 
 class EloquentPaymentRepository implements PaymentRepository
 {
@@ -100,35 +99,6 @@ class EloquentPaymentRepository implements PaymentRepository
         return $model ? $this->mapToDomain($model) : null;
     }
 
-
-    public function findByAnyProviderReference(
-        string $provider,
-        array $references,
-    ): ?Payment {
-        $values = $this->cleanReferenceValues($references);
-
-        if ($values === []) {
-            return null;
-        }
-
-        $model = StagHerdPayment::query()
-            ->where('provider', $provider)
-            ->where(function ($query) use ($values) {
-                foreach ($values as $value) {
-                    $query
-                        ->orWhere('provider_payment_id', $value)
-                        ->orWhere('provider_order_id', $value)
-                        ->orWhere('provider_transaction_id', $value)
-                        ->orWhere('provider_refund_id', $value)
-                        ->orWhere('external_reference', $value);
-                }
-            })
-            ->latest('id')
-            ->first();
-
-        return $model ? $this->mapToDomain($model) : null;
-    }
-
     public function updateFromResult(
         Payment $payment,
         PaymentResultData $result,
@@ -167,39 +137,6 @@ class EloquentPaymentRepository implements PaymentRepository
         return $this->mapToDomain($model->refresh());
     }
 
-    public function paginate(
-        ?string $search = null,
-        int $perPage = 10,
-    ): LengthAwarePaginator {
-        $search = trim((string) $search);
-
-        return StagHerdPayment::query()
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($query) use ($search) {
-                    if (ctype_digit($search)) {
-                        $query->orWhere('id', $search);
-                    }
-
-                    $query
-                        ->orWhere('provider', 'like', "%{$search}%")
-                        ->orWhere('method', 'like', "%{$search}%")
-                        ->orWhere('status', 'like', "%{$search}%")
-                        ->orWhere('payer_reference', 'like', "%{$search}%")
-                        ->orWhere('payer_email', 'like', "%{$search}%")
-                        ->orWhere('provider_payment_id', 'like', "%{$search}%")
-                        ->orWhere('provider_order_id', 'like', "%{$search}%");
-                });
-            })
-            ->latest('id')
-            ->paginate($perPage)
-            ->withQueryString();
-    }
-
-    public function findForDisplay(int|string $id): ?object
-    {
-        return StagHerdPayment::query()->find($id);
-    }
-
     private function mapToDomain(StagHerdPayment $model): Payment
     {
         return new Payment(
@@ -221,15 +158,5 @@ class EloquentPaymentRepository implements PaymentRepository
             ),
             metadata: $model->metadata ?? [],
         );
-    }
-
-    private function cleanReferenceValues(array $references): array
-    {
-        return collect($references)
-            ->filter(fn($value) => $value !== null && $value !== '')
-            ->map(fn($value) => (string) $value)
-            ->unique()
-            ->values()
-            ->all();
     }
 }
