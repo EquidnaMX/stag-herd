@@ -3,6 +3,7 @@
 namespace Equidna\StagHerd\Support;
 
 use Equidna\StagHerd\Contracts\PaymentProvider;
+use Equidna\StagHerd\Exceptions\InvalidPaymentMethodException;
 use Equidna\StagHerd\Exceptions\ProviderNotRegisteredException;
 
 class ProviderRegistry
@@ -14,11 +15,13 @@ class ProviderRegistry
 
     public function register(PaymentProvider $provider): void
     {
-        $this->providers[$provider->getName()] = $provider;
+        $this->providers[strtolower($provider->getName())] = $provider;
     }
 
     public function get(string $name): PaymentProvider
     {
+        $name = strtolower($name);
+
         if (! isset($this->providers[$name])) {
             throw ProviderNotRegisteredException::forProvider($name);
         }
@@ -28,6 +31,28 @@ class ProviderRegistry
 
     public function has(string $name): bool
     {
-        return isset($this->providers[$name]);
+        return isset($this->providers[strtolower($name)]);
+    }
+
+    public function resolveProviderNameForMethod(string $method): string
+    {
+        $method = strtolower($method);
+
+        foreach (config('stag-herd.providers', []) as $providerName => $providerConfig) {
+            if (! ($providerConfig['enabled'] ?? false)) {
+                continue;
+            }
+
+            foreach (($providerConfig['methods'] ?? []) as $configuredMethod => $methodConfig) {
+                if (
+                    strtolower((string) $configuredMethod) === $method
+                    && ($methodConfig['enabled'] ?? false)
+                ) {
+                    return strtolower((string) $providerName);
+                }
+            }
+        }
+
+        throw InvalidPaymentMethodException::forMethod($method);
     }
 }

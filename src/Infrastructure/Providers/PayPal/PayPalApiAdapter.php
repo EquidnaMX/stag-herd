@@ -117,15 +117,11 @@ class PayPalApiAdapter implements PayPalGateway
             }
 
             if ($response->failed()) {
-                dd([
-                    'provider' => self::PROVIDER,
-                    'status' => $response->status(),
-                    'endpoint' => $endpoint,
-                    'request_payload' => $payload,
-                    'paypal_response_json' => $response->json(),
-                    'paypal_response_body' => $response->body(),
-                    'paypal_headers' => $response->headers(),
-                ]);
+                throw ProviderCommunicationException::requestFailed(
+                    self::PROVIDER,
+                    $response->status(),
+                    $response->json() ?? [],
+                );
             }
 
             return $response->json() ?? [];

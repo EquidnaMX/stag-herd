@@ -2,13 +2,15 @@
 
 namespace Equidna\StagHerd\Data;
 
+use Equidna\StagHerd\Support\MoneyFormatter;
+
 final readonly class PaymentRequestData
 {
     public function __construct(
         public int $amount,
         public string $currency,
         public string $method,
-        public string $provider,
+        public ?string $provider = null,
         public ?string $providerOrderId = null,
         public ?string $externalReference = null,
         public ?string $payerReference = null,
@@ -21,50 +23,86 @@ final readonly class PaymentRequestData
         //
     }
 
-    /**
-     * Create a payment request from array data.
-     *
-     * @param array<string, mixed> $data
-     */
+    public static function fromDecimalAmount(
+        int|float|string $amount,
+        string $currency,
+        string $method,
+        ?string $provider = null,
+        ?string $providerOrderId = null,
+        ?string $externalReference = null,
+        ?string $payerReference = null,
+        ?string $payerEmail = null,
+        ?string $description = null,
+        ?string $returnUrl = null,
+        ?string $cancelUrl = null,
+        array $metadata = [],
+    ): self {
+        return new self(
+            amount: MoneyFormatter::fromDecimal($amount),
+            currency: strtoupper($currency),
+            method: strtolower($method),
+            provider: $provider !== null ? strtolower($provider) : null,
+            providerOrderId: $providerOrderId,
+            externalReference: $externalReference,
+            payerReference: $payerReference,
+            payerEmail: $payerEmail,
+            description: $description,
+            returnUrl: $returnUrl,
+            cancelUrl: $cancelUrl,
+            metadata: $metadata,
+        );
+    }
+
     public static function fromArray(array $data): self
     {
         return new self(
             amount: (int) $data['amount'],
             currency: strtoupper((string) $data['currency']),
             method: strtolower((string) $data['method']),
-            provider: strtolower((string) $data['provider']),
-            providerOrderId: isset($data['providerOrderId'])
-                ? (string) $data['providerOrderId']
-                : null,
+            provider: isset($data['provider']) ? strtolower((string) $data['provider']) : null,
+            providerOrderId: isset($data['provider_order_id'])
+                ? (string) $data['provider_order_id']
+                : (isset($data['providerOrderId']) ? (string) $data['providerOrderId'] : null),
             externalReference: isset($data['external_reference'])
                 ? (string) $data['external_reference']
-                : null,
+                : (isset($data['externalReference']) ? (string) $data['externalReference'] : null),
             payerReference: isset($data['payer_reference'])
                 ? (string) $data['payer_reference']
-                : null,
+                : (isset($data['payerReference']) ? (string) $data['payerReference'] : null),
             payerEmail: isset($data['payer_email'])
                 ? (string) $data['payer_email']
-                : null,
-            description: isset($data['description'])
-                ? (string) $data['description']
-                : null,
+                : (isset($data['payerEmail']) ? (string) $data['payerEmail'] : null),
+            description: isset($data['description']) ? (string) $data['description'] : null,
             returnUrl: isset($data['return_url'])
                 ? (string) $data['return_url']
-                : null,
+                : (isset($data['returnUrl']) ? (string) $data['returnUrl'] : null),
             cancelUrl: isset($data['cancel_url'])
                 ? (string) $data['cancel_url']
-                : null,
+                : (isset($data['cancelUrl']) ? (string) $data['cancelUrl'] : null),
             metadata: isset($data['metadata']) && is_array($data['metadata'])
                 ? $data['metadata']
                 : [],
         );
     }
 
-    /**
-     * Convert the payment request to array.
-     *
-     * @return array<string, mixed>
-     */
+    public function withProvider(string $provider): self
+    {
+        return new self(
+            amount: $this->amount,
+            currency: $this->currency,
+            method: $this->method,
+            provider: strtolower($provider),
+            providerOrderId: $this->providerOrderId,
+            externalReference: $this->externalReference,
+            payerReference: $this->payerReference,
+            payerEmail: $this->payerEmail,
+            description: $this->description,
+            returnUrl: $this->returnUrl,
+            cancelUrl: $this->cancelUrl,
+            metadata: $this->metadata,
+        );
+    }
+
     public function toArray(): array
     {
         return [

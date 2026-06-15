@@ -27,8 +27,8 @@ class StagHerdServiceProvider extends ServiceProvider
 
         $this->registerRepositories();
         $this->registerGateways();
-        $this->registerProviders();
         $this->registerCustomPaymentHandlers();
+        $this->registerProviders();
         $this->registerServices();
     }
 
@@ -97,29 +97,6 @@ class StagHerdServiceProvider extends ServiceProvider
         );
     }
 
-    private function registerProviders(): void
-    {
-        $this->app->singleton(ProviderRegistry::class, function ($app) {
-            $registry = new ProviderRegistry();
-
-            foreach (config('stag-herd.providers', []) as $name => $providerConfig) {
-                if (! ($providerConfig['enabled'] ?? false)) {
-                    continue;
-                }
-
-                $providerClass = $providerConfig['provider'] ?? null;
-
-                if (! $providerClass) {
-                    continue;
-                }
-
-                $registry->register($app->make($providerClass));
-            }
-
-            return $registry;
-        });
-    }
-
     private function registerCustomPaymentHandlers(): void
     {
         $this->app->singleton(CustomPaymentHandlerRegistry::class, function ($app) {
@@ -152,6 +129,29 @@ class StagHerdServiceProvider extends ServiceProvider
                 }
 
                 $registry->register($handler);
+            }
+
+            return $registry;
+        });
+    }
+
+    private function registerProviders(): void
+    {
+        $this->app->singleton(ProviderRegistry::class, function ($app) {
+            $registry = new ProviderRegistry();
+
+            foreach (config('stag-herd.providers', []) as $providerConfig) {
+                if (! ($providerConfig['enabled'] ?? false)) {
+                    continue;
+                }
+
+                $providerClass = $providerConfig['provider'] ?? null;
+
+                if (! $providerClass) {
+                    continue;
+                }
+
+                $registry->register($app->make($providerClass));
             }
 
             return $registry;

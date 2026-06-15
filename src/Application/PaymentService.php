@@ -3,11 +3,13 @@
 namespace Equidna\StagHerd\Application;
 
 use Equidna\StagHerd\Application\Actions\CancelPayment;
+use Equidna\StagHerd\Application\Actions\ConfirmPayment;
 use Equidna\StagHerd\Application\Actions\CreatePayment;
 use Equidna\StagHerd\Application\Actions\LookupPayment;
 use Equidna\StagHerd\Application\Actions\RefundPayment;
 use Equidna\StagHerd\Application\Actions\SyncPayment;
 use Equidna\StagHerd\Data\PaymentCancellationData;
+use Equidna\StagHerd\Data\PaymentConfirmationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\RefundRequestData;
@@ -17,6 +19,7 @@ final readonly class PaymentService
 {
     public function __construct(
         private CreatePayment $createPayment,
+        private ConfirmPayment $confirmPayment,
         private LookupPayment $lookupPayment,
         private CancelPayment $cancelPayment,
         private RefundPayment $refundPayment,
@@ -28,6 +31,11 @@ final readonly class PaymentService
     public function createPayment(PaymentRequestData $request): Payment
     {
         return $this->createPayment->handle($request);
+    }
+
+    public function confirmPayment(PaymentConfirmationData $request): Payment
+    {
+        return $this->confirmPayment->handle($request);
     }
 
     public function lookupPayment(PaymentLookupData $request): Payment

@@ -19,6 +19,25 @@ final readonly class CreatePayment
 
     public function handle(PaymentRequestData $request): Payment
     {
+        $providerName = $request->provider
+            ? strtolower($request->provider)
+            : $this->providers->resolveProviderNameForMethod($request->method);
+
+        $request = new PaymentRequestData(
+            amount: $request->amount,
+            currency: strtoupper($request->currency),
+            method: strtolower($request->method),
+            provider: $providerName,
+            providerOrderId: $request->providerOrderId,
+            externalReference: $request->externalReference,
+            payerReference: $request->payerReference,
+            payerEmail: $request->payerEmail,
+            description: $request->description,
+            returnUrl: $request->returnUrl,
+            cancelUrl: $request->cancelUrl,
+            metadata: $request->metadata,
+        );
+
         $provider = $this->providers->get($request->provider);
 
         $result = $provider->createPayment($request);

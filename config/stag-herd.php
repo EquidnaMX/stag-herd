@@ -1,43 +1,17 @@
 <?php
 
 return [
-    /*
-    |--------------------------------------------------------------------------
-    | Repositories
-    |--------------------------------------------------------------------------
-    |
-    | Si el host no define repositorios, el paquete usa sus repositorios internos.
-    | Si el host define una clase, se usa esa implementación.
-    |
-    */
-
     'repositories' => [
         'payments' => null,
         'payment_display' => null,
         'webhooks' => null,
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Demo UI
-    |--------------------------------------------------------------------------
-    |
-    | La demo queda apagada por defecto para no contaminar al host.
-    | Solo debe prenderse en proyectos de prueba o sandbox.
-    |
-    */
-
     'demo' => [
         'enabled' => false,
         'middleware' => ['web'],
         'prefix' => 'stag-herd/payments',
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Webhooks
-    |--------------------------------------------------------------------------
-    */
 
     'webhooks' => [
         'routes' => [
@@ -47,19 +21,17 @@ return [
         ],
 
         'idempotency' => [
-            'driver' => 'redis',
-            'ttl_seconds' => 86400,
+            'driver' => env('STAG_HERD_WEBHOOK_IDEMPOTENCY_DRIVER', 'redis'),
+            'ttl_seconds' => env('STAG_HERD_WEBHOOK_IDEMPOTENCY_TTL', 86400),
             'prefix' => 'stag-herd:webhooks',
         ],
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Providers
-    |--------------------------------------------------------------------------
-    */
-
     'providers' => [
+        /**
+         * Provider para métodos internos del host.
+         *
+         */
         'custom' => [
             'provider' => Equidna\StagHerd\Infrastructure\Providers\Custom\CustomProvider::class,
             'enabled' => false,

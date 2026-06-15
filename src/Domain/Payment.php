@@ -5,76 +5,73 @@ namespace Equidna\StagHerd\Domain;
 use Equidna\StagHerd\Data\ProviderReferencesData;
 use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
 
-final class Payment
+final readonly class Payment
 {
     public function __construct(
-        public readonly ?string $id,
-        public readonly string $provider,
-        public readonly string $method,
-        public readonly int $amount,
-        public readonly string $currency,
-        public readonly PaymentStatusEnum $status,
-        public readonly ?string $providerStatus = null,
-        public readonly ?string $externalReference = null,
-        public readonly ?string $payerReference = null,
-        public readonly ?string $payerEmail = null,
-        public readonly ?ProviderReferencesData $references = null,
-        public readonly array $metadata = [],
+        public string|int $id,
+        public string $provider,
+        public string $method,
+        public int $amount,
+        public string $currency,
+        public PaymentStatusEnum $status,
+        public ?string $providerStatus = null,
+        public ?string $externalReference = null,
+        public ?string $payerReference = null,
+        public ?string $payerEmail = null,
+        public ?ProviderReferencesData $references = null,
+        public array $metadata = [],
     ) {
         //
     }
 
-    /**
-     * Return a new payment instance with a different status.
-     */
-    public function withStatus(
-        PaymentStatusEnum $status,
-        ?string $providerStatus = null,
-    ): self {
-        return new self(
-            id: $this->id,
-            provider: $this->provider,
-            method: $this->method,
-            amount: $this->amount,
-            currency: $this->currency,
-            status: $status,
-            providerStatus: $providerStatus ?? $this->providerStatus,
-            externalReference: $this->externalReference,
-            payerReference: $this->payerReference,
-            payerEmail: $this->payerEmail,
-            references: $this->references,
-            metadata: $this->metadata,
-        );
+    public function isPending(): bool
+    {
+        return $this->status === PaymentStatusEnum::PENDING;
     }
 
-    /**
-     * Check if the payment status is final.
-     */
+    public function isApproved(): bool
+    {
+        return $this->status === PaymentStatusEnum::APPROVED;
+    }
+
+    public function isRejected(): bool
+    {
+        return $this->status === PaymentStatusEnum::REJECTED;
+    }
+
+    public function isCanceled(): bool
+    {
+        return $this->status === PaymentStatusEnum::CANCELED;
+    }
+
+    public function isRefunded(): bool
+    {
+        return $this->status === PaymentStatusEnum::REFUNDED;
+    }
+
+    public function isFailed(): bool
+    {
+        return $this->status === PaymentStatusEnum::FAILED;
+    }
+
+    public function canBeCanceled(): bool
+    {
+        return $this->isPending();
+    }
+
+    public function canBeRefunded(): bool
+    {
+        return $this->isApproved();
+    }
+
     public function isFinal(): bool
     {
-        return $this->status->isFinal();
-    }
-
-    /**
-     * Convert the payment to array.
-     *
-     * @return array<string, mixed>
-     */
-    public function toArray(): array
-    {
-        return [
-            'id' => $this->id,
-            'provider' => $this->provider,
-            'method' => $this->method,
-            'amount' => $this->amount,
-            'currency' => $this->currency,
-            'status' => $this->status->value,
-            'provider_status' => $this->providerStatus,
-            'external_reference' => $this->externalReference,
-            'payer_reference' => $this->payerReference,
-            'payer_email' => $this->payerEmail,
-            'references' => $this->references?->toArray(),
-            'metadata' => $this->metadata,
-        ];
+        return in_array($this->status, [
+            PaymentStatusEnum::APPROVED,
+            PaymentStatusEnum::REJECTED,
+            PaymentStatusEnum::CANCELED,
+            PaymentStatusEnum::REFUNDED,
+            PaymentStatusEnum::FAILED,
+        ], true);
     }
 }
