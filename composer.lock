@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "044d5a4311cb08ee9b9e63b850e96fad",
+    "content-hash": "6464b8bc7952ea13fcad8e25d754a62f",
     "packages": [
         {
             "name": "brick/math",
@@ -510,27 +510,27 @@
         },
         {
             "name": "equidna/laravel-toolkit",
-            "version": "1.0.5",
+            "version": "2.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/EquidnaMX/laravel-toolkit.git",
-                "reference": "a7d16502b8f3793906d82f3239ac8b041bc3e12f"
+                "reference": "0a5dcbd1b802f1117a95c404e0fb8a53e192ce5b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/EquidnaMX/laravel-toolkit/zipball/a7d16502b8f3793906d82f3239ac8b041bc3e12f",
-                "reference": "a7d16502b8f3793906d82f3239ac8b041bc3e12f",
+                "url": "https://api.github.com/repos/EquidnaMX/laravel-toolkit/zipball/0a5dcbd1b802f1117a95c404e0fb8a53e192ce5b",
+                "reference": "0a5dcbd1b802f1117a95c404e0fb8a53e192ce5b",
                 "shasum": ""
             },
             "require": {
-                "illuminate/support": "^11.21 || ^12.0",
-                "laravel/framework": "^11.21 || ^12.0",
+                "illuminate/support": "^12.0 || ^13.0",
+                "laravel/framework": "^12.0 || ^13.0",
                 "laravel/helpers": "^1.7",
                 "php": "^8.2"
             },
             "require-dev": {
                 "larastan/larastan": "*",
-                "phpunit/phpunit": "^9.6",
+                "phpunit/phpunit": "^9.6 || ^11.5 || ^12.5 || ^13.2",
                 "squizlabs/php_codesniffer": "*"
             },
             "type": "library",
@@ -559,9 +559,9 @@
             "description": "Multi-context Laravel helpers, middleware, and utilities.",
             "support": {
                 "issues": "https://github.com/EquidnaMX/laravel-toolkit/issues",
-                "source": "https://github.com/EquidnaMX/laravel-toolkit/tree/1.0.5"
+                "source": "https://github.com/EquidnaMX/laravel-toolkit/tree/2.0.0"
             },
-            "time": "2026-05-08T03:13:42+00:00"
+            "time": "2026-06-14T01:55:03+00:00"
         },
         {
             "name": "fruitcake/php-cors",
