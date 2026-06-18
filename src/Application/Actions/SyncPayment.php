@@ -75,9 +75,9 @@ final readonly class SyncPayment
         }
 
         if (! $localPayment && $providerOrderId) {
-            $localPayment = $this->payments->findByProviderReference(
+            $localPayment = $this->payments->findByProviderOrderId(
                 provider: $lookup->provider,
-                reference: $providerOrderId,
+                providerOrderId: $providerOrderId,
             );
         }
 
@@ -92,9 +92,6 @@ final readonly class SyncPayment
             return $payment;
         }
 
-        /*
-         * Si ya existía localmente, también debe coincidir con el pago local.
-         */
         $externalResult->assertMatchesPayment(
             payment: $localPayment,
             requireAmount: true,

@@ -3,16 +3,16 @@
 namespace Equidna\StagHerd;
 
 use Equidna\StagHerd\Application\PaymentService;
-use Equidna\StagHerd\Contracts\CustomPaymentHandler;
 use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
+use Equidna\StagHerd\Contracts\PaymentMethodHandler;
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentDisplayRepository;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentRepository;
-use Equidna\StagHerd\Infrastructure\Providers\Custom\CustomPaymentHandlerRegistry;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoApiAdapter;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalApiAdapter;
+use Equidna\StagHerd\Support\PaymentMethodHandlerRegistry;
 use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Support\ServiceProvider;
 
@@ -27,7 +27,7 @@ class StagHerdServiceProvider extends ServiceProvider
 
         $this->registerRepositories();
         $this->registerGateways();
-        $this->registerCustomPaymentHandlers();
+        $this->registerProviderMethodHandlers();
         $this->registerProviders();
         $this->registerServices();
     }
@@ -97,42 +97,44 @@ class StagHerdServiceProvider extends ServiceProvider
         );
     }
 
-    private function registerCustomPaymentHandlers(): void
+    private function registerProviderMethodHandlers(): void
     {
-        $this->app->singleton(CustomPaymentHandlerRegistry::class, function ($app) {
-            $registry = new CustomPaymentHandlerRegistry();
+        foreach (config('stag-herd.providers', []) as $providerName => $providerConfig) {
+            $this->app->singleton(
+                $this->methodRegistryKey((string) $providerName),
+                function ($app) use ($providerName, $providerConfig) {
+                    $registry = new PaymentMethodHandlerRegistry();
 
-            $methods = config('stag-herd.providers.custom.methods', []);
+                    foreach (($providerConfig['methods'] ?? []) as $method => $methodConfig) {
+                        if (! ($methodConfig['enabled'] ?? false)) {
+                            continue;
+                        }
 
-            foreach ($methods as $method => $methodConfig) {
-                if (! ($methodConfig['enabled'] ?? false)) {
-                    continue;
+                        $handlerClass = $methodConfig['handler'] ?? null;
+
+                        if (! $handlerClass) {
+                            continue;
+                        }
+
+                        $handler = $app->make($handlerClass);
+
+                        if (! $handler instanceof PaymentMethodHandler) {
+                            throw new \RuntimeException(sprintf(
+                                'Payment method handler [%s] for provider [%s] and method [%s] must implement [%s].',
+                                $handlerClass,
+                                $providerName,
+                                $method,
+                                PaymentMethodHandler::class,
+                            ));
+                        }
+
+                        $registry->register($handler);
+                    }
+
+                    return $registry;
                 }
-
-                $handlerClass = $methodConfig['handler'] ?? null;
-
-                if (! $handlerClass) {
-                    continue;
-                }
-
-                $handler = $app->make($handlerClass);
-
-                if (! $handler instanceof CustomPaymentHandler) {
-                    throw new \RuntimeException(
-                        sprintf(
-                            'Custom payment handler [%s] for method [%s] must implement [%s].',
-                            $handlerClass,
-                            $method,
-                            CustomPaymentHandler::class,
-                        )
-                    );
-                }
-
-                $registry->register($handler);
-            }
-
-            return $registry;
-        });
+            );
+        }
     }
 
     private function registerProviders(): void
@@ -140,7 +142,7 @@ class StagHerdServiceProvider extends ServiceProvider
         $this->app->singleton(ProviderRegistry::class, function ($app) {
             $registry = new ProviderRegistry();
 
-            foreach (config('stag-herd.providers', []) as $providerConfig) {
+            foreach (config('stag-herd.providers', []) as $providerName => $providerConfig) {
                 if (! ($providerConfig['enabled'] ?? false)) {
                     continue;
                 }
@@ -151,7 +153,15 @@ class StagHerdServiceProvider extends ServiceProvider
                     continue;
                 }
 
-                $registry->register($app->make($providerClass));
+                $methodRegistry = $app->make(
+                    $this->methodRegistryKey((string) $providerName)
+                );
+
+                $provider = $app->makeWith($providerClass, [
+                    'handlers' => $methodRegistry,
+                ]);
+
+                $registry->register($provider);
             }
 
             return $registry;
@@ -161,5 +171,10 @@ class StagHerdServiceProvider extends ServiceProvider
     private function registerServices(): void
     {
         $this->app->singleton(PaymentService::class);
+    }
+
+    private function methodRegistryKey(string $providerName): string
+    {
+        return 'stag-herd.provider.' . $providerName . '.method-handlers';
     }
 }

@@ -1,5 +1,13 @@
 <?php
 
+use Equidna\StagHerd\Infrastructure\Providers\Cash\CashProvider;
+use Equidna\StagHerd\Infrastructure\Providers\Custom\CustomProvider;
+use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalProvider;
+use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoProvider;
+use Equidna\StagHerd\Infrastructure\Providers\Cash\Handlers\CashPaymentHandler;
+use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalCheckoutHandler;
+use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers\MercadoPagoCardHandler;
+
 return [
     'repositories' => [
         'payments' => null,
@@ -28,12 +36,8 @@ return [
     ],
 
     'providers' => [
-        /**
-         * Provider para métodos internos del host.
-         *
-         */
         'custom' => [
-            'provider' => Equidna\StagHerd\Infrastructure\Providers\Custom\CustomProvider::class,
+            'provider' => CustomProvider::class,
             'enabled' => false,
 
             'methods' => [
@@ -42,25 +46,27 @@ return [
         ],
 
         'cash' => [
-            'provider' => Equidna\StagHerd\Infrastructure\Providers\Cash\CashProvider::class,
+            'provider' => CashProvider::class,
             'enabled' => true,
 
             'methods' => [
                 'cash' => [
                     'enabled' => true,
                     'label' => 'Cash',
+                    'handler' => CashPaymentHandler::class,
                 ],
             ],
         ],
 
         'mercado_pago' => [
-            'provider' => Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoProvider::class,
+            'provider' => MercadoPagoProvider::class,
             'enabled' => false,
 
             'methods' => [
                 'card' => [
                     'enabled' => true,
                     'label' => 'Tarjeta',
+                    'handler' => MercadoPagoCardHandler::class,
                 ],
             ],
 
@@ -77,13 +83,14 @@ return [
         ],
 
         'paypal' => [
-            'provider' => Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalProvider::class,
+            'provider' => PayPalProvider::class,
             'enabled' => false,
 
             'methods' => [
                 'paypal' => [
                     'enabled' => true,
                     'label' => 'PayPal',
+                    'handler' => PayPalCheckoutHandler::class,
                 ],
             ],
 

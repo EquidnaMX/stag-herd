@@ -12,6 +12,11 @@ interface PaymentProvider
 {
     public function getName(): string;
 
+    /**
+     * @return list<string>
+     */
+    public function getMethods(): array;
+
     public function createPayment(PaymentRequestData $request): PaymentResultData;
 
     public function lookupPayment(PaymentLookupData $request): PaymentResultData;

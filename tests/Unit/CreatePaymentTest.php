@@ -183,6 +183,23 @@ class InMemoryPaymentRepository implements PaymentRepository
         return $this->payments[(string) $id] ?? null;
     }
 
+    public function findByProviderPaymentId(
+        string $provider,
+        string $providerPaymentId,
+    ): ?Payment {
+        foreach ($this->payments as $payment) {
+            if ($payment->provider !== $provider) {
+                continue;
+            }
+
+            if ($payment->references?->providerPaymentId === $providerPaymentId) {
+                return $payment;
+            }
+        }
+
+        return null;
+    }
+
     public function findByExternalReference(string $externalReference): ?Payment
     {
         foreach ($this->payments as $payment) {
@@ -194,28 +211,16 @@ class InMemoryPaymentRepository implements PaymentRepository
         return null;
     }
 
-    public function findByProviderReference(
+    public function findByProviderOrderId(
         string $provider,
-        string $reference,
+        string $providerOrderId,
     ): ?Payment {
         foreach ($this->payments as $payment) {
             if ($payment->provider !== $provider) {
                 continue;
             }
 
-            if ($payment->references?->providerPaymentId === $reference) {
-                return $payment;
-            }
-
-            if ($payment->references?->providerOrderId === $reference) {
-                return $payment;
-            }
-
-            if ($payment->references?->providerTransactionId === $reference) {
-                return $payment;
-            }
-
-            if ($payment->references?->providerRefundId === $reference) {
+            if ($payment->references?->providerOrderId === $providerOrderId) {
                 return $payment;
             }
         }

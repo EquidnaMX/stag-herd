@@ -11,17 +11,20 @@ use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\RefundRequestData;
 use Equidna\StagHerd\Facades\StagHerd;
 use Equidna\StagHerd\Support\MoneyFormatter;
+use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\View\View;
+use RuntimeException;
 use Throwable;
 
 class PaymentDemoController extends Controller
 {
     public function __construct(
         private readonly PaymentDisplayRepository $payments,
+        private readonly ProviderRegistry $providers,
     ) {
         //
     }
@@ -409,7 +412,7 @@ class PaymentDemoController extends Controller
             $payment = StagHerd::createPayment(new PaymentRequestData(
                 amount: MoneyFormatter::fromDecimal($data['amount']),
                 currency: strtoupper($data['currency']),
-                method: 'paypal',
+                method: $this->resolveFirstEnabledMethodForProvider('paypal'),
                 provider: 'paypal',
                 providerOrderId: $data['provider_order_id'],
                 externalReference: $data['external_reference'] ?? $data['provider_order_id'],
@@ -760,6 +763,19 @@ class PaymentDemoController extends Controller
         return data_get($payment->metadata ?? [], 'external_reference')
             ?? data_get($payment->raw_payload ?? [], 'external_reference')
             ?? data_get($payment->raw_payload ?? [], 'purchase_units.0.reference_id');
+    }
+
+    private function resolveFirstEnabledMethodForProvider(string $provider): string
+    {
+        $methods = $this->providers->methodsForProvider($provider);
+
+        if ($methods !== []) {
+            return $methods[0];
+        }
+
+        throw new RuntimeException(
+            sprintf('Payment provider [%s] has no enabled methods configured.', strtolower($provider))
+        );
     }
 
     private function cleanMetadata(array $metadata): array

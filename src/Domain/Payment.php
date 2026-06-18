@@ -24,6 +24,26 @@ final readonly class Payment
         //
     }
 
+    public function withStatus(
+        PaymentStatusEnum $status,
+        ?string $providerStatus = null,
+    ): self {
+        return new self(
+            id: $this->id,
+            provider: $this->provider,
+            method: $this->method,
+            amount: $this->amount,
+            currency: $this->currency,
+            status: $status,
+            providerStatus: $providerStatus ?? $this->providerStatus,
+            externalReference: $this->externalReference,
+            payerReference: $this->payerReference,
+            payerEmail: $this->payerEmail,
+            references: $this->references,
+            metadata: $this->metadata,
+        );
+    }
+
     public function isPending(): bool
     {
         return $this->status === PaymentStatusEnum::PENDING;
@@ -73,5 +93,26 @@ final readonly class Payment
             PaymentStatusEnum::REFUNDED,
             PaymentStatusEnum::FAILED,
         ], true);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'provider' => $this->provider,
+            'method' => $this->method,
+            'amount' => $this->amount,
+            'currency' => $this->currency,
+            'status' => $this->status->value,
+            'provider_status' => $this->providerStatus,
+            'external_reference' => $this->externalReference,
+            'payer_reference' => $this->payerReference,
+            'payer_email' => $this->payerEmail,
+            'references' => $this->references?->toArray(),
+            'metadata' => $this->metadata,
+        ];
     }
 }

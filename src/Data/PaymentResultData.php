@@ -110,37 +110,13 @@ final readonly class PaymentResultData
             ?? $request->providerOrderId
             ?? $request->payerReference;
 
-        if ($this->amount === null) {
-            if ($requireAmount) {
-                throw InvalidPaymentPayloadException::amountMissingFromProvider(
-                    provider: $request->provider,
-                    reference: $reference,
-                );
-            }
-
-            return;
-        }
-
-        if ((int) $this->amount !== (int) $request->amount) {
-            throw InvalidPaymentPayloadException::amountMismatch(
-                expectedAmount: (int) $request->amount,
-                providerAmount: (int) $this->amount,
-                provider: $request->provider,
-                reference: $reference,
-            );
-        }
-
-        if (
-            $this->currency !== null
-            && strtoupper($this->currency) !== strtoupper($request->currency)
-        ) {
-            throw InvalidPaymentPayloadException::currencyMismatch(
-                expectedCurrency: $request->currency,
-                providerCurrency: $this->currency,
-                provider: $request->provider,
-                reference: $reference,
-            );
-        }
+        $this->assertMatchesExpectedValues(
+            expectedAmount: $request->amount,
+            expectedCurrency: $request->currency,
+            provider: $request->provider,
+            reference: $reference,
+            requireAmount: $requireAmount,
+        );
     }
 
     public function assertMatchesPayment(
@@ -153,10 +129,26 @@ final readonly class PaymentResultData
             ?? $payment->externalReference
             ?? $payment->id;
 
+        $this->assertMatchesExpectedValues(
+            expectedAmount: $payment->amount,
+            expectedCurrency: $payment->currency,
+            provider: $payment->provider,
+            reference: $reference,
+            requireAmount: $requireAmount,
+        );
+    }
+
+    private function assertMatchesExpectedValues(
+        int $expectedAmount,
+        ?string $expectedCurrency,
+        string $provider,
+        string|int|null $reference,
+        bool $requireAmount,
+    ): void {
         if ($this->amount === null) {
             if ($requireAmount) {
                 throw InvalidPaymentPayloadException::amountMissingFromProvider(
-                    provider: $payment->provider,
+                    provider: $provider,
                     reference: $reference,
                 );
             }
@@ -164,23 +156,24 @@ final readonly class PaymentResultData
             return;
         }
 
-        if ((int) $this->amount !== (int) $payment->amount) {
+        if ((int) $this->amount !== $expectedAmount) {
             throw InvalidPaymentPayloadException::amountMismatch(
-                expectedAmount: (int) $payment->amount,
+                expectedAmount: $expectedAmount,
                 providerAmount: (int) $this->amount,
-                provider: $payment->provider,
+                provider: $provider,
                 reference: $reference,
             );
         }
 
         if (
             $this->currency !== null
-            && strtoupper($this->currency) !== strtoupper($payment->currency)
+            && $expectedCurrency !== null
+            && strtoupper($this->currency) !== strtoupper($expectedCurrency)
         ) {
             throw InvalidPaymentPayloadException::currencyMismatch(
-                expectedCurrency: $payment->currency,
+                expectedCurrency: $expectedCurrency,
                 providerCurrency: $this->currency,
-                provider: $payment->provider,
+                provider: $provider,
                 reference: $reference,
             );
         }

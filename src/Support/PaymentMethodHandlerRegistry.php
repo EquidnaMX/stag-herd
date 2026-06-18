@@ -1,23 +1,23 @@
 <?php
 
-namespace Equidna\StagHerd\Infrastructure\Providers\Custom;
+namespace Equidna\StagHerd\Support;
 
-use Equidna\StagHerd\Contracts\CustomPaymentHandler;
+use Equidna\StagHerd\Contracts\PaymentMethodHandler;
 use Equidna\StagHerd\Exceptions\InvalidPaymentMethodException;
 
-class CustomPaymentHandlerRegistry
+final class PaymentMethodHandlerRegistry
 {
     /**
-     * @var array<string, CustomPaymentHandler>
+     * @var array<string, PaymentMethodHandler>
      */
     private array $handlers = [];
 
-    public function register(CustomPaymentHandler $handler): void
+    public function register(PaymentMethodHandler $handler): void
     {
         $this->handlers[strtolower($handler->getMethod())] = $handler;
     }
 
-    public function get(string $method): CustomPaymentHandler
+    public function get(string $method): PaymentMethodHandler
     {
         $method = strtolower($method);
 

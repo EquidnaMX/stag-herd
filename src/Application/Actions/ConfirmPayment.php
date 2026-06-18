@@ -97,10 +97,7 @@ final readonly class ConfirmPayment
         }
 
         if ($request->externalReference) {
-            $payment = $this->payments->findByProviderReference(
-                provider: $request->provider,
-                reference: $request->externalReference,
-            );
+            $payment = $this->payments->findByExternalReference($request->externalReference);
 
             if ($payment) {
                 return $payment;
@@ -111,11 +108,13 @@ final readonly class ConfirmPayment
             throw PaymentNotFoundException::withId($request->paymentId);
         }
 
+        if ($request->externalReference) {
+            throw PaymentNotFoundException::withExternalReference($request->externalReference);
+        }
+
         throw PaymentNotFoundException::withProviderReference(
             provider: $request->provider,
-            reference: $request->providerPaymentId
-                ?? $request->externalReference
-                ?? 'unknown',
+            reference: $request->providerPaymentId ?? 'unknown',
         );
     }
 }

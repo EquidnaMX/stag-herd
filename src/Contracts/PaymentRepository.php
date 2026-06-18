@@ -14,12 +14,12 @@ interface PaymentRepository
     ): Payment;
 
     /**
-     * Busca por el ID interno del pago.
+     * Find a payment by its internal identifier.
      */
     public function find(int|string $id): ?Payment;
 
     /**
-     * Busca por el ID del pago generado por el provider.
+     * Find a payment by the provider payment identifier.
      */
     public function findByProviderPaymentId(
         string $provider,
@@ -27,16 +27,17 @@ interface PaymentRepository
     ): ?Payment;
 
     /**
-     * Busca por las referencias principales persistidas del provider.
-     *
-     * En la persistencia interna del paquete solo se buscan:
-     * - provider_payment_id
-     * - provider_order_id
+     * Find a payment by the provider order identifier.
      */
-    public function findByProviderReference(
+    public function findByProviderOrderId(
         string $provider,
-        string $reference,
+        string $providerOrderId,
     ): ?Payment;
+
+    /**
+     * Find a payment by the external reference stored in metadata.
+     */
+    public function findByExternalReference(string $externalReference): ?Payment;
 
     public function updateFromResult(
         Payment $payment,

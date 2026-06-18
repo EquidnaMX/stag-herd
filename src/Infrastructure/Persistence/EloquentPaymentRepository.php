@@ -74,17 +74,23 @@ class EloquentPaymentRepository implements PaymentRepository
         return $model ? $this->mapToDomain($model) : null;
     }
 
-    public function findByProviderReference(
+    public function findByProviderOrderId(
         string $provider,
-        string $reference,
+        string $providerOrderId,
     ): ?Payment {
         $model = StagHerdPayment::query()
             ->where('provider', $provider)
-            ->where(function ($query) use ($reference) {
-                $query
-                    ->where('provider_payment_id', $reference)
-                    ->orWhere('provider_order_id', $reference);
-            })
+            ->where('provider_order_id', $providerOrderId)
+            ->latest('id')
+            ->first();
+
+        return $model ? $this->mapToDomain($model) : null;
+    }
+
+    public function findByExternalReference(string $externalReference): ?Payment
+    {
+        $model = StagHerdPayment::query()
+            ->where('metadata->external_reference', $externalReference)
             ->latest('id')
             ->first();
 

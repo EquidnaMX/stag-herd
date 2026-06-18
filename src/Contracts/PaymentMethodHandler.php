@@ -9,7 +9,7 @@ use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\RefundRequestData;
 
-interface CustomPaymentHandler
+interface PaymentMethodHandler
 {
     public function getMethod(): string;
 

@@ -114,9 +114,9 @@ final readonly class LookupPayment
 
     private function lookupByProviderOrderId(PaymentLookupData $lookup): Payment
     {
-        $payment = $this->payments->findByProviderReference(
+        $payment = $this->payments->findByProviderOrderId(
             provider: $lookup->provider,
-            reference: (string) $lookup->providerOrderId,
+            providerOrderId: (string) $lookup->providerOrderId,
         );
 
         $provider = $this->providers->get($lookup->provider);
@@ -141,9 +141,9 @@ final readonly class LookupPayment
         }
 
         if (! $payment && $providerOrderId) {
-            $payment = $this->payments->findByProviderReference(
+            $payment = $this->payments->findByProviderOrderId(
                 provider: $lookup->provider,
-                reference: $providerOrderId,
+                providerOrderId: $providerOrderId,
             );
         }
 

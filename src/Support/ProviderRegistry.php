@@ -34,22 +34,54 @@ class ProviderRegistry
         return isset($this->providers[strtolower($name)]);
     }
 
+    /**
+     * @return list<string>
+     */
+    public function methodsForProvider(string $provider): array
+    {
+        $provider = strtolower($provider);
+
+        if (! $this->has($provider)) {
+            return [];
+        }
+
+        $declaredMethods = array_values(array_unique(array_map(
+            static fn (string $method): string => strtolower($method),
+            $this->get($provider)->getMethods(),
+        )));
+
+        if ($declaredMethods === []) {
+            return [];
+        }
+
+        $providerConfig = config("stag-herd.providers.{$provider}");
+
+        if (! is_array($providerConfig) || ! ($providerConfig['enabled'] ?? false)) {
+            return [];
+        }
+
+        $enabledMethods = [];
+
+        foreach ($declaredMethods as $declaredMethod) {
+            $methodConfig = $providerConfig['methods'][$declaredMethod] ?? null;
+
+            if (! is_array($methodConfig) || ! ($methodConfig['enabled'] ?? false)) {
+                continue;
+            }
+
+            $enabledMethods[] = $declaredMethod;
+        }
+
+        return $enabledMethods;
+    }
+
     public function resolveProviderNameForMethod(string $method): string
     {
         $method = strtolower($method);
 
-        foreach (config('stag-herd.providers', []) as $providerName => $providerConfig) {
-            if (! ($providerConfig['enabled'] ?? false)) {
-                continue;
-            }
-
-            foreach (($providerConfig['methods'] ?? []) as $configuredMethod => $methodConfig) {
-                if (
-                    strtolower((string) $configuredMethod) === $method
-                    && ($methodConfig['enabled'] ?? false)
-                ) {
-                    return strtolower((string) $providerName);
-                }
+        foreach (array_keys($this->providers) as $providerName) {
+            if (in_array($method, $this->methodsForProvider($providerName), true)) {
+                return $providerName;
             }
         }
 
