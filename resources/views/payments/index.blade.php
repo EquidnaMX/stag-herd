@@ -620,6 +620,7 @@
                         data-amount="120.00" data-currency="MXN" data-external-reference=""
                         data-payer-email="cliente@test.com" data-description="Pago desde Mercado Pago Card Brick"
                         data-process-url="{{ route('stag-herd.payments.brick.process') }}"
+                        data-order-lookup-url="{{ url(config('stag-herd.demo.prefix', 'stag-herd/payments') . '/mercado-pago/orders/{order_id}') }}"
                         data-csrf-token="{{ csrf_token() }}"></div>
                 </section>
 

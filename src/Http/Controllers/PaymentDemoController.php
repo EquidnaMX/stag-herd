@@ -15,6 +15,7 @@ use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Routing\Controller;
 use Illuminate\View\View;
 use RuntimeException;
@@ -450,18 +451,22 @@ class PaymentDemoController extends Controller
                 'external_reference' => ['nullable', 'string', 'max:255'],
                 'payer_email' => ['nullable', 'email', 'max:255'],
                 'description' => ['nullable', 'string', 'max:255'],
+                'device_id' => ['nullable', 'string', 'max:255'],
 
                 'metadata' => ['nullable', 'array'],
 
                 'mercado_pago' => ['nullable', 'array'],
                 'mercado_pago.token' => ['nullable', 'string'],
                 'mercado_pago.payment_method_id' => ['nullable', 'string'],
+                'mercado_pago.payment_method_type' => ['nullable', 'string'],
+                'mercado_pago.payment_type_id' => ['nullable', 'string'],
                 'mercado_pago.issuer_id' => ['nullable'],
                 'mercado_pago.installments' => ['nullable'],
                 'mercado_pago.payer' => ['nullable', 'array'],
 
                 'token' => ['nullable', 'string'],
                 'payment_method_id' => ['nullable', 'string'],
+                'payment_type_id' => ['nullable', 'string'],
                 'issuer_id' => ['nullable'],
                 'installments' => ['nullable'],
                 'payer' => ['nullable', 'array'],
@@ -476,6 +481,12 @@ class PaymentDemoController extends Controller
 
             $paymentMethodId = data_get($mercadoPagoData, 'payment_method_id')
                 ?? ($data['payment_method_id'] ?? null);
+
+            $paymentTypeId = data_get($mercadoPagoData, 'payment_type_id')
+                ?? data_get($mercadoPagoData, 'payment_method_type')
+                ?? ($data['payment_type_id'] ?? null)
+                ?? data_get($data, 'raw_form_data.payment_type_id')
+                ?? 'credit_card';
 
             $issuerId = data_get($mercadoPagoData, 'issuer_id')
                 ?? ($data['issuer_id'] ?? null);
@@ -513,14 +524,25 @@ class PaymentDemoController extends Controller
 
             $metadata = $this->cleanMetadata($data['metadata'] ?? []);
 
+            $idempotencyKey = substr(
+                (string) ($request->header('X-Idempotency-Key') ?: 'stag-herd-mp-' . Str::uuid()),
+                0,
+                64,
+            );
+
             $metadata = array_replace_recursive($metadata, [
                 'source' => 'stag-herd-brick-ui',
                 'external_reference' => $externalReference,
+                'idempotency_key' => $idempotencyKey,
+                'device_id' => $data['device_id'] ?? null,
                 'mercado_pago' => array_filter([
+                    'flow' => 'orders',
                     'token' => $token,
                     'payment_method_id' => $paymentMethodId,
+                    'payment_type_id' => $paymentTypeId,
                     'issuer_id' => $issuerId,
                     'installments' => (int) $installments,
+                    'device_id' => $data['device_id'] ?? null,
                     'payer' => array_merge(
                         is_array($payerFromMercadoPago) ? $payerFromMercadoPago : [],
                         is_array($payerFromRoot) ? $payerFromRoot : [],
@@ -538,16 +560,45 @@ class PaymentDemoController extends Controller
                 method: strtolower($data['method'] ?? 'card'),
                 provider: strtolower($data['provider'] ?? 'mercado_pago'),
                 externalReference: $externalReference,
-                payerReference: null,
+                payerReference: data_get($metadata, 'id_client'),
                 payerEmail: $payerEmail,
                 description: $data['description'] ?? 'Pago desde Mercado Pago Brick',
                 metadata: $metadata,
             ));
 
+            return response()->json(
+                $this->mercadoPagoPaymentJson($payment, 'Orden Mercado Pago creada correctamente.')
+            );
+        } catch (Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
+            ], 422);
+        }
+    }
+
+    public function getMercadoPagoOrder(string $orderId): JsonResponse
+    {
+        try {
+            $order = app(MercadoPagoGateway::class)->getOrder($orderId);
+
+            $mpPayment = data_get($order, 'transactions.payments.0', []);
+
             return response()->json([
                 'ok' => true,
-                'message' => 'Pago creado correctamente.',
-                'payment' => $payment->toArray(),
+                'order_id' => data_get($order, 'id'),
+                'order_status' => data_get($order, 'status'),
+                'status_detail' => data_get($order, 'status_detail')
+                    ?? data_get($mpPayment, 'status_detail'),
+
+                'payment_id' => data_get($mpPayment, 'id'),
+                'payment_status' => data_get($mpPayment, 'status'),
+                'payment_status_detail' => data_get($mpPayment, 'status_detail'),
+
+                'raw' => $order,
             ]);
         } catch (Throwable $exception) {
             return response()->json([
@@ -579,9 +630,7 @@ class PaymentDemoController extends Controller
                         ->getPayment($searchValue),
 
                     'provider_order_id' => app(MercadoPagoGateway::class)
-                        ->searchPayments([
-                            'order.id' => $searchValue,
-                        ]),
+                        ->getOrder($searchValue),
 
                     default => throw new \InvalidArgumentException(
                         "Tipo de búsqueda no soportado: {$searchType}"
@@ -776,6 +825,39 @@ class PaymentDemoController extends Controller
         throw new RuntimeException(
             sprintf('Payment provider [%s] has no enabled methods configured.', strtolower($provider))
         );
+    }
+
+    private function mercadoPagoPaymentJson(\Equidna\StagHerd\Domain\Payment $payment, string $message): array
+    {
+        $raw = $payment->metadata['raw_payload'] ?? null;
+        $rawPayload = method_exists($payment, 'toArray') ? ($payment->toArray()['raw_payload'] ?? null) : null;
+        $raw = $rawPayload ?? $raw;
+
+        // The canonical raw payload is stored in persistence. The domain object intentionally does not expose it.
+        // For the frontend, we only need the normalized references and statuses.
+        return [
+            'ok' => true,
+            'message' => $message,
+
+            'order_id' => $payment->references?->providerOrderId,
+            'order_status' => data_get($payment->metadata, 'mercado_pago_order_status'),
+            'status_detail' => data_get($payment->metadata, 'mercado_pago_status_detail'),
+
+            'payment_id' => $payment->references?->providerPaymentId,
+            'payment_status' => data_get($payment->metadata, 'mercado_pago_payment_status')
+                ?? $payment->providerStatus,
+            'payment_status_detail' => data_get($payment->metadata, 'mercado_pago_payment_status_detail')
+                ?? data_get($payment->metadata, 'mercado_pago_status_detail'),
+
+            'next_action' => data_get($payment->metadata, 'mercado_pago_challenge_url')
+                ? [
+                    'type' => 'redirect',
+                    'url' => data_get($payment->metadata, 'mercado_pago_challenge_url'),
+                ]
+                : null,
+
+            'payment' => $payment->toArray(),
+        ];
     }
 
     private function cleanMetadata(array $metadata): array
