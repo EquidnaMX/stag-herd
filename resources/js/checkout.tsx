@@ -20,14 +20,6 @@ mercadoPagoElements.forEach((element) => {
       description={
         element.dataset.description ?? "Pago desde Mercado Pago Card Brick"
       }
-      orderLookupUrl={element.dataset.orderLookupUrl ?? ""}
-      completeUrl={element.dataset.completeUrl ?? ""}
-      successUrlTemplate={element.dataset.successUrlTemplate ?? ""}
-      checkoutType={element.dataset.checkoutType ?? ""}
-      action={element.dataset.action ?? ""}
-      idOrder={element.dataset.idOrder ?? ""}
-      msisdn={element.dataset.msisdn ?? ""}
-      offerId={element.dataset.offerId ?? ""}
     />,
   );
 });

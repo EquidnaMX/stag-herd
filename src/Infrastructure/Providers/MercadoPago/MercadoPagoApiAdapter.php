@@ -7,7 +7,6 @@ use Equidna\StagHerd\Exceptions\ProviderAuthenticationException;
 use Equidna\StagHerd\Exceptions\ProviderCommunicationException;
 use Equidna\StagHerd\Exceptions\ProviderNotConfiguredException;
 use Equidna\StagHerd\Support\MoneyFormatter;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -21,36 +20,12 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
     public function createPayment(
         array $payload,
         ?string $idempotencyKey = null,
-        ?string $deviceId = null,
     ): array {
         return $this->send(
             method: 'post',
             endpoint: '/v1/payments',
             payload: $payload,
             idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
-            deviceId: $deviceId,
-        );
-    }
-
-    public function createOrder(
-        array $payload,
-        ?string $idempotencyKey = null,
-        ?string $deviceId = null,
-    ): array {
-        return $this->send(
-            method: 'post',
-            endpoint: '/v1/orders',
-            payload: $payload,
-            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
-            deviceId: $deviceId,
-        );
-    }
-
-    public function getOrder(string $providerOrderId): array
-    {
-        return $this->send(
-            method: 'get',
-            endpoint: "/v1/orders/{$providerOrderId}",
         );
     }
 
@@ -110,10 +85,9 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
         string $endpoint,
         array $payload = [],
         ?string $idempotencyKey = null,
-        ?string $deviceId = null,
     ): array {
         try {
-            $request = $this->request($idempotencyKey, $deviceId);
+            $request = $this->request($idempotencyKey);
 
             $response = match (strtolower($method)) {
                 'get' => $request->get($endpoint, $payload),
@@ -145,7 +119,7 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
             return $response->json() ?? [];
         } catch (ProviderAuthenticationException | ProviderCommunicationException | ProviderNotConfiguredException $exception) {
             throw $exception;
-        } catch (ConnectionException | RequestException $exception) {
+        } catch (RequestException $exception) {
             throw ProviderCommunicationException::connectionFailed(
                 self::PROVIDER,
                 $exception->getMessage(),
@@ -158,10 +132,8 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
         }
     }
 
-    private function request(
-        ?string $idempotencyKey = null,
-        ?string $deviceId = null,
-    ): PendingRequest {
+    private function request(?string $idempotencyKey = null): PendingRequest
+    {
         $accessToken = config('stag-herd.providers.mercado_pago.credentials.access_token');
 
         if (! $accessToken) {
@@ -171,24 +143,21 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
             );
         }
 
-        $headers = [];
-
-        if ($idempotencyKey !== null && trim($idempotencyKey) !== '') {
-            $headers['X-Idempotency-Key'] = substr($idempotencyKey, 0, 64);
-        }
-
-        if ($deviceId !== null && trim($deviceId) !== '') {
-            $headers['X-meli-session-id'] = $deviceId;
-        }
-
-        return Http::baseUrl((string) config(
+        $request = Http::baseUrl((string) config(
             'stag-herd.providers.mercado_pago.http.base_uri',
             'https://api.mercadopago.com',
         ))
             ->timeout((int) config('stag-herd.providers.mercado_pago.http.timeout', 15))
             ->acceptJson()
             ->asJson()
-            ->withToken((string) $accessToken)
-            ->withHeaders($headers);
+            ->withToken((string) $accessToken);
+
+        if ($idempotencyKey !== null) {
+            $request = $request->withHeaders([
+                'X-Idempotency-Key' => $idempotencyKey,
+            ]);
+        }
+
+        return $request;
     }
 }

@@ -16,9 +16,6 @@ Route::middleware(config('stag-herd.demo.middleware', ['web']))
         Route::post('/brick/process', [PaymentDemoController::class, 'processBrick'])
             ->name('brick.process');
 
-        Route::get('/mercado-pago/orders/{orderId}', [PaymentDemoController::class, 'getMercadoPagoOrder'])
-            ->name('mercado-pago.orders.show');
-
         Route::post('/paypal/create', [PaymentDemoController::class, 'processPayPalCreate'])
             ->name('paypal.create');
 

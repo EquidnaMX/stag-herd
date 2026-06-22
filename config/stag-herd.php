@@ -25,7 +25,7 @@ return [
         'routes' => [
             'enabled' => true,
             'prefix' => 'stag-herd/webhooks',
-            'middleware' => ['web'],
+            'middleware' => ['api'],
         ],
 
         'idempotency' => [
@@ -74,25 +74,6 @@ return [
                 'access_token' => env('MERCADO_PAGO_ACCESS_TOKEN'),
                 'public_key' => env('MERCADO_PAGO_PUBLIC_KEY'),
                 'webhook_secret' => env('MERCADO_PAGO_WEBHOOK_SECRET'),
-            ],
-
-            /*
-             * orders = flujo recomendado para Card Brick. Regresa ORD... y payment_id.
-             * payments = flujo directo/legacy /v1/payments.
-             */
-            'checkout_flow' => env('MERCADO_PAGO_CHECKOUT_FLOW', 'orders'),
-
-            'orders' => [
-                'processing_mode' => env('MERCADO_PAGO_PROCESSING_MODE', 'automatic'),
-                'capture_mode' => env('MERCADO_PAGO_CAPTURE_MODE', 'automatic_async'),
-                'config' => [
-                    'online' => [
-                        'transaction_security' => [
-                            'validation' => env('MERCADO_PAGO_SECURITY_VALIDATION', 'on_fraud_risk'),
-                            'liability_shift' => env('MERCADO_PAGO_LIABILITY_SHIFT', 'required'),
-                        ],
-                    ],
-                ],
             ],
 
             'http' => [

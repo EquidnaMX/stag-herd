@@ -5,33 +5,13 @@ namespace Equidna\StagHerd\Contracts\Gateways;
 interface MercadoPagoGateway
 {
     /**
-     * Legacy/direct Payments API flow.
-     *
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
     public function createPayment(
         array $payload,
         ?string $idempotencyKey = null,
-        ?string $deviceId = null,
     ): array;
-
-    /**
-     * Orders API flow. Recommended for Card Brick.
-     *
-     * @param array<string, mixed> $payload
-     * @return array<string, mixed>
-     */
-    public function createOrder(
-        array $payload,
-        ?string $idempotencyKey = null,
-        ?string $deviceId = null,
-    ): array;
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function getOrder(string $providerOrderId): array;
 
     /**
      * @return array<string, mixed>
