@@ -38,6 +38,7 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler
         $response = $this->gateway->createPayment(
             payload: $this->buildCreatePaymentPayload($request),
             idempotencyKey: $this->resolveIdempotencyKey($request),
+            deviceId: $this->resolveDeviceId($request),
         );
 
         return $this->mapper->mapPaymentResponseToResult($request, $response);
@@ -96,7 +97,8 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler
         $response = $this->gateway->refundPayment(
             providerPaymentId: $providerPaymentId,
             amount: $request->amount,
-            idempotencyKey: data_get($request->metadata, 'idempotency_key'),
+            idempotencyKey: data_get($request->metadata, 'mercado_pago.idempotency_key')
+                ?? data_get($request->metadata, 'idempotency_key'),
         );
 
         return $this->mapper->mapRefundResponseToResult($request, $response);
@@ -141,6 +143,7 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler
             'metadata' => array_filter([
                 'payer_reference' => $request->payerReference,
                 'source' => $request->metadata['source'] ?? null,
+                'external_reference' => $request->externalReference,
             ]),
         ];
 
@@ -247,14 +250,29 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler
     {
         $mercadoPago = $request->metadata['mercado_pago'] ?? [];
 
-        if (isset($mercadoPago['idempotency_key'])) {
-            return (string) $mercadoPago['idempotency_key'];
-        }
+        $idempotencyKey = $mercadoPago['idempotency_key']
+            ?? $request->metadata['idempotency_key']
+            ?? null;
 
-        if ($request->externalReference) {
-            return 'stag-herd-' . $request->externalReference;
+        if ($idempotencyKey !== null && $idempotencyKey !== '') {
+            return substr((string) $idempotencyKey, 0, 64);
         }
 
         return 'stag-herd-' . (string) Str::uuid();
+    }
+
+    private function resolveDeviceId(PaymentRequestData $request): ?string
+    {
+        $mercadoPago = $request->metadata['mercado_pago'] ?? [];
+
+        $deviceId = $mercadoPago['device_id']
+            ?? $request->metadata['device_id']
+            ?? null;
+
+        if ($deviceId === null || $deviceId === '') {
+            return null;
+        }
+
+        return (string) $deviceId;
     }
 }

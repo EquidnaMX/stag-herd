@@ -10,6 +10,7 @@ type Props = {
   processUrl: string;
   csrfToken: string;
   description?: string;
+  onSuccess?: (data: any) => void | Promise<void>;
 };
 
 type CheckoutStatus = "idle" | "loading" | "success" | "error";
@@ -20,6 +21,7 @@ type Metadata = Record<string, MetadataValue>;
 declare global {
   interface Window {
     MercadoPago?: any;
+    MP_DEVICE_SESSION_ID?: string;
   }
 }
 
@@ -59,6 +61,40 @@ function readMetadataFromPage(): Metadata {
   return metadata;
 }
 
+function loadMercadoPagoSecurity(): Promise<void> {
+  return new Promise((resolve) => {
+    if (window.MP_DEVICE_SESSION_ID) {
+      resolve();
+      return;
+    }
+
+    const existingScript = document.querySelector(
+      'script[src="https://www.mercadopago.com/v2/security.js"]',
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(), { once: true });
+      existingScript.addEventListener("error", () => resolve(), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+
+    script.src = "https://www.mercadopago.com/v2/security.js";
+    script.async = true;
+    script.setAttribute("view", "checkout");
+
+    script.onload = () => resolve();
+
+    script.onerror = () => {
+      console.warn("No se pudo cargar security.js de Mercado Pago.");
+      resolve();
+    };
+
+    document.body.appendChild(script);
+  });
+}
+
 export function MercadoPagoCardCheckout({
   publicKey,
   amount,
@@ -68,6 +104,7 @@ export function MercadoPagoCardCheckout({
   processUrl,
   csrfToken,
   description = "Pago desde Mercado Pago Card Brick",
+  onSuccess,
 }: Props) {
   const reactId = useId();
   const containerId = `stag-herd-card-payment-brick-${reactId.replace(/:/g, "")}`;
@@ -105,6 +142,7 @@ export function MercadoPagoCardCheckout({
       }
 
       await loadMercadoPago();
+      await loadMercadoPagoSecurity();
 
       if (cancelled) {
         return;
@@ -141,6 +179,7 @@ export function MercadoPagoCardCheckout({
             },
             paymentMethods: {
               maxInstallments: 1,
+              minInstallments: 1,
             },
           },
 
@@ -155,13 +194,6 @@ export function MercadoPagoCardCheckout({
               setMessage("Procesando pago...");
               setResponsePayload(null);
 
-              /*
-               * Estos campos son de la demo visual.
-               *
-               * No son parte del contrato específico de ningún host.
-               * Los leemos justo al enviar porque React no se vuelve a renderizar
-               * automáticamente cuando el Blade cambia data-*.
-               */
               const currentAmount = Number(readInputValue("amount") || amount);
               const currentCurrency = readInputValue("currency") || currency;
 
@@ -179,13 +211,10 @@ export function MercadoPagoCardCheckout({
                 payerEmail ||
                 "cliente@test.com";
 
-              /*
-               * Metadata genérica.
-               *
-               * El componente NO sabe qué es id_order, id_client, invoice_id, etc.
-               * Solo lee inputs marcados con data-stag-herd-metadata.
-               */
               const metadata = readMetadataFromPage();
+
+              const idempotencyKey = crypto.randomUUID().slice(0, 64);
+              const deviceId = window.MP_DEVICE_SESSION_ID ?? null;
 
               const payload = {
                 provider: "mercado_pago",
@@ -198,6 +227,9 @@ export function MercadoPagoCardCheckout({
                 payer_email: resolvedPayerEmail,
                 description: currentDescription,
 
+                idempotency_key: idempotencyKey,
+                device_id: deviceId,
+
                 metadata,
 
                 mercado_pago: {
@@ -209,6 +241,8 @@ export function MercadoPagoCardCheckout({
                     ...(cardFormData?.payer ?? {}),
                     email: resolvedPayerEmail,
                   },
+                  idempotency_key: idempotencyKey,
+                  device_id: deviceId,
                 },
 
                 raw_form_data: cardFormData,
@@ -222,6 +256,7 @@ export function MercadoPagoCardCheckout({
                     Accept: "application/json",
                     "X-CSRF-TOKEN": csrfToken,
                     "X-Requested-With": "XMLHttpRequest",
+                    "X-Idempotency-Key": idempotencyKey,
                   },
                   body: JSON.stringify(payload),
                 });
@@ -249,6 +284,10 @@ export function MercadoPagoCardCheckout({
                 setStatus("success");
                 setMessage("Pago enviado correctamente.");
                 setResponsePayload(data);
+
+                if (onSuccess) {
+                  await onSuccess(data);
+                }
 
                 return data;
               } catch (error) {
@@ -308,6 +347,7 @@ export function MercadoPagoCardCheckout({
     csrfToken,
     description,
     containerId,
+    onSuccess,
   ]);
 
   return (

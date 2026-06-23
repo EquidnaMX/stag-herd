@@ -11,6 +11,7 @@ interface MercadoPagoGateway
     public function createPayment(
         array $payload,
         ?string $idempotencyKey = null,
+        ?string $deviceId = null,
     ): array;
 
     /**

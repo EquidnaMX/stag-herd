@@ -16,11 +16,12 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use RuntimeException;
 use Throwable;
 
-class PaymentDemoController extends Controller
+class PaymentController extends Controller
 {
     public function __construct(
         private readonly PaymentDisplayRepository $payments,
@@ -451,6 +452,9 @@ class PaymentDemoController extends Controller
                 'payer_email' => ['nullable', 'email', 'max:255'],
                 'description' => ['nullable', 'string', 'max:255'],
 
+                'idempotency_key' => ['nullable', 'string', 'max:64'],
+                'device_id' => ['nullable', 'string', 'max:255'],
+
                 'metadata' => ['nullable', 'array'],
 
                 'mercado_pago' => ['nullable', 'array'],
@@ -459,6 +463,8 @@ class PaymentDemoController extends Controller
                 'mercado_pago.issuer_id' => ['nullable'],
                 'mercado_pago.installments' => ['nullable'],
                 'mercado_pago.payer' => ['nullable', 'array'],
+                'mercado_pago.idempotency_key' => ['nullable', 'string', 'max:64'],
+                'mercado_pago.device_id' => ['nullable', 'string', 'max:255'],
 
                 'token' => ['nullable', 'string'],
                 'payment_method_id' => ['nullable', 'string'],
@@ -511,11 +517,27 @@ class PaymentDemoController extends Controller
             $externalReference = $data['external_reference']
                 ?? 'BRICK-' . now()->format('YmdHis');
 
+            $idempotencyKey = substr(
+                (string) (
+                    data_get($mercadoPagoData, 'idempotency_key')
+                    ?? $data['idempotency_key']
+                    ?? $request->header('X-Idempotency-Key')
+                    ?? Str::uuid()
+                ),
+                0,
+                64,
+            );
+
+            $deviceId = data_get($mercadoPagoData, 'device_id')
+                ?? $data['device_id']
+                ?? null;
+
             $metadata = $this->cleanMetadata($data['metadata'] ?? []);
 
             $metadata = array_replace_recursive($metadata, [
                 'source' => 'stag-herd-brick-ui',
                 'external_reference' => $externalReference,
+
                 'mercado_pago' => array_filter([
                     'token' => $token,
                     'payment_method_id' => $paymentMethodId,
@@ -526,7 +548,10 @@ class PaymentDemoController extends Controller
                         is_array($payerFromRoot) ? $payerFromRoot : [],
                         ['email' => $payerEmail],
                     ),
+                    'idempotency_key' => $idempotencyKey,
+                    'device_id' => $deviceId,
                 ], fn($value) => $value !== null && $value !== ''),
+
                 'raw_form_data' => $data['raw_form_data'] ?? null,
             ]);
 

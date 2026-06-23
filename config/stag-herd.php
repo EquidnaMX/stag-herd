@@ -7,6 +7,7 @@ use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoProvider;
 use Equidna\StagHerd\Infrastructure\Providers\Cash\Handlers\CashPaymentHandler;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalCheckoutHandler;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers\MercadoPagoCardHandler;
+use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoWebhookParser;
 
 return [
     'repositories' => [
@@ -72,13 +73,17 @@ return [
 
             'credentials' => [
                 'access_token' => env('MERCADO_PAGO_ACCESS_TOKEN'),
-                'public_key' => env('MERCADO_PAGO_PUBLIC_KEY'),
+                'public_key' => env('VITE_MERCADO_PAGO_PUBLIC_KEY'),
                 'webhook_secret' => env('MERCADO_PAGO_WEBHOOK_SECRET'),
             ],
 
             'http' => [
                 'base_uri' => env('MERCADO_PAGO_BASE_URI', 'https://api.mercadopago.com'),
                 'timeout' => 15,
+            ],
+
+            'webhooks' => [
+                'parser' => MercadoPagoWebhookParser::class,
             ],
         ],
 
@@ -95,7 +100,7 @@ return [
             ],
 
             'credentials' => [
-                'client_id' => env('PAYPAL_CLIENT_ID'),
+                'client_id' => env('VITE_PAYPAL_CLIENT_ID'),
                 'secret' => env('PAYPAL_SECRET'),
             ],
 

@@ -8,10 +8,12 @@ use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
 use Equidna\StagHerd\Contracts\PaymentMethodHandler;
 use Equidna\StagHerd\Contracts\PaymentRepository;
+use Equidna\StagHerd\Contracts\WebhookIdempotencyStore;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentDisplayRepository;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentRepository;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoApiAdapter;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalApiAdapter;
+use Equidna\StagHerd\Infrastructure\Webhooks\RedisWebhookIdempotencyStore;
 use Equidna\StagHerd\Support\PaymentMethodHandlerRegistry;
 use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Support\ServiceProvider;
@@ -27,6 +29,7 @@ class StagHerdServiceProvider extends ServiceProvider
 
         $this->registerRepositories();
         $this->registerGateways();
+        $this->registerWebhooks();
         $this->registerProviderMethodHandlers();
         $this->registerProviders();
         $this->registerServices();
@@ -94,6 +97,15 @@ class StagHerdServiceProvider extends ServiceProvider
         $this->app->bind(
             PayPalGateway::class,
             PayPalApiAdapter::class,
+        );
+    }
+
+
+    private function registerWebhooks(): void
+    {
+        $this->app->bind(
+            WebhookIdempotencyStore::class,
+            RedisWebhookIdempotencyStore::class,
         );
     }
 

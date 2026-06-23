@@ -20,12 +20,14 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
     public function createPayment(
         array $payload,
         ?string $idempotencyKey = null,
+        ?string $deviceId = null,
     ): array {
         return $this->send(
             method: 'post',
             endpoint: '/v1/payments',
             payload: $payload,
             idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+            deviceId: $deviceId,
         );
     }
 
@@ -85,9 +87,13 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
         string $endpoint,
         array $payload = [],
         ?string $idempotencyKey = null,
+        ?string $deviceId = null,
     ): array {
         try {
-            $request = $this->request($idempotencyKey);
+            $request = $this->request(
+                idempotencyKey: $idempotencyKey,
+                deviceId: $deviceId,
+            );
 
             $response = match (strtolower($method)) {
                 'get' => $request->get($endpoint, $payload),
@@ -132,8 +138,10 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
         }
     }
 
-    private function request(?string $idempotencyKey = null): PendingRequest
-    {
+    private function request(
+        ?string $idempotencyKey = null,
+        ?string $deviceId = null,
+    ): PendingRequest {
         $accessToken = config('stag-herd.providers.mercado_pago.credentials.access_token');
 
         if (! $accessToken) {
@@ -152,10 +160,18 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
             ->asJson()
             ->withToken((string) $accessToken);
 
-        if ($idempotencyKey !== null) {
-            $request = $request->withHeaders([
-                'X-Idempotency-Key' => $idempotencyKey,
-            ]);
+        $headers = [];
+
+        if ($idempotencyKey !== null && $idempotencyKey !== '') {
+            $headers['X-Idempotency-Key'] = substr($idempotencyKey, 0, 64);
+        }
+
+        if ($deviceId !== null && $deviceId !== '') {
+            $headers['X-meli-session-id'] = $deviceId;
+        }
+
+        if ($headers !== []) {
+            $request = $request->withHeaders($headers);
         }
 
         return $request;

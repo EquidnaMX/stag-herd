@@ -1,5 +1,5 @@
-import React, { useEffect, useId, useRef, useState } from "react";
 import { loadScript } from "@paypal/paypal-js";
+import { useEffect, useId, useRef, useState } from "react";
 
 type Props = {
   clientId: string;
@@ -11,6 +11,9 @@ type Props = {
   createOrderUrl: string;
   captureOrderUrl: string;
   csrfToken: string;
+  onSuccess?: (payload: any) => void | Promise<void>;
+  onError?: (error: unknown) => void;
+  onCancel?: (payload: unknown) => void;
 };
 
 type CheckoutStatus = "idle" | "loading" | "success" | "error";
@@ -61,9 +64,30 @@ async function parseJsonResponse(response: Response): Promise<any> {
     return text ? JSON.parse(text) : null;
   } catch {
     throw new Error(
-      `El backend no devolvió JSON. Status ${response.status}. Respuesta: ${text.substring(0, 300)}`,
+      `El backend no devolvió JSON. Status ${response.status}. Respuesta: ${text.substring(
+        0,
+        300,
+      )}`,
     );
   }
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim() !== "") {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+function isZoidDestroyedError(error: unknown): boolean {
+  const message = getErrorMessage(error, "").toLowerCase();
+
+  return (
+    message.includes("zoid destroyed all components") ||
+    message.includes("all components destroyed") ||
+    message.includes("component destroyed")
+  );
 }
 
 export function PayPalCheckout({
@@ -76,24 +100,35 @@ export function PayPalCheckout({
   createOrderUrl,
   captureOrderUrl,
   csrfToken,
+  onSuccess,
+  onError,
+  onCancel,
 }: Props) {
   const reactId = useId();
   const containerId = `stag-herd-paypal-buttons-${reactId.replace(/:/g, "")}`;
 
   const buttonsRef = useRef<any>(null);
-
-  /*
-   * Aquí guardamos temporalmente los datos que regresó /paypal/create.
-   *
-   * No es un Payment local todavía.
-   * Solo sirve para que /paypal/capture pueda crear el Payment local
-   * después de capturar exitosamente.
-   */
   const checkoutContextRef = useRef<any>(null);
+
+  const onSuccessRef = useRef<Props["onSuccess"]>(onSuccess);
+  const onErrorRef = useRef<Props["onError"]>(onError);
+  const onCancelRef = useRef<Props["onCancel"]>(onCancel);
 
   const [status, setStatus] = useState<CheckoutStatus>("idle");
   const [message, setMessage] = useState<string>("");
   const [responsePayload, setResponsePayload] = useState<unknown>(null);
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
+  useEffect(() => {
+    onCancelRef.current = onCancel;
+  }, [onCancel]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,11 +156,20 @@ export function PayPalCheckout({
         return;
       }
 
+      const container = document.getElementById(containerId);
+
+      if (!container) {
+        return;
+      }
+
+      container.innerHTML = "";
+
       const paypal = await loadScript({
         clientId,
         currency: currency || "MXN",
         intent: "capture",
         components: "buttons",
+        enableFunding: "card",
       });
 
       if (cancelled) {
@@ -152,6 +196,7 @@ export function PayPalCheckout({
           setResponsePayload(null);
 
           const currentAmount = Number(readInputValue("amount") || amount);
+
           const currentCurrency = readInputValue("currency") || currency;
 
           const currentExternalReference =
@@ -197,6 +242,7 @@ export function PayPalCheckout({
               "X-CSRF-TOKEN": csrfToken,
               "X-Requested-With": "XMLHttpRequest",
             },
+            credentials: "include",
             body: JSON.stringify(payload),
           });
 
@@ -217,10 +263,6 @@ export function PayPalCheckout({
             throw new Error("El backend no regresó provider_order_id.");
           }
 
-          /*
-           * IMPORTANTE:
-           * Aquí guardamos lo que después se mandará a /paypal/capture.
-           */
           checkoutContextRef.current = data?.checkout_context ?? null;
 
           if (!checkoutContextRef.current) {
@@ -231,19 +273,19 @@ export function PayPalCheckout({
 
           setResponsePayload(data);
           setMessage(
-            `Orden creada en PayPal: ${orderId}. Aún no se guardó Payment local.`,
+            `Orden creada en PayPal: ${orderId}. Esperando aprobación del comprador.`,
           );
 
-          return orderId;
+          return String(orderId);
         },
 
-        onApprove: async (data: any) => {
+        onApprove: async (data: any): Promise<void> => {
           setStatus("loading");
           setMessage("Capturando orden de PayPal...");
 
           if (!checkoutContextRef.current) {
             throw new Error(
-              "No existe checkout_context. No se puede crear el Payment local después del capture.",
+              "No existe checkout_context. No se puede crear el Payment después del capture.",
             );
           }
 
@@ -251,13 +293,6 @@ export function PayPalCheckout({
             provider_order_id: data?.orderID,
             ...checkoutContextRef.current,
           };
-
-          /*
-           * Debug útil:
-           * revisa en la consola del navegador que aquí ya venga amount,
-           * currency, metadata, etc.
-           */
-          console.log("PayPal capture payload:", capturePayload);
 
           const response = await fetch(captureOrderUrl, {
             method: "POST",
@@ -267,6 +302,7 @@ export function PayPalCheckout({
               "X-CSRF-TOKEN": csrfToken,
               "X-Requested-With": "XMLHttpRequest",
             },
+            credentials: "include",
             body: JSON.stringify(capturePayload),
           });
 
@@ -281,31 +317,48 @@ export function PayPalCheckout({
           }
 
           setStatus("success");
-          setMessage("Pago PayPal capturado y guardado localmente.");
+          setMessage("Pago PayPal capturado correctamente.");
           setResponsePayload(responseData);
 
-          return responseData;
+          if (onSuccessRef.current) {
+            await onSuccessRef.current(responseData);
+          }
+
+          /**
+           * No retornar responseData.
+           * PayPal espera Promise<void>.
+           */
         },
 
         onCancel: (data: any) => {
           setStatus("idle");
-          setMessage(
-            "El comprador canceló el flujo de PayPal. No se guardó Payment local.",
-          );
+          setMessage("El comprador canceló el flujo de PayPal.");
           setResponsePayload(data);
+
+          if (onCancelRef.current) {
+            onCancelRef.current(data);
+          }
         },
 
         onError: (error: unknown) => {
+          if (isZoidDestroyedError(error)) {
+            return;
+          }
+
           console.error(error);
 
-          const errorMessage =
-            error instanceof Error
-              ? error.message
-              : "PayPal devolvió un error inesperado.";
+          const errorMessage = getErrorMessage(
+            error,
+            "PayPal devolvió un error inesperado.",
+          );
 
           setStatus("error");
           setMessage(errorMessage);
           setResponsePayload(error);
+
+          if (onErrorRef.current) {
+            onErrorRef.current(error);
+          }
         },
       });
 
@@ -319,6 +372,10 @@ export function PayPalCheckout({
 
       await buttons.render(`#${containerId}`);
 
+      if (cancelled) {
+        return;
+      }
+
       buttonsRef.current = buttons;
 
       setStatus("idle");
@@ -326,26 +383,38 @@ export function PayPalCheckout({
     }
 
     initializePayPal().catch((error) => {
+      if (cancelled || isZoidDestroyedError(error)) {
+        return;
+      }
+
       console.error(error);
 
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "No se pudo inicializar PayPal.";
+      const errorMessage = getErrorMessage(
+        error,
+        "No se pudo inicializar PayPal.",
+      );
 
       setStatus("error");
       setMessage(errorMessage);
       setResponsePayload(error);
+
+      if (onErrorRef.current) {
+        onErrorRef.current(error);
+      }
     });
 
     return () => {
       cancelled = true;
 
-      if (buttonsRef.current?.close) {
-        buttonsRef.current.close();
-      }
-
+      /**
+       * No usamos buttons.close().
+       * En React/Vite dev, PayPal/zoid puede tronar con:
+       * "zoid destroyed all components".
+       *
+       * Solo limpiamos referencias.
+       */
       buttonsRef.current = null;
+      checkoutContextRef.current = null;
     };
   }, [
     clientId,
@@ -393,12 +462,6 @@ export function PayPalCheckout({
         >
           {JSON.stringify(responsePayload, null, 2)}
         </pre>
-      )}
-
-      {status === "success" && (
-        <div style={{ marginTop: 16 }}>
-          <a href={window.location.href}>Recargar pagos locales</a>
-        </div>
       )}
     </section>
   );
