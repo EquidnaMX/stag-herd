@@ -301,6 +301,8 @@ class PaymentController extends Controller
                 'payer_email' => ['nullable', 'email', 'max:255'],
                 'description' => ['nullable', 'string', 'max:255'],
 
+                'idempotency_key' => ['nullable', 'string', 'max:64'],
+
                 'metadata' => ['nullable', 'array'],
 
                 'paypal' => ['nullable', 'array'],
@@ -319,22 +321,34 @@ class PaymentController extends Controller
             $currency = strtoupper($data['currency']);
 
             $metadata = $this->cleanMetadata($data['metadata'] ?? []);
+            $idempotencyKey = substr(
+                (string) (
+                    $data['idempotency_key']
+                    ?? $request->header('X-Idempotency-Key')
+                    ?? 'stag-herd-paypal-order-' . Str::uuid()
+                ),
+                0,
+                64,
+            );
+
+            $invoiceId = data_get($data, 'paypal.invoice_id');
+            $purchaseUnit = array_filter([
+                'reference_id' => $externalReference,
+                'description' => $data['description'] ?? 'Pago desde PayPal Buttons',
+                'custom_id' => data_get($metadata, 'id_client'),
+                'invoice_id' => $invoiceId,
+
+                'amount' => [
+                    'currency_code' => $currency,
+                    'value' => MoneyFormatter::toDecimal($amount),
+                ],
+            ], fn($value) => $value !== null && $value !== '');
 
             $paypalPayload = [
                 'intent' => strtoupper((string) data_get($data, 'paypal.intent', 'CAPTURE')),
 
                 'purchase_units' => [
-                    array_filter([
-                        'reference_id' => $externalReference,
-                        'description' => $data['description'] ?? 'Pago desde PayPal Buttons',
-                        'custom_id' => data_get($metadata, 'id_client'),
-                        'invoice_id' => data_get($data, 'paypal.invoice_id'),
-
-                        'amount' => [
-                            'currency_code' => $currency,
-                            'value' => MoneyFormatter::toDecimal($amount),
-                        ],
-                    ], fn($value) => $value !== null && $value !== ''),
+                    $purchaseUnit,
                 ],
 
                 'application_context' => array_filter([
@@ -349,7 +363,7 @@ class PaymentController extends Controller
 
             $response = app(PayPalGateway::class)->createOrder(
                 payload: $paypalPayload,
-                idempotencyKey: 'stag-herd-paypal-order-' . $externalReference,
+                idempotencyKey: $idempotencyKey,
             );
 
             $providerOrderId = data_get($response, 'id');
@@ -373,7 +387,9 @@ class PaymentController extends Controller
                     'external_reference' => $externalReference,
                     'payer_email' => $data['payer_email'] ?? 'cliente@test.com',
                     'description' => $data['description'] ?? 'Pago desde PayPal Buttons',
-                    'metadata' => $metadata,
+                    'metadata' => array_replace_recursive($metadata, [
+                        'paypal_create_idempotency_key' => $idempotencyKey,
+                    ]),
                 ],
             ]);
         } catch (Throwable $exception) {
@@ -392,20 +408,35 @@ class PaymentController extends Controller
         try {
             $data = $request->validate([
                 'provider_order_id' => ['required', 'string', 'max:255'],
+
                 'amount' => ['required', 'numeric', 'min:0.01'],
                 'currency' => ['required', 'string', 'size:3'],
                 'external_reference' => ['nullable', 'string', 'max:255'],
                 'payer_email' => ['nullable', 'email', 'max:255'],
                 'description' => ['nullable', 'string', 'max:255'],
+
+                'idempotency_key' => ['nullable', 'string', 'max:64'],
+
                 'metadata' => ['nullable', 'array'],
             ]);
+
+            $providerOrderId = $data['provider_order_id'];
+            $captureIdempotencyKey = substr(
+                (string) (
+                    $data['idempotency_key']
+                    ?? $request->header('X-Idempotency-Key')
+                    ?? 'stag-herd-paypal-capture-' . $providerOrderId
+                ),
+                0,
+                64,
+            );
 
             $metadata = $this->cleanMetadata($data['metadata'] ?? []);
 
             $metadata = array_replace_recursive($metadata, [
                 'source' => 'stag-herd-paypal-buttons-ui-after-capture',
-                'paypal_order_id' => $data['provider_order_id'],
-                'idempotency_key' => 'stag-herd-paypal-capture-' . $data['provider_order_id'],
+                'paypal_order_id' => $providerOrderId,
+                'idempotency_key' => $captureIdempotencyKey,
             ]);
 
             $metadata = $this->cleanMetadata($metadata);
@@ -415,8 +446,8 @@ class PaymentController extends Controller
                 currency: strtoupper($data['currency']),
                 method: $this->resolveFirstEnabledMethodForProvider('paypal'),
                 provider: 'paypal',
-                providerOrderId: $data['provider_order_id'],
-                externalReference: $data['external_reference'] ?? $data['provider_order_id'],
+                providerOrderId: $providerOrderId,
+                externalReference: $data['external_reference'] ?? $providerOrderId,
                 payerReference: data_get($metadata, 'id_client'),
                 payerEmail: $data['payer_email'] ?? 'cliente@test.com',
                 description: $data['description'] ?? 'Pago PayPal capturado',
@@ -431,10 +462,10 @@ class PaymentController extends Controller
         } catch (Throwable $exception) {
             return response()->json([
                 'ok' => false,
-                'type' => class_basename($exception),
-                'message' => $exception->getMessage(),
-                'file' => config('app.debug') ? $exception->getFile() : null,
-                'line' => config('app.debug') ? $exception->getLine() : null,
+                'message' => 'No ha sido posible procesar el pago',
+                'errors' => [
+                    $exception->getMessage(),
+                ],
             ], 422);
         }
     }

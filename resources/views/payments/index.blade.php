@@ -645,7 +645,7 @@
                         data-amount="120.00" data-currency="MXN" data-external-reference=""
                         data-payer-email="cliente@test.com" data-description="Pago desde PayPal Checkout"
                         data-create-order-url="{{ route('stag-herd.payments.paypal.create') }}"
-                        data-capture-order-url="{{ route('stag-herd.payments.paypal.capture.json') }}"
+                        data-capture-order-url="{{ route('stag-herd.payments.paypal.capture') }}"
                         data-csrf-token="{{ csrf_token() }}"></div>
                 </section>
 

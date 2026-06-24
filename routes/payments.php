@@ -20,7 +20,7 @@ Route::middleware(config('stag-herd.demo.middleware', ['web']))
             ->name('paypal.create');
 
         Route::post('/paypal/capture', [PaymentController::class, 'processPayPalCapture'])
-            ->name('paypal.capture.json');
+            ->name('paypal.capture');
 
         Route::post('/provider/lookup', [PaymentController::class, 'providerLookup'])
             ->name('provider.lookup');

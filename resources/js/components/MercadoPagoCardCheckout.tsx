@@ -1,5 +1,5 @@
-import React, { useEffect, useId, useRef, useState } from "react";
 import { loadMercadoPago } from "@mercadopago/sdk-js";
+import { CSSProperties, useEffect, useId, useRef } from "react";
 
 type Props = {
   publicKey: string;
@@ -10,10 +10,24 @@ type Props = {
   processUrl: string;
   csrfToken: string;
   description?: string;
-  onSuccess?: (data: any) => void | Promise<void>;
-};
 
-type CheckoutStatus = "idle" | "loading" | "success" | "error";
+  className?: string;
+  containerStyle?: CSSProperties;
+
+  locale?: "es-MX" | "es-AR" | "es-CL" | "es-CO" | "es-PE" | "pt-BR" | "en-US";
+
+  theme?: "default" | "dark" | "bootstrap" | "flat";
+  minInstallments?: number;
+  maxInstallments?: number;
+
+  onStatusChange?: (
+    status: "idle" | "loading" | "ready" | "success" | "error",
+    message?: string,
+  ) => void;
+
+  onSuccess?: (data: any) => void | Promise<void>;
+  onError?: (error: unknown) => void;
+};
 
 type MetadataValue = string | number | boolean | null;
 type Metadata = Record<string, MetadataValue>;
@@ -51,7 +65,7 @@ function readMetadataFromPage(): Metadata {
 
     const value = element.value?.trim();
 
-    if (value === undefined || value === null || value === "") {
+    if (!value) {
       return;
     }
 
@@ -73,8 +87,14 @@ function loadMercadoPagoSecurity(): Promise<void> {
     );
 
     if (existingScript) {
-      existingScript.addEventListener("load", () => resolve(), { once: true });
-      existingScript.addEventListener("error", () => resolve(), { once: true });
+      existingScript.addEventListener("load", () => resolve(), {
+        once: true,
+      });
+
+      existingScript.addEventListener("error", () => resolve(), {
+        once: true,
+      });
+
       return;
     }
 
@@ -95,6 +115,59 @@ function loadMercadoPagoSecurity(): Promise<void> {
   });
 }
 
+async function parseJsonResponse(response: Response): Promise<any> {
+  const text = await response.text();
+
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error(
+      `El backend no devolvió JSON. Status ${response.status}. Respuesta: ${text.substring(
+        0,
+        300,
+      )}`,
+    );
+  }
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim() !== "") {
+    return error.message;
+  }
+
+  if (error && typeof error === "object") {
+    const e = error as {
+      message?: unknown;
+      cause?: unknown;
+      type?: unknown;
+    };
+
+    if (typeof e.message === "string" && e.message.trim() !== "") {
+      return e.message;
+    }
+
+    if (typeof e.cause === "string" && e.cause.trim() !== "") {
+      return e.cause;
+    }
+
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return fallback;
+    }
+  }
+
+  return fallback;
+}
+
+function makeIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID().slice(0, 64);
+  }
+
+  return `mp-${Date.now()}-${Math.random().toString(16).slice(2)}`.slice(0, 64);
+}
+
 export function MercadoPagoCardCheckout({
   publicKey,
   amount,
@@ -104,241 +177,30 @@ export function MercadoPagoCardCheckout({
   processUrl,
   csrfToken,
   description = "Pago desde Mercado Pago Card Brick",
+
+  className,
+  containerStyle,
+
+  locale = "es-MX",
+  theme = "default",
+  minInstallments = 1,
+  maxInstallments = 1,
+
+  onStatusChange,
   onSuccess,
+  onError,
 }: Props) {
   const reactId = useId();
-  const containerId = `stag-herd-card-payment-brick-${reactId.replace(/:/g, "")}`;
+
+  const containerId = `stag-herd-card-payment-brick-${reactId.replace(
+    /:/g,
+    "",
+  )}`;
 
   const controllerRef = useRef<any>(null);
+  const initializingRef = useRef(false);
 
-  const [status, setStatus] = useState<CheckoutStatus>("idle");
-  const [message, setMessage] = useState<string>("");
-  const [responsePayload, setResponsePayload] = useState<unknown>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function initializeBrick() {
-      setStatus("loading");
-      setMessage("Inicializando Mercado Pago...");
-      setResponsePayload(null);
-
-      if (!publicKey) {
-        setStatus("error");
-        setMessage("Falta configurar MERCADO_PAGO_PUBLIC_KEY.");
-        return;
-      }
-
-      if (!processUrl) {
-        setStatus("error");
-        setMessage("Falta configurar processUrl.");
-        return;
-      }
-
-      if (!amount || amount <= 0) {
-        setStatus("error");
-        setMessage("El monto debe ser mayor a cero.");
-        return;
-      }
-
-      await loadMercadoPago();
-      await loadMercadoPagoSecurity();
-
-      if (cancelled) {
-        return;
-      }
-
-      if (!window.MercadoPago) {
-        setStatus("error");
-        setMessage("No se pudo cargar Mercado Pago.");
-        return;
-      }
-
-      const mp = new window.MercadoPago(publicKey, {
-        locale: "es-MX",
-      });
-
-      const bricksBuilder = mp.bricks();
-
-      const controller = await bricksBuilder.create(
-        "cardPayment",
-        containerId,
-        {
-          initialization: {
-            amount,
-            payer: {
-              email: payerEmail || "cliente@test.com",
-            },
-          },
-
-          customization: {
-            visual: {
-              style: {
-                theme: "default",
-              },
-            },
-            paymentMethods: {
-              maxInstallments: 1,
-              minInstallments: 1,
-            },
-          },
-
-          callbacks: {
-            onReady: () => {
-              setStatus("idle");
-              setMessage("Checkout listo.");
-            },
-
-            onSubmit: async (cardFormData: any) => {
-              setStatus("loading");
-              setMessage("Procesando pago...");
-              setResponsePayload(null);
-
-              const currentAmount = Number(readInputValue("amount") || amount);
-              const currentCurrency = readInputValue("currency") || currency;
-
-              const currentExternalReference =
-                readInputValue("external_reference") ||
-                externalReference ||
-                `BRICK-${Date.now()}`;
-
-              const currentDescription =
-                readInputValue("description") || description;
-
-              const resolvedPayerEmail =
-                cardFormData?.payer?.email ||
-                readInputValue("payer_email") ||
-                payerEmail ||
-                "cliente@test.com";
-
-              const metadata = readMetadataFromPage();
-
-              const idempotencyKey = crypto.randomUUID().slice(0, 64);
-              const deviceId = window.MP_DEVICE_SESSION_ID ?? null;
-
-              const payload = {
-                provider: "mercado_pago",
-                method: "card",
-
-                amount: currentAmount,
-                currency: currentCurrency,
-
-                external_reference: currentExternalReference,
-                payer_email: resolvedPayerEmail,
-                description: currentDescription,
-
-                idempotency_key: idempotencyKey,
-                device_id: deviceId,
-
-                metadata,
-
-                mercado_pago: {
-                  token: cardFormData?.token,
-                  payment_method_id: cardFormData?.payment_method_id,
-                  issuer_id: cardFormData?.issuer_id,
-                  installments: Number(cardFormData?.installments ?? 1),
-                  payer: {
-                    ...(cardFormData?.payer ?? {}),
-                    email: resolvedPayerEmail,
-                  },
-                  idempotency_key: idempotencyKey,
-                  device_id: deviceId,
-                },
-
-                raw_form_data: cardFormData,
-              };
-
-              try {
-                const response = await fetch(processUrl, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                    "X-CSRF-TOKEN": csrfToken,
-                    "X-Requested-With": "XMLHttpRequest",
-                    "X-Idempotency-Key": idempotencyKey,
-                  },
-                  body: JSON.stringify(payload),
-                });
-
-                const responseText = await response.text();
-
-                let data: any = null;
-
-                try {
-                  data = responseText ? JSON.parse(responseText) : null;
-                } catch {
-                  throw new Error(
-                    `El backend no devolvió JSON. Status ${response.status}. Respuesta: ${responseText.substring(0, 300)}`,
-                  );
-                }
-
-                if (!response.ok) {
-                  throw new Error(
-                    data?.message ||
-                      data?.error ||
-                      `No se pudo procesar el pago. Status ${response.status}`,
-                  );
-                }
-
-                setStatus("success");
-                setMessage("Pago enviado correctamente.");
-                setResponsePayload(data);
-
-                if (onSuccess) {
-                  await onSuccess(data);
-                }
-
-                return data;
-              } catch (error) {
-                const errorMessage =
-                  error instanceof Error
-                    ? error.message
-                    : "Error inesperado al procesar el pago.";
-
-                setStatus("error");
-                setMessage(errorMessage);
-                setResponsePayload(error);
-
-                throw error;
-              }
-            },
-
-            onError: (error: unknown) => {
-              console.error(error);
-
-              setStatus("error");
-              setMessage(
-                "Mercado Pago devolvió un error al inicializar el formulario.",
-              );
-              setResponsePayload(error);
-            },
-          },
-        },
-      );
-
-      controllerRef.current = controller;
-    }
-
-    initializeBrick().catch((error) => {
-      console.error(error);
-
-      setStatus("error");
-      setMessage("No se pudo inicializar el checkout.");
-      setResponsePayload(error);
-    });
-
-    return () => {
-      cancelled = true;
-
-      if (controllerRef.current?.unmount) {
-        controllerRef.current.unmount();
-      }
-
-      controllerRef.current = null;
-    };
-  }, [
-    publicKey,
+  const latestPropsRef = useRef({
     amount,
     currency,
     externalReference,
@@ -346,44 +208,405 @@ export function MercadoPagoCardCheckout({
     processUrl,
     csrfToken,
     description,
+  });
+
+  const onStatusChangeRef = useRef<Props["onStatusChange"]>(onStatusChange);
+  const onSuccessRef = useRef<Props["onSuccess"]>(onSuccess);
+  const onErrorRef = useRef<Props["onError"]>(onError);
+
+  useEffect(() => {
+    latestPropsRef.current = {
+      amount,
+      currency,
+      externalReference,
+      payerEmail,
+      processUrl,
+      csrfToken,
+      description,
+    };
+  }, [
+    amount,
+    currency,
+    externalReference,
+    payerEmail,
+    processUrl,
+    csrfToken,
+    description,
+  ]);
+
+  useEffect(() => {
+    onStatusChangeRef.current = onStatusChange;
+  }, [onStatusChange]);
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
+  function notifyStatus(
+    status: "idle" | "loading" | "ready" | "success" | "error",
+    message?: string,
+  ): void {
+    if (onStatusChangeRef.current) {
+      onStatusChangeRef.current(status, message);
+    }
+  }
+
+  function notifyError(error: unknown, fallback: string): void {
+    console.error(error);
+
+    notifyStatus("error", getErrorMessage(error, fallback));
+
+    if (onErrorRef.current) {
+      onErrorRef.current(error);
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initializeBrick() {
+      if (initializingRef.current || controllerRef.current) {
+        console.warn(
+          "[MP DEBUG] Brick ya inicializado o inicializando. Se omite.",
+          {
+            containerId,
+          },
+        );
+
+        return;
+      }
+
+      initializingRef.current = true;
+
+      console.group("[MP DEBUG] init");
+      console.log("publicKey exists:", Boolean(publicKey));
+      console.log("publicKey prefix:", publicKey?.slice(0, 8));
+      console.log("amount:", amount, typeof amount);
+      console.log("payerEmail:", payerEmail);
+      console.log("processUrl:", processUrl);
+      console.log("csrf exists:", Boolean(csrfToken));
+      console.log("containerId:", containerId);
+      console.log(
+        "container exists:",
+        Boolean(document.getElementById(containerId)),
+      );
+      console.log("MP_DEVICE_SESSION_ID before:", window.MP_DEVICE_SESSION_ID);
+      console.groupEnd();
+
+      notifyStatus("loading", "Inicializando Mercado Pago...");
+
+      try {
+        if (!publicKey) {
+          throw new Error("Falta configurar MERCADO_PAGO_PUBLIC_KEY.");
+        }
+
+        if (!processUrl) {
+          throw new Error("Falta configurar processUrl.");
+        }
+
+        if (!amount || amount <= 0) {
+          throw new Error("El monto debe ser mayor a cero.");
+        }
+
+        const container = document.getElementById(containerId);
+
+        if (!container) {
+          return;
+        }
+
+        container.innerHTML = "";
+
+        await loadMercadoPago();
+        await loadMercadoPagoSecurity();
+
+        console.group("[MP DEBUG] loaded");
+        console.log("window.MercadoPago:", Boolean(window.MercadoPago));
+        console.log("MP_DEVICE_SESSION_ID after:", window.MP_DEVICE_SESSION_ID);
+        console.groupEnd();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!window.MercadoPago) {
+          throw new Error("No se pudo cargar Mercado Pago.");
+        }
+
+        const mp = new window.MercadoPago(publicKey, {
+          locale,
+        });
+
+        const bricksBuilder = mp.bricks();
+
+        const controller = await bricksBuilder.create(
+          "cardPayment",
+          containerId,
+          {
+            initialization: {
+              amount: Number(amount),
+              ...(payerEmail
+                ? {
+                    payer: {
+                      email: payerEmail,
+                    },
+                  }
+                : {}),
+            },
+
+            customization: {
+              visual: {
+                style: {
+                  theme,
+                },
+              },
+              paymentMethods: {
+                minInstallments,
+                maxInstallments,
+              },
+            },
+
+            callbacks: {
+              onReady: () => {
+                notifyStatus("ready", "Checkout Mercado Pago listo.");
+              },
+
+              onSubmit: async (rawCardFormData: any, additionalData?: any) => {
+                console.group("[MP DEBUG] onSubmit");
+                console.log("rawCardFormData:", rawCardFormData);
+                console.log("additionalData:", additionalData);
+                console.groupEnd();
+
+                const cardFormData =
+                  rawCardFormData?.formData ?? rawCardFormData;
+
+                console.group("[MP DEBUG] normalized formData");
+                console.log("cardFormData:", cardFormData);
+                console.log("token:", cardFormData?.token);
+                console.log("card_token_id:", cardFormData?.card_token_id);
+                console.log(
+                  "payment_method_id:",
+                  cardFormData?.payment_method_id,
+                );
+                console.log("issuer_id:", cardFormData?.issuer_id);
+                console.log("installments:", cardFormData?.installments);
+                console.log("payer:", cardFormData?.payer);
+                console.groupEnd();
+
+                const token = String(
+                  cardFormData?.token ?? cardFormData?.card_token_id ?? "",
+                ).trim();
+
+                if (!token) {
+                  throw new Error("Mercado Pago no generó token de tarjeta.");
+                }
+
+                const paymentMethodId = String(
+                  cardFormData?.payment_method_id ?? "",
+                ).trim();
+
+                if (!paymentMethodId) {
+                  throw new Error("Mercado Pago no generó payment_method_id.");
+                }
+
+                notifyStatus("loading", "Procesando pago...");
+
+                const current = latestPropsRef.current;
+
+                const currentAmount = Number(
+                  readInputValue("amount") || current.amount,
+                );
+
+                const currentCurrency =
+                  readInputValue("currency") || current.currency || "MXN";
+
+                const currentExternalReference =
+                  readInputValue("external_reference") ||
+                  current.externalReference ||
+                  `BRICK-${Date.now()}`;
+
+                const currentDescription =
+                  readInputValue("description") || current.description;
+
+                const resolvedPayerEmail =
+                  cardFormData?.payer?.email ||
+                  readInputValue("payer_email") ||
+                  current.payerEmail ||
+                  "";
+
+                if (!resolvedPayerEmail) {
+                  throw new Error(
+                    "Falta el correo del pagador para Mercado Pago.",
+                  );
+                }
+
+                const metadata = readMetadataFromPage();
+
+                const idempotencyKey = makeIdempotencyKey();
+                const deviceId = window.MP_DEVICE_SESSION_ID ?? null;
+
+                const payload = {
+                  provider: "mercado_pago",
+                  method: "card",
+
+                  amount: currentAmount,
+                  currency: currentCurrency,
+
+                  external_reference: currentExternalReference,
+                  payer_email: resolvedPayerEmail,
+                  description: currentDescription,
+
+                  idempotency_key: idempotencyKey,
+                  device_id: deviceId,
+
+                  metadata,
+
+                  mercado_pago: {
+                    token,
+                    payment_method_id: paymentMethodId,
+                    issuer_id: cardFormData?.issuer_id ?? null,
+                    installments: Number(cardFormData?.installments ?? 1),
+                    payer: {
+                      ...(cardFormData?.payer ?? {}),
+                      email: resolvedPayerEmail,
+                    },
+                    payment_type_id:
+                      additionalData?.paymentTypeId ??
+                      rawCardFormData?.selectedPaymentMethod ??
+                      null,
+                    idempotency_key: idempotencyKey,
+                    device_id: deviceId,
+                  },
+
+                  raw_form_data: cardFormData,
+                };
+
+                try {
+                  const response = await fetch(current.processUrl, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Accept: "application/json",
+                      "X-CSRF-TOKEN": current.csrfToken,
+                      "X-Requested-With": "XMLHttpRequest",
+                      "X-Idempotency-Key": idempotencyKey,
+                    },
+                    credentials: "include",
+                    body: JSON.stringify(payload),
+                  });
+
+                  const data = await parseJsonResponse(response);
+
+                  if (!response.ok) {
+                    throw new Error(
+                      data?.message ||
+                        data?.error ||
+                        `No se pudo procesar el pago. Status ${response.status}`,
+                    );
+                  }
+
+                  notifyStatus("success", "Pago enviado correctamente.");
+
+                  if (onSuccessRef.current) {
+                    await onSuccessRef.current(data);
+                  }
+
+                  return data;
+                } catch (error) {
+                  notifyError(error, "Error inesperado al procesar el pago.");
+
+                  throw error;
+                }
+              },
+
+              onError: (error: unknown) => {
+                console.group("[MP DEBUG] Brick onError");
+                console.log("raw error:", error);
+
+                try {
+                  console.log("JSON:", JSON.stringify(error, null, 2));
+                } catch {
+                  console.log("JSON:", "No se pudo serializar el error.");
+                }
+
+                console.log("type:", (error as any)?.type);
+                console.log("cause:", (error as any)?.cause);
+                console.log("message:", (error as any)?.message);
+                console.trace("trace");
+                console.groupEnd();
+
+                notifyError(
+                  error,
+                  "Mercado Pago devolvió un error al inicializar o tokenizar el formulario.",
+                );
+              },
+            },
+          },
+        );
+
+        if (cancelled) {
+          if (controller?.unmount) {
+            controller.unmount();
+          }
+
+          return;
+        }
+
+        controllerRef.current = controller;
+        initializingRef.current = false;
+      } catch (error) {
+        initializingRef.current = false;
+
+        throw error;
+      }
+    }
+
+    initializeBrick().catch((error) => {
+      if (cancelled) {
+        return;
+      }
+
+      notifyError(error, "No se pudo inicializar el checkout.");
+    });
+
+    return () => {
+      cancelled = true;
+      initializingRef.current = false;
+
+      try {
+        if (controllerRef.current?.unmount) {
+          controllerRef.current.unmount();
+        }
+      } catch (error) {
+        console.warn("No se pudo desmontar Mercado Pago Card Brick.", error);
+      }
+
+      controllerRef.current = null;
+    };
+  }, [
+    publicKey,
+    amount,
+    payerEmail,
+    processUrl,
     containerId,
-    onSuccess,
+    locale,
+    theme,
+    minInstallments,
+    maxInstallments,
+    csrfToken,
   ]);
 
   return (
-    <section>
-      <div style={{ marginBottom: 16 }}>
-        <strong>Referencia:</strong>{" "}
-        {externalReference || "Se tomará del formulario"}
-        <br />
-        <strong>Monto:</strong> ${amount.toFixed(2)} {currency}
-        <br />
-        <strong>Email:</strong> {payerEmail || "cliente@test.com"}
-      </div>
-
-      <div id={containerId} />
-
-      {message && (
-        <div style={{ marginTop: 20 }}>
-          <strong>Estado:</strong> {message}
-        </div>
-      )}
-
-      {responsePayload !== null && (
-        <pre
-          style={{
-            marginTop: 16,
-            overflow: "auto",
-            background: "#0f172a",
-            color: "#e5e7eb",
-            padding: 14,
-            borderRadius: 12,
-            fontSize: 12,
-          }}
-        >
-          {JSON.stringify(responsePayload, null, 2)}
-        </pre>
-      )}
-    </section>
+    <div
+      id={containerId}
+      className={className}
+      style={{
+        width: "100%",
+        ...containerStyle,
+      }}
+    />
   );
 }

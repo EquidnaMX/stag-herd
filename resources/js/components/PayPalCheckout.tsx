@@ -1,5 +1,19 @@
 import { loadScript } from "@paypal/paypal-js";
-import { useEffect, useId, useRef, useState } from "react";
+import { CSSProperties, useEffect, useId, useRef, useState } from "react";
+
+type PayPalButtonStyle = {
+  layout?: "vertical" | "horizontal";
+  color?: "gold" | "blue" | "silver" | "white" | "black";
+  shape?: "rect" | "pill";
+  label?: "paypal" | "checkout" | "buynow" | "pay" | "installment";
+  height?: number;
+  tagline?: boolean;
+};
+
+type CheckoutStatus = "idle" | "loading" | "ready" | "success" | "error";
+
+type MetadataValue = string | number | boolean | null;
+type Metadata = Record<string, MetadataValue>;
 
 type Props = {
   clientId: string;
@@ -11,15 +25,16 @@ type Props = {
   createOrderUrl: string;
   captureOrderUrl: string;
   csrfToken: string;
+
+  className?: string;
+  containerStyle?: CSSProperties;
+  buttonStyle?: PayPalButtonStyle;
+
+  onStatusChange?: (status: CheckoutStatus, message?: string) => void;
   onSuccess?: (payload: any) => void | Promise<void>;
   onError?: (error: unknown) => void;
   onCancel?: (payload: unknown) => void;
 };
-
-type CheckoutStatus = "idle" | "loading" | "success" | "error";
-
-type MetadataValue = string | number | boolean | null;
-type Metadata = Record<string, MetadataValue>;
 
 function readInputValue(id: string): string {
   const element = document.getElementById(id) as
@@ -47,7 +62,7 @@ function readMetadataFromPage(): Metadata {
 
     const value = element.value?.trim();
 
-    if (value === undefined || value === null || value === "") {
+    if (!value) {
       return;
     }
 
@@ -80,6 +95,18 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function getBackendErrorMessage(data: any, fallback: string): string {
+  return (
+    data?.message ||
+    data?.errors?.[0] ||
+    data?.error ||
+    data?.errors?.paypal_description ||
+    data?.errors?.response?.response_json?.details?.[0]?.description ||
+    data?.response_json?.details?.[0]?.description ||
+    fallback
+  );
+}
+
 function isZoidDestroyedError(error: unknown): boolean {
   const message = getErrorMessage(error, "").toLowerCase();
 
@@ -88,6 +115,25 @@ function isZoidDestroyedError(error: unknown): boolean {
     message.includes("all components destroyed") ||
     message.includes("component destroyed")
   );
+}
+
+function normalizeButtonStyle(style?: PayPalButtonStyle): PayPalButtonStyle {
+  const height = style?.height;
+
+  return {
+    layout: style?.layout ?? "vertical",
+    color: style?.color ?? "gold",
+    shape: style?.shape ?? "pill",
+    label: style?.label ?? "paypal",
+    tagline: style?.tagline ?? false,
+    ...(typeof height === "number"
+      ? {
+          height: Math.min(55, Math.max(25, height)),
+        }
+      : {
+          height: 45,
+        }),
+  };
 }
 
 export function PayPalCheckout({
@@ -100,6 +146,10 @@ export function PayPalCheckout({
   createOrderUrl,
   captureOrderUrl,
   csrfToken,
+  className,
+  containerStyle,
+  buttonStyle,
+  onStatusChange,
   onSuccess,
   onError,
   onCancel,
@@ -110,13 +160,51 @@ export function PayPalCheckout({
   const buttonsRef = useRef<any>(null);
   const checkoutContextRef = useRef<any>(null);
 
+  const [checkoutStatus, setCheckoutStatus] = useState<CheckoutStatus>("idle");
+
+  const [checkoutMessage, setCheckoutMessage] = useState<string>("");
+
+  const latestPropsRef = useRef({
+    amount,
+    currency,
+    externalReference,
+    payerEmail,
+    description,
+    createOrderUrl,
+    captureOrderUrl,
+    csrfToken,
+  });
+
+  const onStatusChangeRef = useRef<Props["onStatusChange"]>(onStatusChange);
   const onSuccessRef = useRef<Props["onSuccess"]>(onSuccess);
   const onErrorRef = useRef<Props["onError"]>(onError);
   const onCancelRef = useRef<Props["onCancel"]>(onCancel);
 
-  const [status, setStatus] = useState<CheckoutStatus>("idle");
-  const [message, setMessage] = useState<string>("");
-  const [responsePayload, setResponsePayload] = useState<unknown>(null);
+  useEffect(() => {
+    latestPropsRef.current = {
+      amount,
+      currency,
+      externalReference,
+      payerEmail,
+      description,
+      createOrderUrl,
+      captureOrderUrl,
+      csrfToken,
+    };
+  }, [
+    amount,
+    currency,
+    externalReference,
+    payerEmail,
+    description,
+    createOrderUrl,
+    captureOrderUrl,
+    csrfToken,
+  ]);
+
+  useEffect(() => {
+    onStatusChangeRef.current = onStatusChange;
+  }, [onStatusChange]);
 
   useEffect(() => {
     onSuccessRef.current = onSuccess;
@@ -130,30 +218,47 @@ export function PayPalCheckout({
     onCancelRef.current = onCancel;
   }, [onCancel]);
 
+  function notifyStatus(status: CheckoutStatus, message?: string): void {
+    setCheckoutStatus(status);
+    setCheckoutMessage(message ?? "");
+
+    if (onStatusChangeRef.current) {
+      onStatusChangeRef.current(status, message);
+    }
+  }
+
+  function notifyError(error: unknown, fallback: string): void {
+    if (isZoidDestroyedError(error)) {
+      return;
+    }
+
+    console.error(error);
+
+    const message = getErrorMessage(error, fallback);
+
+    notifyStatus("error", message);
+
+    if (onErrorRef.current) {
+      onErrorRef.current(error);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
     async function initializePayPal() {
-      setStatus("loading");
-      setMessage("Inicializando PayPal...");
-      setResponsePayload(null);
+      notifyStatus("loading", "Inicializando PayPal...");
 
       if (!clientId) {
-        setStatus("error");
-        setMessage("Falta configurar PAYPAL_CLIENT_ID.");
-        return;
+        throw new Error("Falta configurar PAYPAL_CLIENT_ID.");
       }
 
       if (!createOrderUrl) {
-        setStatus("error");
-        setMessage("Falta createOrderUrl.");
-        return;
+        throw new Error("Falta createOrderUrl.");
       }
 
       if (!captureOrderUrl) {
-        setStatus("error");
-        setMessage("Falta captureOrderUrl.");
-        return;
+        throw new Error("Falta captureOrderUrl.");
       }
 
       const container = document.getElementById(containerId);
@@ -177,163 +282,171 @@ export function PayPalCheckout({
       }
 
       if (!paypal?.Buttons) {
-        setStatus("error");
-        setMessage("No se pudo cargar PayPal Buttons.");
-        return;
+        throw new Error("No se pudo cargar PayPal Buttons.");
       }
 
       const buttons = paypal.Buttons({
-        style: {
-          layout: "vertical",
-          color: "gold",
-          shape: "rect",
-          label: "paypal",
-        },
+        style: normalizeButtonStyle(buttonStyle),
 
         createOrder: async () => {
-          setStatus("loading");
-          setMessage("Creando orden de PayPal...");
-          setResponsePayload(null);
+          try {
+            notifyStatus("loading", "Creando orden de PayPal...");
 
-          const currentAmount = Number(readInputValue("amount") || amount);
+            const current = latestPropsRef.current;
 
-          const currentCurrency = readInputValue("currency") || currency;
-
-          const currentExternalReference =
-            readInputValue("external_reference") ||
-            externalReference ||
-            `PAYPAL-${Date.now()}`;
-
-          const currentDescription =
-            readInputValue("description") || description;
-
-          const resolvedPayerEmail =
-            readInputValue("payer_email") || payerEmail || "cliente@test.com";
-
-          const metadata = readMetadataFromPage();
-
-          const payload = {
-            amount: currentAmount,
-            currency: currentCurrency,
-
-            external_reference: currentExternalReference,
-            payer_email: resolvedPayerEmail,
-            description: currentDescription,
-
-            metadata,
-
-            paypal: {
-              intent: "CAPTURE",
-              brand_name:
-                readInputValue("paypal_brand_name") || "Stag Herd Demo",
-              landing_page: readInputValue("paypal_landing_page") || "LOGIN",
-              user_action: readInputValue("paypal_user_action") || "PAY_NOW",
-              shipping_preference:
-                readInputValue("paypal_shipping_preference") || "NO_SHIPPING",
-              invoice_id: readInputValue("paypal_invoice_id") || undefined,
-            },
-          };
-
-          const response = await fetch(createOrderUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-              "X-CSRF-TOKEN": csrfToken,
-              "X-Requested-With": "XMLHttpRequest",
-            },
-            credentials: "include",
-            body: JSON.stringify(payload),
-          });
-
-          const data = await parseJsonResponse(response);
-
-          if (!response.ok || !data?.ok) {
-            throw new Error(
-              data?.message ||
-                data?.error ||
-                `No se pudo crear la orden de PayPal. Status ${response.status}`,
+            const currentAmount = Number(
+              readInputValue("amount") || current.amount,
             );
+
+            const currentCurrency =
+              readInputValue("currency") || current.currency || "MXN";
+
+            const currentExternalReference =
+              readInputValue("external_reference") ||
+              current.externalReference ||
+              `PAYPAL-${Date.now()}`;
+
+            const currentDescription =
+              readInputValue("description") || current.description;
+
+            const resolvedPayerEmail =
+              readInputValue("payer_email") ||
+              current.payerEmail ||
+              "cliente@test.com";
+
+            const metadata = readMetadataFromPage();
+
+            const payload = {
+              amount: currentAmount,
+              currency: currentCurrency,
+
+              external_reference: currentExternalReference,
+              payer_email: resolvedPayerEmail,
+              description: currentDescription,
+
+              metadata,
+
+              paypal: {
+                intent: "CAPTURE",
+                brand_name:
+                  readInputValue("paypal_brand_name") || "Stag Herd Demo",
+                landing_page: readInputValue("paypal_landing_page") || "LOGIN",
+                user_action: readInputValue("paypal_user_action") || "PAY_NOW",
+                shipping_preference:
+                  readInputValue("paypal_shipping_preference") || "NO_SHIPPING",
+                invoice_id: readInputValue("paypal_invoice_id") || undefined,
+              },
+            };
+
+            const response = await fetch(current.createOrderUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-CSRF-TOKEN": current.csrfToken,
+                "X-Requested-With": "XMLHttpRequest",
+              },
+              credentials: "include",
+              body: JSON.stringify(payload),
+            });
+
+            const data = await parseJsonResponse(response);
+
+            if (!response.ok || !data?.ok) {
+              throw new Error(
+                getBackendErrorMessage(
+                  data,
+                  `No se pudo crear la orden de PayPal. Status ${response.status}`,
+                ),
+              );
+            }
+
+            const orderId =
+              data?.provider_order_id || data?.paypal_order?.id || data?.id;
+
+            if (!orderId) {
+              throw new Error("El backend no regresó provider_order_id.");
+            }
+
+            checkoutContextRef.current = data?.checkout_context ?? null;
+
+            if (!checkoutContextRef.current) {
+              throw new Error(
+                "El backend creó la orden, pero no regresó checkout_context.",
+              );
+            }
+
+            notifyStatus("loading", "Esperando aprobación del comprador.");
+
+            return String(orderId);
+          } catch (error) {
+            notifyError(error, "No ha sido posible crear la orden de PayPal.");
+
+            throw error;
           }
-
-          const orderId =
-            data?.provider_order_id || data?.paypal_order?.id || data?.id;
-
-          if (!orderId) {
-            throw new Error("El backend no regresó provider_order_id.");
-          }
-
-          checkoutContextRef.current = data?.checkout_context ?? null;
-
-          if (!checkoutContextRef.current) {
-            throw new Error(
-              "El backend creó la orden, pero no regresó checkout_context.",
-            );
-          }
-
-          setResponsePayload(data);
-          setMessage(
-            `Orden creada en PayPal: ${orderId}. Esperando aprobación del comprador.`,
-          );
-
-          return String(orderId);
         },
 
         onApprove: async (data: any): Promise<void> => {
-          setStatus("loading");
-          setMessage("Capturando orden de PayPal...");
+          try {
+            notifyStatus("loading", "Capturando orden de PayPal...");
 
-          if (!checkoutContextRef.current) {
-            throw new Error(
-              "No existe checkout_context. No se puede crear el Payment después del capture.",
-            );
+            const current = latestPropsRef.current;
+
+            if (!checkoutContextRef.current) {
+              throw new Error(
+                "No existe checkout_context. No se puede crear el Payment después del capture.",
+              );
+            }
+
+            const capturePayload = {
+              provider_order_id: data?.orderID,
+              ...checkoutContextRef.current,
+            };
+
+            const response = await fetch(current.captureOrderUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-CSRF-TOKEN": current.csrfToken,
+                "X-Requested-With": "XMLHttpRequest",
+              },
+              credentials: "include",
+              body: JSON.stringify(capturePayload),
+            });
+
+            const responseData = await parseJsonResponse(response);
+
+            if (!response.ok || !responseData?.ok) {
+              throw new Error(
+                getBackendErrorMessage(
+                  responseData,
+                  `No se pudo capturar la orden de PayPal. Status ${response.status}`,
+                ),
+              );
+            }
+
+            notifyStatus("success", "Pago PayPal capturado correctamente.");
+
+            if (onSuccessRef.current) {
+              await onSuccessRef.current(responseData);
+            }
+          } catch (error) {
+            notifyError(error, "No ha sido posible procesar el pago.");
+
+            /**
+             * Importante:
+             * No relanzar el error aquí.
+             *
+             * Si haces throw error dentro de onApprove,
+             * PayPal lo registra como:
+             * onApprove_non_resume_flow_merchant_callback_rejected
+             */
           }
-
-          const capturePayload = {
-            provider_order_id: data?.orderID,
-            ...checkoutContextRef.current,
-          };
-
-          const response = await fetch(captureOrderUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-              "X-CSRF-TOKEN": csrfToken,
-              "X-Requested-With": "XMLHttpRequest",
-            },
-            credentials: "include",
-            body: JSON.stringify(capturePayload),
-          });
-
-          const responseData = await parseJsonResponse(response);
-
-          if (!response.ok || !responseData?.ok) {
-            throw new Error(
-              responseData?.message ||
-                responseData?.error ||
-                `No se pudo capturar la orden de PayPal. Status ${response.status}`,
-            );
-          }
-
-          setStatus("success");
-          setMessage("Pago PayPal capturado correctamente.");
-          setResponsePayload(responseData);
-
-          if (onSuccessRef.current) {
-            await onSuccessRef.current(responseData);
-          }
-
-          /**
-           * No retornar responseData.
-           * PayPal espera Promise<void>.
-           */
         },
 
         onCancel: (data: any) => {
-          setStatus("idle");
-          setMessage("El comprador canceló el flujo de PayPal.");
-          setResponsePayload(data);
+          notifyStatus("idle", "El comprador canceló el flujo de PayPal.");
 
           if (onCancelRef.current) {
             onCancelRef.current(data);
@@ -341,33 +454,14 @@ export function PayPalCheckout({
         },
 
         onError: (error: unknown) => {
-          if (isZoidDestroyedError(error)) {
-            return;
-          }
-
-          console.error(error);
-
-          const errorMessage = getErrorMessage(
-            error,
-            "PayPal devolvió un error inesperado.",
-          );
-
-          setStatus("error");
-          setMessage(errorMessage);
-          setResponsePayload(error);
-
-          if (onErrorRef.current) {
-            onErrorRef.current(error);
-          }
+          notifyError(error, "PayPal devolvió un error inesperado.");
         },
       });
 
       if (!buttons.isEligible()) {
-        setStatus("error");
-        setMessage(
+        throw new Error(
           "PayPal Buttons no está disponible para esta configuración.",
         );
-        return;
       }
 
       await buttons.render(`#${containerId}`);
@@ -378,8 +472,7 @@ export function PayPalCheckout({
 
       buttonsRef.current = buttons;
 
-      setStatus("idle");
-      setMessage("Checkout PayPal listo.");
+      notifyStatus("ready", "Checkout PayPal listo.");
     }
 
     initializePayPal().catch((error) => {
@@ -387,82 +480,88 @@ export function PayPalCheckout({
         return;
       }
 
-      console.error(error);
-
-      const errorMessage = getErrorMessage(
-        error,
-        "No se pudo inicializar PayPal.",
-      );
-
-      setStatus("error");
-      setMessage(errorMessage);
-      setResponsePayload(error);
-
-      if (onErrorRef.current) {
-        onErrorRef.current(error);
-      }
+      notifyError(error, "No se pudo inicializar PayPal.");
     });
 
     return () => {
       cancelled = true;
-
-      /**
-       * No usamos buttons.close().
-       * En React/Vite dev, PayPal/zoid puede tronar con:
-       * "zoid destroyed all components".
-       *
-       * Solo limpiamos referencias.
-       */
       buttonsRef.current = null;
       checkoutContextRef.current = null;
     };
   }, [
     clientId,
-    amount,
     currency,
-    externalReference,
-    payerEmail,
-    description,
     createOrderUrl,
     captureOrderUrl,
     csrfToken,
     containerId,
+    buttonStyle,
   ]);
 
   return (
-    <section>
-      <div style={{ marginBottom: 16 }}>
-        <strong>Referencia:</strong>{" "}
-        {externalReference || "Se tomará del formulario"}
-        <br />
-        <strong>Monto:</strong> ${amount.toFixed(2)} {currency}
-        <br />
-        <strong>Email:</strong> {payerEmail || "cliente@test.com"}
-      </div>
-
-      <div id={containerId} />
-
-      {message && (
-        <div style={{ marginTop: 20 }}>
-          <strong>Estado:</strong> {message}
+    <div
+      className={className}
+      style={{
+        width: "100%",
+        maxWidth: 420,
+        ...containerStyle,
+      }}
+    >
+      {checkoutStatus === "error" && checkoutMessage && (
+        <div
+          role="alert"
+          style={{
+            marginBottom: 12,
+            padding: "10px 12px",
+            borderRadius: 8,
+            border: "1px solid #dc2626",
+            background: "#fef2f2",
+            color: "#991b1b",
+            fontSize: 14,
+            lineHeight: 1.4,
+          }}
+        >
+          {checkoutMessage}
         </div>
       )}
 
-      {responsePayload !== null && (
-        <pre
+      {checkoutStatus === "success" && checkoutMessage && (
+        <div
+          role="status"
           style={{
-            marginTop: 16,
-            overflow: "auto",
-            background: "#0f172a",
-            color: "#e5e7eb",
-            padding: 14,
-            borderRadius: 12,
-            fontSize: 12,
+            marginBottom: 12,
+            padding: "10px 12px",
+            borderRadius: 8,
+            border: "1px solid #16a34a",
+            background: "#f0fdf4",
+            color: "#166534",
+            fontSize: 14,
+            lineHeight: 1.4,
           }}
         >
-          {JSON.stringify(responsePayload, null, 2)}
-        </pre>
+          {checkoutMessage}
+        </div>
       )}
-    </section>
+
+      {checkoutStatus === "loading" && checkoutMessage && (
+        <div
+          role="status"
+          style={{
+            marginBottom: 12,
+            padding: "10px 12px",
+            borderRadius: 8,
+            border: "1px solid #d1d5db",
+            background: "#f9fafb",
+            color: "#374151",
+            fontSize: 14,
+            lineHeight: 1.4,
+          }}
+        >
+          {checkoutMessage}
+        </div>
+      )}
+
+      <div id={containerId} />
+    </div>
   );
 }
