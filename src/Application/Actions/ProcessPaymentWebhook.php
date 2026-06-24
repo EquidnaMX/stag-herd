@@ -12,6 +12,7 @@ use Equidna\StagHerd\Events\PaymentWebhookProcessed;
 use Equidna\StagHerd\Events\PaymentWebhookReceived;
 use Equidna\StagHerd\Exceptions\DuplicateWebhookException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
+use Throwable;
 
 final readonly class ProcessPaymentWebhook
 {
@@ -26,29 +27,35 @@ final readonly class ProcessPaymentWebhook
     {
         $parser = $this->parserFor($payload->provider);
         $webhook = $parser->parse($payload);
+        $idempotencyKey = $webhook->idempotencyKey(
+            (string) config('stag-herd.webhooks.idempotency.prefix', 'stag-herd:webhooks')
+        );
+        $ttlSeconds = (int) config('stag-herd.webhooks.idempotency.ttl_seconds', 86400);
 
         event(new PaymentWebhookReceived($webhook));
 
         $claimed = $this->idempotency->claim(
-            key: $webhook->idempotencyKey(
-                (string) config('stag-herd.webhooks.idempotency.prefix', 'stag-herd:webhooks')
-            ),
-            ttlSeconds: (int) config('stag-herd.webhooks.idempotency.ttl_seconds', 86400),
+            key: $idempotencyKey,
+            ttlSeconds: $ttlSeconds,
         );
 
         if (! $claimed) {
-            throw DuplicateWebhookException::withKey(
-                $webhook->idempotencyKey(
-                    (string) config('stag-herd.webhooks.idempotency.prefix', 'stag-herd:webhooks')
-                )
-            );
+            throw DuplicateWebhookException::withKey($idempotencyKey);
         }
 
-        $payment = $this->lookupPayment->handle($this->lookupData($payload, $webhook));
+        try {
+            $payment = $this->lookupPayment->handle($this->lookupData($payload, $webhook));
 
-        event(new PaymentWebhookProcessed($webhook, $payment));
+            event(new PaymentWebhookProcessed($webhook, $payment));
 
-        return $payment;
+            $this->idempotency->markProcessed($idempotencyKey, $ttlSeconds);
+
+            return $payment;
+        } catch (Throwable $exception) {
+            $this->idempotency->releaseIfProcessing($idempotencyKey);
+
+            throw $exception;
+        }
     }
 
     private function lookupData(WebhookPayloadData $payload, NormalizedWebhookData $webhook): PaymentLookupData

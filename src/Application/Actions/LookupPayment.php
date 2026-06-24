@@ -7,6 +7,7 @@ use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Domain\Payment;
 use Equidna\StagHerd\Domain\PaymentStateMachine;
+use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Support\PaymentEventDispatcher;
@@ -54,7 +55,7 @@ final readonly class LookupPayment
         $result = $provider->lookupPayment(
             new PaymentLookupData(
                 provider: $payment->provider,
-                method: $payment->method,
+                method: $this->resolveLookupMethod($lookup, $payment),
                 providerPaymentId: $providerPaymentId,
             )
         );
@@ -78,7 +79,7 @@ final readonly class LookupPayment
         $result = $provider->lookupPayment(
             new PaymentLookupData(
                 provider: $lookup->provider,
-                method: $payment?->method ?? $lookup->method,
+                method: $this->resolveLookupMethod($lookup, $payment),
                 providerPaymentId: $lookup->providerPaymentId,
             )
         );
@@ -124,7 +125,7 @@ final readonly class LookupPayment
         $result = $provider->lookupPayment(
             new PaymentLookupData(
                 provider: $lookup->provider,
-                method: $payment?->method ?? $lookup->method,
+                method: $this->resolveLookupMethod($lookup, $payment),
                 providerOrderId: $lookup->providerOrderId,
             )
         );
@@ -187,5 +188,63 @@ final readonly class LookupPayment
         );
 
         return $updatedPayment;
+    }
+
+    private function resolveLookupMethod(PaymentLookupData $lookup, ?Payment $payment = null): string
+    {
+        $resolvedMethod = $this->normalizeMethod($payment?->method)
+            ?? $this->normalizeMethod($lookup->method);
+
+        if ($resolvedMethod !== null) {
+            return $resolvedMethod;
+        }
+
+        $enabledMethods = $this->providers->methodsForProvider($lookup->provider);
+
+        if (count($enabledMethods) === 1) {
+            return $enabledMethods[0];
+        }
+
+        if (count($enabledMethods) > 1) {
+            throw InvalidPaymentPayloadException::invalidField(
+                'method',
+                sprintf(
+                    'Lookup payment method is required for provider [%s] because multiple methods are enabled: [%s].',
+                    $lookup->provider,
+                    implode(', ', $enabledMethods),
+                ),
+            );
+        }
+
+        $declaredMethods = array_values(array_unique(array_map(
+            static fn (string $method): string => strtolower($method),
+            $this->providers->get($lookup->provider)->getMethods(),
+        )));
+
+        if (count($declaredMethods) === 1) {
+            return $declaredMethods[0];
+        }
+
+        if (count($declaredMethods) > 1) {
+            throw InvalidPaymentPayloadException::invalidField(
+                'method',
+                sprintf(
+                    'Lookup payment method is required for provider [%s] because multiple methods are declared: [%s].',
+                    $lookup->provider,
+                    implode(', ', $declaredMethods),
+                ),
+            );
+        }
+
+        throw InvalidPaymentPayloadException::missingField('method');
+    }
+
+    private function normalizeMethod(?string $method): ?string
+    {
+        if ($method === null || trim($method) === '') {
+            return null;
+        }
+
+        return strtolower($method);
     }
 }

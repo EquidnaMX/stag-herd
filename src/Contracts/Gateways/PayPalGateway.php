@@ -55,4 +55,11 @@ interface PayPalGateway
         ?string $currency = null,
         ?string $idempotencyKey = null,
     ): array;
+
+    /**
+     * Verifies a PayPal webhook signature against PayPal's API.
+     *
+     * @param array<string, mixed> $payload
+     */
+    public function verifyWebhookSignature(array $payload): bool;
 }

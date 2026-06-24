@@ -8,6 +8,7 @@ use Equidna\StagHerd\Infrastructure\Providers\Cash\Handlers\CashPaymentHandler;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalCheckoutHandler;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers\MercadoPagoCardHandler;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoWebhookParser;
+use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalWebhookParser;
 
 return [
     'repositories' => [
@@ -101,12 +102,17 @@ return [
 
             'credentials' => [
                 'client_id' => env('VITE_PAYPAL_CLIENT_ID'),
-                'secret' => env('PAYPAL_SECRET'),
+                'secret' => env('PAYPAL_CLIENT_SECRET', env('PAYPAL_SECRET')),
+                'webhook_id' => env('PAYPAL_WEBHOOK_ID'),
             ],
 
             'http' => [
                 'base_uri' => env('PAYPAL_BASE_URI', 'https://api-m.sandbox.paypal.com'),
                 'timeout' => 15,
+            ],
+
+            'webhooks' => [
+                'parser' => PayPalWebhookParser::class,
             ],
         ],
     ],

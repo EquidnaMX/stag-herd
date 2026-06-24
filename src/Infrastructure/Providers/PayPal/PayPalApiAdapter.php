@@ -83,6 +83,17 @@ class PayPalApiAdapter implements PayPalGateway
         );
     }
 
+    public function verifyWebhookSignature(array $payload): bool
+    {
+        $response = $this->send(
+            method: 'post',
+            endpoint: '/v1/notifications/verify-webhook-signature',
+            payload: $payload,
+        );
+
+        return strtoupper((string) ($response['verification_status'] ?? '')) === 'SUCCESS';
+    }
+
     /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>

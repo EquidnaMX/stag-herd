@@ -18,9 +18,9 @@ La fase actual contempla:
 - reembolso;
 - persistencia interna por defecto;
 - repositorios reemplazables por configuración;
-- endpoints de webhooks preparados para integración posterior.
+- procesamiento de webhooks para Mercado Pago y PayPal (mínimo).
 
-Los webhooks entrantes todavía no procesan cambios de estado de forma completa. Esa parte pertenece a la siguiente fase de implementación.
+Los webhooks reutilizan el flujo parser -> idempotencia -> lookup -> update. En PayPal, por ahora solo se procesa `PAYMENT.CAPTURE.COMPLETED` como evento terminal útil.
 
 ## Instalación
 
@@ -341,15 +341,16 @@ Los webhooks se configuran en:
 ],
 ```
 
-Endpoint actual para Mercado Pago:
+Endpoints actuales:
 
 ```txt
 /stag-herd/webhooks/mercado-pago
+/stag-herd/webhooks/paypal
 ```
 
-En la fase actual, el endpoint queda preparado y sin dependencias de la arquitectura anterior.
+PayPal requiere configurar `PAYPAL_WEBHOOK_ID` para que el paquete verifique la firma vía la API oficial de PayPal antes de normalizar el evento.
 
-El procesamiento completo de webhooks, incluyendo validación, normalización, idempotencia con Redis y actualización de pagos, pertenece a la siguiente fase.
+En la fase actual de PayPal solo se soporta `PAYMENT.CAPTURE.COMPLETED`; cualquier otro evento responde con error controlado.
 
 ## Arquitectura general
 

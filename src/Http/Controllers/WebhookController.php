@@ -6,7 +6,10 @@ use Equidna\StagHerd\Application\Actions\ProcessPaymentWebhook;
 use Equidna\StagHerd\Data\WebhookPayloadData;
 use Equidna\StagHerd\Events\PaymentWebhookFailed;
 use Equidna\StagHerd\Exceptions\DuplicateWebhookException;
+use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
+use Equidna\StagHerd\Exceptions\InvalidWebhookSignatureException;
 use Equidna\StagHerd\Exceptions\ProviderNotRegisteredException;
+use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -68,6 +71,21 @@ class WebhookController extends Controller
                 'message' => 'Webhook already processed.',
                 'provider' => $provider,
             ]);
+        } catch (InvalidWebhookSignatureException) {
+            return response()->json([
+                'message' => 'Invalid webhook signature.',
+                'provider' => $provider,
+            ], 401);
+        } catch (InvalidPaymentPayloadException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'provider' => $provider,
+            ], 422);
+        } catch (UnsupportedOperationException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'provider' => $provider,
+            ], 400);
         } catch (Throwable $exception) {
             event(new PaymentWebhookFailed($payload, $exception));
 

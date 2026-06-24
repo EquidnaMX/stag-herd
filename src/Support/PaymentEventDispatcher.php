@@ -18,10 +18,6 @@ final class PaymentEventDispatcher
         Payment $payment,
         ?Payment $previousPayment = null,
     ): void {
-        /*
-         * Si viene un pago anterior y el estado no cambió,
-         * no disparamos eventos para evitar ruido.
-         */
         if (
             $previousPayment !== null
             && $previousPayment->status === $payment->status

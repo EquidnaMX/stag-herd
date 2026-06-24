@@ -22,9 +22,10 @@ final readonly class NormalizedWebhookData
     public function idempotencyKey(string $prefix): string
     {
         return sprintf(
-            '%s:%s:%s:%s',
+            '%s:%s:%s:%s:%s',
             rtrim($prefix, ':'),
             $this->provider,
+            $this->eventType,
             $this->resourceType,
             $this->resourceId,
         );
