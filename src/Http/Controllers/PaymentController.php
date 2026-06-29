@@ -6,6 +6,7 @@ use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
 use Equidna\StagHerd\Data\PaymentCancellationData;
+use Equidna\StagHerd\Data\PaymentConfirmationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\RefundRequestData;
@@ -603,6 +604,171 @@ class PaymentController extends Controller
             return response()->json([
                 'ok' => true,
                 'message' => 'Pago creado correctamente.',
+                'payment' => $payment->toArray(),
+            ]);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
+            ], 422);
+        }
+    }
+
+    public function processStripeIntent(Request $request): JsonResponse
+    {
+        try {
+            $data = $request->validate([
+                'amount' => ['required', 'numeric', 'min:0.01'],
+                'currency' => ['required', 'string', 'size:3'],
+                'external_reference' => ['nullable', 'string', 'max:255'],
+                'payer_email' => ['nullable', 'email', 'max:255'],
+                'description' => ['nullable', 'string', 'max:255'],
+
+                'idempotency_key' => ['nullable', 'string', 'max:255'],
+
+                'metadata' => ['nullable', 'array'],
+
+                'stripe' => ['nullable', 'array'],
+                'stripe.customer' => ['nullable', 'string', 'max:255'],
+                'stripe.payment_method' => ['nullable', 'string', 'max:255'],
+                'stripe.capture_method' => ['nullable', 'string', 'max:50'],
+                'stripe.statement_descriptor' => ['nullable', 'string', 'max:22'],
+                'stripe.statement_descriptor_suffix' => ['nullable', 'string', 'max:22'],
+                'stripe.setup_future_usage' => ['nullable', 'string', 'max:50'],
+                'stripe.return_url' => ['nullable', 'url', 'max:500'],
+                'stripe.metadata' => ['nullable', 'array'],
+            ]);
+
+            $externalReference = $data['external_reference']
+                ?? 'STRIPE-' . now()->format('YmdHis');
+
+            $metadata = $this->cleanMetadata($data['metadata'] ?? []);
+
+            $stripeMetadata = $this->cleanMetadata($data['stripe'] ?? []);
+
+            $idempotencyKey = substr(
+                (string) (
+                    $data['idempotency_key']
+                    ?? $request->header('X-Idempotency-Key')
+                    ?? 'stag-herd-stripe-intent-' . Str::uuid()
+                ),
+                0,
+                255,
+            );
+
+            $metadata = array_replace_recursive($metadata, [
+                'source' => 'stag-herd-stripe-payment-element',
+                'external_reference' => $externalReference,
+                'stripe' => array_replace_recursive($stripeMetadata, [
+                    'idempotency_key' => $idempotencyKey,
+                ]),
+            ]);
+
+            $metadata = $this->cleanMetadata($metadata);
+
+            $payment = StagHerd::createPayment(new PaymentRequestData(
+                amount: MoneyFormatter::fromDecimal($data['amount']),
+                currency: strtoupper($data['currency']),
+                method: 'card',
+                provider: 'stripe',
+                externalReference: $externalReference,
+                payerReference: data_get($metadata, 'id_client'),
+                payerEmail: $data['payer_email'] ?? null,
+                description: $data['description'] ?? 'Pago desde Stripe Payment Element',
+                metadata: $metadata,
+            ));
+
+            $paymentArray = $payment->toArray();
+
+            $clientSecret = data_get($paymentArray, 'metadata.stripe_client_secret')
+                ?? data_get($paymentArray, 'metadata.client_secret');
+
+            $paymentIntentId = data_get($paymentArray, 'references.provider_payment_id')
+                ?? data_get($paymentArray, 'metadata.stripe_payment_intent_id');
+
+            if (! $clientSecret) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Stripe no regresó client_secret.',
+                    'payment' => $paymentArray,
+                ], 422);
+            }
+
+            if (! $paymentIntentId) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Stripe no regresó payment_intent_id.',
+                    'payment' => $paymentArray,
+                ], 422);
+            }
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'PaymentIntent de Stripe creado correctamente.',
+                'payment_id' => $payment->id,
+                'payment_intent_id' => $paymentIntentId,
+                'client_secret' => $clientSecret,
+                'payment' => $paymentArray,
+            ]);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
+            ], 422);
+        }
+    }
+
+    public function processStripeConfirm(Request $request): JsonResponse
+    {
+        try {
+            $data = $request->validate([
+                'payment_id' => ['required', 'string', 'max:255'],
+                'provider_payment_id' => ['required', 'string', 'max:255'],
+
+                'stripe_status' => ['nullable', 'string', 'max:255'],
+                'idempotency_key' => ['nullable', 'string', 'max:255'],
+
+                'metadata' => ['nullable', 'array'],
+            ]);
+
+            $metadata = $this->cleanMetadata($data['metadata'] ?? []);
+
+            $metadata = array_replace_recursive($metadata, [
+                'source' => 'stag-herd-stripe-payment-element-confirm',
+                'stripe_payment_intent_id' => $data['provider_payment_id'],
+                'stripe_status_from_client' => $data['stripe_status'] ?? null,
+                'stripe' => [
+                    'confirm_idempotency_key' => substr(
+                        (string) (
+                            $data['idempotency_key']
+                            ?? $request->header('X-Idempotency-Key')
+                            ?? 'stag-herd-stripe-confirm-' . $data['provider_payment_id']
+                        ),
+                        0,
+                        255,
+                    ),
+                ],
+            ]);
+
+            $metadata = $this->cleanMetadata($metadata);
+
+            $payment = StagHerd::confirmPayment(new PaymentConfirmationData(
+                provider: 'stripe',
+                method: 'card',
+                paymentId: (string) $data['payment_id'],
+                providerPaymentId: (string) $data['provider_payment_id'],
+                metadata: $metadata,
+            ));
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Pago Stripe confirmado y sincronizado correctamente.',
                 'payment' => $payment->toArray(),
             ]);
         } catch (Throwable $exception) {

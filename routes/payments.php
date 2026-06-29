@@ -22,6 +22,12 @@ Route::middleware(config('stag-herd.demo.middleware', ['web']))
         Route::post('/paypal/capture', [PaymentController::class, 'processPayPalCapture'])
             ->name('paypal.capture');
 
+        Route::post('/stripe/intent', [PaymentController::class, 'processStripeIntent'])
+            ->name('stripe.intent');
+
+        Route::post('/stripe/confirm', [PaymentController::class, 'processStripeConfirm'])
+            ->name('stripe.confirm');
+
         Route::post('/provider/lookup', [PaymentController::class, 'providerLookup'])
             ->name('provider.lookup');
 

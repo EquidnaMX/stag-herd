@@ -14,4 +14,8 @@ Route::middleware(config('stag-herd.webhooks.routes.middleware', ['api']))
         Route::match(['get', 'post'], '/paypal', [WebhookController::class, 'handle'])
             ->defaults('provider', 'paypal')
             ->name('paypal');
+
+        Route::post('/stripe', [WebhookController::class, 'handle'])
+            ->defaults('provider', 'stripe')
+            ->name('stripe');
     });

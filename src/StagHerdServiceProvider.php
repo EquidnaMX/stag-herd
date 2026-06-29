@@ -5,6 +5,7 @@ namespace Equidna\StagHerd;
 use Equidna\StagHerd\Application\PaymentService;
 use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
+use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
 use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
 use Equidna\StagHerd\Contracts\PaymentMethodHandler;
 use Equidna\StagHerd\Contracts\PaymentRepository;
@@ -13,6 +14,7 @@ use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentDisplayRepository
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentRepository;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoApiAdapter;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalApiAdapter;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeApiAdapter;
 use Equidna\StagHerd\Infrastructure\Webhooks\RedisWebhookIdempotencyStore;
 use Equidna\StagHerd\Support\PaymentMethodHandlerRegistry;
 use Equidna\StagHerd\Support\ProviderRegistry;
@@ -97,6 +99,11 @@ class StagHerdServiceProvider extends ServiceProvider
         $this->app->bind(
             PayPalGateway::class,
             PayPalApiAdapter::class,
+        );
+
+        $this->app->bind(
+            StripeGateway::class,
+            StripeApiAdapter::class,
         );
     }
 

@@ -2,6 +2,8 @@
   "dependencies": {
     "@mercadopago/sdk-js": "^0.0.3",
     "@paypal/paypal-js": "^10.0.0",
+    "@stripe/react-stripe-js": "^6.6.0",
+    "@stripe/stripe-js": "^9.8.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

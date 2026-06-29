@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { MercadoPagoCardCheckout } from "./components/MercadoPagoCardCheckout";
 import { PayPalCheckout } from "./components/PayPalCheckout";
+import { StripeCardCheckout } from "./components/StripeCardCheckout";
 
 const mercadoPagoElements = document.querySelectorAll<HTMLElement>(
   "[data-stag-herd-checkout='mercado-pago-card']",
@@ -40,6 +41,27 @@ paypalElements.forEach((element) => {
       createOrderUrl={element.dataset.createOrderUrl ?? ""}
       captureOrderUrl={element.dataset.captureOrderUrl ?? ""}
       csrfToken={element.dataset.csrfToken ?? ""}
+    />,
+  );
+});
+
+const stripeElements = document.querySelectorAll<HTMLElement>(
+  "[data-stag-herd-checkout='stripe-card']",
+);
+
+stripeElements.forEach((element) => {
+  createRoot(element).render(
+    <StripeCardCheckout
+      publicKey={element.dataset.publicKey ?? ""}
+      amount={Number(element.dataset.amount ?? 0)}
+      currency={element.dataset.currency ?? "MXN"}
+      externalReference={element.dataset.externalReference ?? ""}
+      payerEmail={element.dataset.payerEmail ?? "cliente@test.com"}
+      description={element.dataset.description ?? "Pago desde Stripe Card"}
+      createIntentUrl={element.dataset.createIntentUrl ?? ""}
+      confirmIntentUrl={element.dataset.confirmIntentUrl ?? ""}
+      csrfToken={element.dataset.csrfToken ?? ""}
+      returnUrl={element.dataset.returnUrl ?? ""}
     />,
   );
 });
