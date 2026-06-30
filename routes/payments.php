@@ -7,8 +7,10 @@ Route::middleware(config('stag-herd.demo.middleware', ['web']))
     ->prefix(config('stag-herd.demo.prefix', 'stag-herd/payments'))
     ->name('stag-herd.payments.')
     ->group(function () {
-        Route::get('/', [PaymentController::class, 'index'])
-            ->name('index');
+        if (config('stag-herd.demo.enabled', false)) {
+            Route::get('/', [PaymentController::class, 'index'])
+                ->name('index');
+        }
 
         Route::post('/', [PaymentController::class, 'store'])
             ->name('store');

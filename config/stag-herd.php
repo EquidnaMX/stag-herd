@@ -20,12 +20,6 @@ return [
         'webhooks' => null,
     ],
 
-    'demo' => [
-        'enabled' => false,
-        'middleware' => ['web'],
-        'prefix' => 'stag-herd/payments',
-    ],
-
     'webhooks' => [
         'routes' => [
             'enabled' => true,

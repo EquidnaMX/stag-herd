@@ -6,7 +6,8 @@ type Props = {
   amount: number;
   currency: string;
   externalReference: string;
-  payerEmail: string;
+  payerEmail?: string;
+  showEmailInput?: boolean;
   processUrl: string;
   csrfToken: string;
   description?: string;
@@ -174,6 +175,7 @@ export function MercadoPagoCardCheckout({
   currency,
   externalReference,
   payerEmail,
+  showEmailInput = false,
   processUrl,
   csrfToken,
   description = "Pago desde Mercado Pago Card Brick",
@@ -205,6 +207,7 @@ export function MercadoPagoCardCheckout({
     currency,
     externalReference,
     payerEmail,
+    showEmailInput,
     processUrl,
     csrfToken,
     description,
@@ -220,6 +223,7 @@ export function MercadoPagoCardCheckout({
       currency,
       externalReference,
       payerEmail,
+      showEmailInput,
       processUrl,
       csrfToken,
       description,
@@ -229,6 +233,7 @@ export function MercadoPagoCardCheckout({
     currency,
     externalReference,
     payerEmail,
+    showEmailInput,
     processUrl,
     csrfToken,
     description,
@@ -281,22 +286,6 @@ export function MercadoPagoCardCheckout({
       }
 
       initializingRef.current = true;
-
-      console.group("[MP DEBUG] init");
-      console.log("publicKey exists:", Boolean(publicKey));
-      console.log("publicKey prefix:", publicKey?.slice(0, 8));
-      console.log("amount:", amount, typeof amount);
-      console.log("payerEmail:", payerEmail);
-      console.log("processUrl:", processUrl);
-      console.log("csrf exists:", Boolean(csrfToken));
-      console.log("containerId:", containerId);
-      console.log(
-        "container exists:",
-        Boolean(document.getElementById(containerId)),
-      );
-      console.log("MP_DEVICE_SESSION_ID before:", window.MP_DEVICE_SESSION_ID);
-      console.groupEnd();
-
       notifyStatus("loading", "Inicializando Mercado Pago...");
 
       try {
@@ -312,6 +301,12 @@ export function MercadoPagoCardCheckout({
           throw new Error("El monto debe ser mayor a cero.");
         }
 
+        if (!showEmailInput && !payerEmail) {
+          throw new Error(
+            "Configuración inválida: si ocultas el input de email, debes enviar payerEmail prellenado.",
+          );
+        }
+
         const container = document.getElementById(containerId);
 
         if (!container) {
@@ -322,10 +317,6 @@ export function MercadoPagoCardCheckout({
 
         await loadMercadoPago();
         await loadMercadoPagoSecurity();
-
-        console.group("[MP DEBUG] loaded");
-        console.log("window.MercadoPago:", Boolean(window.MercadoPago));
-        console.log("MP_DEVICE_SESSION_ID after:", window.MP_DEVICE_SESSION_ID);
         console.groupEnd();
 
         if (cancelled) {
@@ -348,7 +339,7 @@ export function MercadoPagoCardCheckout({
           {
             initialization: {
               amount: Number(amount),
-              ...(payerEmail
+              ...(!showEmailInput && payerEmail
                 ? {
                     payer: {
                       email: payerEmail,
@@ -375,27 +366,8 @@ export function MercadoPagoCardCheckout({
               },
 
               onSubmit: async (rawCardFormData: any, additionalData?: any) => {
-                console.group("[MP DEBUG] onSubmit");
-                console.log("rawCardFormData:", rawCardFormData);
-                console.log("additionalData:", additionalData);
-                console.groupEnd();
-
                 const cardFormData =
                   rawCardFormData?.formData ?? rawCardFormData;
-
-                console.group("[MP DEBUG] normalized formData");
-                console.log("cardFormData:", cardFormData);
-                console.log("token:", cardFormData?.token);
-                console.log("card_token_id:", cardFormData?.card_token_id);
-                console.log(
-                  "payment_method_id:",
-                  cardFormData?.payment_method_id,
-                );
-                console.log("issuer_id:", cardFormData?.issuer_id);
-                console.log("installments:", cardFormData?.installments);
-                console.log("payer:", cardFormData?.payer);
-                console.groupEnd();
-
                 const token = String(
                   cardFormData?.token ?? cardFormData?.card_token_id ?? "",
                 ).trim();
@@ -590,6 +562,7 @@ export function MercadoPagoCardCheckout({
     publicKey,
     amount,
     payerEmail,
+    showEmailInput,
     processUrl,
     containerId,
     locale,

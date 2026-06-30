@@ -41,9 +41,7 @@ class StagHerdServiceProvider extends ServiceProvider
     {
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'stag-herd');
 
-        if (config('stag-herd.demo.enabled', false)) {
-            $this->loadRoutesFrom(__DIR__ . '/../routes/payments.php');
-        }
+        $this->loadRoutesFrom(__DIR__ . '/../routes/payments.php');
 
         if (config('stag-herd.webhooks.routes.enabled', true)) {
             $this->loadRoutesFrom(__DIR__ . '/../routes/webhooks.php');
