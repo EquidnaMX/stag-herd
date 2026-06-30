@@ -3,7 +3,7 @@
 use Equidna\StagHerd\Http\Controllers\PaymentController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(config('stag-herd.demo.middleware', ['web']))
+Route::middleware(['api'])
     ->prefix(config('stag-herd.demo.prefix', 'stag-herd/payments'))
     ->name('stag-herd.payments.')
     ->group(function () {
