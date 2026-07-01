@@ -93,7 +93,7 @@ class PaymentController extends Controller
 
         $metadata = $this->cleanMetadata($data['metadata'] ?? []);
         $metadata = array_replace_recursive($metadata, [
-            'source' => 'stag-herd-default-ui',
+            'source' => 'stag-herd-host-ui',
         ]);
 
         if (! empty($externalReference)) {
@@ -128,11 +128,11 @@ class PaymentController extends Controller
 
         $resolvedExternalReference = ! empty($externalReference)
             ? $externalReference
-            : strtoupper($provider) . '-DEMO-' . now()->format('YmdHis');
+            : strtoupper($provider) . '-' . now()->format('YmdHis');
 
         if ($provider === 'paypal') {
-            $returnUrl = $returnUrl ?: route('stag-herd.payments.index');
-            $cancelUrl = $cancelUrl ?: route('stag-herd.payments.index');
+            $returnUrl = $returnUrl ?: $this->resolveHostUrl($request);
+            $cancelUrl = $cancelUrl ?: $this->resolveHostUrl($request);
         }
 
         try {
@@ -146,7 +146,7 @@ class PaymentController extends Controller
                 payerEmail: ! empty($payerEmail) ? $payerEmail : null,
                 description: ! empty($description)
                     ? $description
-                    : 'Pago creado desde Stag Herd UI',
+                    : 'Payment created from host UI',
                 returnUrl: ! empty($returnUrl) ? $returnUrl : null,
                 cancelUrl: ! empty($cancelUrl) ? $cancelUrl : null,
                 metadata: $metadata,
@@ -156,8 +156,7 @@ class PaymentController extends Controller
                 ? $this->payments->findForDisplay($payment->id)
                 : null;
 
-            return redirect()
-                ->route('stag-herd.payments.index')
+            return $this->redirectToHost($request)
                 ->with('stag_herd_result', [
                     'action' => 'create',
                     'payment' => $payment->toArray(),
@@ -165,35 +164,35 @@ class PaymentController extends Controller
                     'raw_payload' => $model->raw_payload ?? [],
                 ]);
         } catch (Throwable $exception) {
-            return $this->redirectWithError($exception);
+            return $this->redirectWithError($request, $exception);
         }
     }
 
-    public function show(int|string $payment): RedirectResponse
+    public function show(Request $request, int|string $payment): RedirectResponse
     {
         $model = $this->payments->findForDisplay($payment);
 
         if (! $model) {
             return $this->redirectWithError(
-                new \RuntimeException("No se encontró el pago {$payment}.")
+                $request,
+                new RuntimeException("No se encontró el pago {$payment}.")
             );
         }
 
-        return redirect()
-            ->route('stag-herd.payments.index')
+        return $this->redirectToHost($request)
             ->with('stag_herd_selected_payment', [
                 'payment' => $this->displayPaymentToArray($model),
                 'checkout_url' => $this->resolveCheckoutUrl($model),
             ]);
     }
 
-    public function lookup(int|string $payment): RedirectResponse
+    public function lookup(Request $request, int|string $payment): RedirectResponse
     {
         try {
             $model = $this->payments->findForDisplay($payment);
 
             if (! $model) {
-                throw new \RuntimeException("No se encontró el pago {$payment}.");
+                throw new RuntimeException("No se encontró el pago {$payment}.");
             }
 
             $updated = StagHerd::lookupPayment(new PaymentLookupData(
@@ -201,9 +200,9 @@ class PaymentController extends Controller
                 paymentId: (string) $model->id,
             ));
 
-            return $this->redirectWithResult('lookup', $updated->toArray());
+            return $this->redirectWithResult($request, 'lookup', $updated->toArray());
         } catch (Throwable $exception) {
-            return $this->redirectWithError($exception);
+            return $this->redirectWithError($request, $exception);
         }
     }
 
@@ -213,19 +212,19 @@ class PaymentController extends Controller
             $model = $this->payments->findForDisplay($payment);
 
             if (! $model) {
-                throw new \RuntimeException("No se encontró el pago {$payment}.");
+                throw new RuntimeException("No se encontró el pago {$payment}.");
             }
 
             $updated = StagHerd::cancelPayment(new PaymentCancellationData(
                 provider: $model->provider,
                 paymentId: (string) $model->id,
                 reason: $request->string('reason')->toString()
-                    ?: 'Cancelado desde Stag Herd UI',
+                    ?: 'Cancelled from host UI',
             ));
 
-            return $this->redirectWithResult('cancel', $updated->toArray());
+            return $this->redirectWithResult($request, 'cancel', $updated->toArray());
         } catch (Throwable $exception) {
-            return $this->redirectWithError($exception);
+            return $this->redirectWithError($request, $exception);
         }
     }
 
@@ -235,7 +234,7 @@ class PaymentController extends Controller
             $model = $this->payments->findForDisplay($payment);
 
             if (! $model) {
-                throw new \RuntimeException("No se encontró el pago {$payment}.");
+                throw new RuntimeException("No se encontró el pago {$payment}.");
             }
 
             $amount = $request->input('amount');
@@ -247,22 +246,22 @@ class PaymentController extends Controller
                     ? MoneyFormatter::fromDecimal($amount)
                     : null,
                 reason: $request->string('reason')->toString()
-                    ?: 'Reembolso desde Stag Herd UI',
+                    ?: 'Refund from host UI',
             ));
 
-            return $this->redirectWithResult('refund', $updated->toArray());
+            return $this->redirectWithResult($request, 'refund', $updated->toArray());
         } catch (Throwable $exception) {
-            return $this->redirectWithError($exception);
+            return $this->redirectWithError($request, $exception);
         }
     }
 
-    public function sync(int|string $payment): RedirectResponse
+    public function sync(Request $request, int|string $payment): RedirectResponse
     {
         try {
             $model = $this->payments->findForDisplay($payment);
 
             if (! $model) {
-                throw new \RuntimeException("No se encontró el pago {$payment}.");
+                throw new RuntimeException("No se encontró el pago {$payment}.");
             }
 
             $lookup = new PaymentLookupData(
@@ -278,17 +277,17 @@ class PaymentController extends Controller
                 externalReference: $this->resolveExternalReference($model),
                 payerReference: $model->payer_reference,
                 payerEmail: $model->payer_email,
-                description: 'Pago sincronizado desde registro local',
+                description: 'Payment synced from local record',
                 metadata: array_merge($model->metadata ?? [], [
-                    'source' => 'stag-herd-local-sync-ui',
+                    'source' => 'stag-herd-host-sync-ui',
                 ]),
             );
 
             $updated = StagHerd::syncPayment($lookup, $fallbackRequest);
 
-            return $this->redirectWithResult('sync', $updated->toArray());
+            return $this->redirectWithResult($request, 'sync', $updated->toArray());
         } catch (Throwable $exception) {
-            return $this->redirectWithError($exception);
+            return $this->redirectWithError($request, $exception);
         }
     }
 
@@ -301,6 +300,8 @@ class PaymentController extends Controller
                 'external_reference' => ['nullable', 'string', 'max:255'],
                 'payer_email' => ['nullable', 'email', 'max:255'],
                 'description' => ['nullable', 'string', 'max:255'],
+                'return_url' => ['nullable', 'url', 'max:500'],
+                'cancel_url' => ['nullable', 'url', 'max:500'],
 
                 'idempotency_key' => ['nullable', 'string', 'max:64'],
 
@@ -313,6 +314,8 @@ class PaymentController extends Controller
                 'paypal.user_action' => ['nullable', 'string'],
                 'paypal.shipping_preference' => ['nullable', 'string'],
                 'paypal.invoice_id' => ['nullable', 'string'],
+                'paypal.return_url' => ['nullable', 'url', 'max:500'],
+                'paypal.cancel_url' => ['nullable', 'url', 'max:500'],
             ]);
 
             $externalReference = $data['external_reference']
@@ -335,26 +338,31 @@ class PaymentController extends Controller
             $invoiceId = data_get($data, 'paypal.invoice_id');
             $purchaseUnit = array_filter([
                 'reference_id' => $externalReference,
-                'description' => $data['description'] ?? 'Pago desde PayPal Buttons',
+                'description' => $data['description'] ?? 'Payment from PayPal Buttons',
                 'custom_id' => data_get($metadata, 'id_client'),
                 'invoice_id' => $invoiceId,
-
                 'amount' => [
                     'currency_code' => $currency,
                     'value' => MoneyFormatter::toDecimal($amount),
                 ],
             ], fn($value) => $value !== null && $value !== '');
 
+            $returnUrl = $data['return_url']
+                ?? data_get($data, 'paypal.return_url')
+                ?? $this->resolveHostUrl($request);
+
+            $cancelUrl = $data['cancel_url']
+                ?? data_get($data, 'paypal.cancel_url')
+                ?? $this->resolveHostUrl($request);
+
             $paypalPayload = [
                 'intent' => strtoupper((string) data_get($data, 'paypal.intent', 'CAPTURE')),
-
                 'purchase_units' => [
                     $purchaseUnit,
                 ],
-
                 'application_context' => array_filter([
-                    'return_url' => route('stag-herd.payments.index'),
-                    'cancel_url' => route('stag-herd.payments.index'),
+                    'return_url' => $returnUrl,
+                    'cancel_url' => $cancelUrl,
                     'brand_name' => data_get($data, 'paypal.brand_name', config('app.name')),
                     'landing_page' => data_get($data, 'paypal.landing_page', 'LOGIN'),
                     'user_action' => data_get($data, 'paypal.user_action', 'PAY_NOW'),
@@ -379,7 +387,7 @@ class PaymentController extends Controller
 
             return response()->json([
                 'ok' => true,
-                'message' => 'Orden PayPal creada correctamente. Todavía NO se guardó Payment local.',
+                'message' => 'Orden PayPal creada correctamente. Todavía no se guardó el Payment local.',
                 'provider_order_id' => $providerOrderId,
                 'paypal_order' => $response,
                 'checkout_context' => [
@@ -387,7 +395,7 @@ class PaymentController extends Controller
                     'currency' => $currency,
                     'external_reference' => $externalReference,
                     'payer_email' => $data['payer_email'] ?? 'cliente@test.com',
-                    'description' => $data['description'] ?? 'Pago desde PayPal Buttons',
+                    'description' => $data['description'] ?? 'Payment from PayPal Buttons',
                     'metadata' => array_replace_recursive($metadata, [
                         'paypal_create_idempotency_key' => $idempotencyKey,
                     ]),
@@ -435,7 +443,7 @@ class PaymentController extends Controller
             $metadata = $this->cleanMetadata($data['metadata'] ?? []);
 
             $metadata = array_replace_recursive($metadata, [
-                'source' => 'stag-herd-paypal-buttons-ui-after-capture',
+                'source' => 'stag-herd-paypal-host-ui-after-capture',
                 'paypal_order_id' => $providerOrderId,
                 'idempotency_key' => $captureIdempotencyKey,
             ]);
@@ -451,7 +459,7 @@ class PaymentController extends Controller
                 externalReference: $data['external_reference'] ?? $providerOrderId,
                 payerReference: data_get($metadata, 'id_client'),
                 payerEmail: $data['payer_email'] ?? 'cliente@test.com',
-                description: $data['description'] ?? 'Pago PayPal capturado',
+                description: $data['description'] ?? 'Captured PayPal payment',
                 metadata: $metadata,
             ));
 
@@ -567,9 +575,8 @@ class PaymentController extends Controller
             $metadata = $this->cleanMetadata($data['metadata'] ?? []);
 
             $metadata = array_replace_recursive($metadata, [
-                'source' => 'stag-herd-brick-ui',
+                'source' => 'stag-herd-brick-host-ui',
                 'external_reference' => $externalReference,
-
                 'mercado_pago' => array_filter([
                     'token' => $token,
                     'payment_method_id' => $paymentMethodId,
@@ -583,7 +590,6 @@ class PaymentController extends Controller
                     'idempotency_key' => $idempotencyKey,
                     'device_id' => $deviceId,
                 ], fn($value) => $value !== null && $value !== ''),
-
                 'raw_form_data' => $data['raw_form_data'] ?? null,
             ]);
 
@@ -597,7 +603,7 @@ class PaymentController extends Controller
                 externalReference: $externalReference,
                 payerReference: null,
                 payerEmail: $payerEmail,
-                description: $data['description'] ?? 'Pago desde Mercado Pago Brick',
+                description: $data['description'] ?? 'Payment from Mercado Pago Brick',
                 metadata: $metadata,
             ));
 
@@ -646,7 +652,6 @@ class PaymentController extends Controller
                 ?? 'STRIPE-' . now()->format('YmdHis');
 
             $metadata = $this->cleanMetadata($data['metadata'] ?? []);
-
             $stripeMetadata = $this->cleanMetadata($data['stripe'] ?? []);
 
             $idempotencyKey = substr(
@@ -660,7 +665,7 @@ class PaymentController extends Controller
             );
 
             $metadata = array_replace_recursive($metadata, [
-                'source' => 'stag-herd-stripe-payment-element',
+                'source' => 'stag-herd-stripe-host-ui',
                 'external_reference' => $externalReference,
                 'stripe' => array_replace_recursive($stripeMetadata, [
                     'idempotency_key' => $idempotencyKey,
@@ -677,7 +682,7 @@ class PaymentController extends Controller
                 externalReference: $externalReference,
                 payerReference: data_get($metadata, 'id_client'),
                 payerEmail: $data['payer_email'] ?? null,
-                description: $data['description'] ?? 'Pago desde Stripe Payment Element',
+                description: $data['description'] ?? 'Payment from Stripe Payment Element',
                 metadata: $metadata,
             ));
 
@@ -740,7 +745,7 @@ class PaymentController extends Controller
             $metadata = $this->cleanMetadata($data['metadata'] ?? []);
 
             $metadata = array_replace_recursive($metadata, [
-                'source' => 'stag-herd-stripe-payment-element-confirm',
+                'source' => 'stag-herd-stripe-host-ui-confirm',
                 'stripe_payment_intent_id' => $data['provider_payment_id'],
                 'stripe_status_from_client' => $data['stripe_status'] ?? null,
                 'stripe' => [
@@ -827,8 +832,7 @@ class PaymentController extends Controller
                 ),
             };
 
-            return redirect()
-                ->route('stag-herd.payments.index')
+            return $this->redirectToHost($request)
                 ->with('stag_herd_provider_result', [
                     'action' => 'provider_lookup',
                     'provider' => $provider,
@@ -837,7 +841,7 @@ class PaymentController extends Controller
                     'response' => $response,
                 ]);
         } catch (Throwable $exception) {
-            return $this->redirectWithError($exception);
+            return $this->redirectWithError($request, $exception);
         }
     }
 
@@ -878,7 +882,7 @@ class PaymentController extends Controller
             $metadata = $this->cleanMetadata($data['metadata'] ?? []);
 
             $metadata = array_replace_recursive($metadata, [
-                'source' => 'stag-herd-provider-sync-ui',
+                'source' => 'stag-herd-provider-sync-host-ui',
                 'sync_reference_type' => $searchType,
                 'sync_reference_value' => $searchValue,
             ]);
@@ -903,36 +907,65 @@ class PaymentController extends Controller
                     : null,
                 description: ! empty($data['description'])
                     ? $data['description']
-                    : 'Pago sincronizado desde provider',
+                    : 'Payment synced from provider',
                 metadata: $metadata,
             );
 
             $payment = StagHerd::syncPayment($lookup, $fallbackRequest);
 
-            return $this->redirectWithResult('provider_sync', $payment->toArray());
+            return $this->redirectWithResult($request, 'provider_sync', $payment->toArray());
         } catch (Throwable $exception) {
-            return $this->redirectWithError($exception);
+            return $this->redirectWithError($request, $exception);
         }
     }
 
-    private function redirectWithResult(string $action, array $payment): RedirectResponse
+    private function redirectWithResult(Request $request, string $action, array $payment): RedirectResponse
     {
-        return redirect()
-            ->route('stag-herd.payments.index')
+        return $this->redirectToHost($request)
             ->with('stag_herd_result', [
                 'action' => $action,
                 'payment' => $payment,
             ]);
     }
 
-    private function redirectWithError(Throwable $exception): RedirectResponse
+    private function redirectWithError(Request $request, Throwable $exception): RedirectResponse
     {
-        return redirect()
-            ->route('stag-herd.payments.index')
+        return $this->redirectToHost($request)
             ->with('stag_herd_error', [
                 'type' => class_basename($exception),
                 'message' => $exception->getMessage(),
             ]);
+    }
+
+    private function redirectToHost(Request $request): RedirectResponse
+    {
+        return redirect()->to($this->resolveHostUrl($request));
+    }
+
+    private function resolveHostUrl(Request $request): string
+    {
+        $explicit = $request->input('return_url')
+            ?? $request->input('cancel_url')
+            ?? data_get($request->input('paypal'), 'return_url')
+            ?? data_get($request->input('paypal'), 'cancel_url');
+
+        if (is_string($explicit) && filter_var($explicit, FILTER_VALIDATE_URL)) {
+            return $explicit;
+        }
+
+        $referer = $request->headers->get('referer');
+
+        if (is_string($referer) && filter_var($referer, FILTER_VALIDATE_URL)) {
+            return $referer;
+        }
+
+        $origin = $request->headers->get('origin');
+
+        if (is_string($origin) && filter_var($origin, FILTER_VALIDATE_URL)) {
+            return $origin;
+        }
+
+        return rtrim((string) config('app.url', '/'), '/');
     }
 
     private function resolveCheckoutUrl(object $payment): ?string

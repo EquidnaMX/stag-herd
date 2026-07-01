@@ -161,7 +161,6 @@ export function PayPalCheckout({
   const checkoutContextRef = useRef<any>(null);
 
   const [checkoutStatus, setCheckoutStatus] = useState<CheckoutStatus>("idle");
-
   const [checkoutMessage, setCheckoutMessage] = useState<string>("");
 
   const latestPropsRef = useRef({
@@ -227,6 +226,15 @@ export function PayPalCheckout({
     }
   }
 
+  function notifySilentStatus(status: CheckoutStatus): void {
+    setCheckoutStatus(status);
+    setCheckoutMessage("");
+
+    if (onStatusChangeRef.current) {
+      onStatusChangeRef.current(status);
+    }
+  }
+
   function notifyError(error: unknown, fallback: string): void {
     if (isZoidDestroyedError(error)) {
       return;
@@ -247,7 +255,7 @@ export function PayPalCheckout({
     let cancelled = false;
 
     async function initializePayPal() {
-      notifyStatus("loading", "Inicializando PayPal...");
+      notifySilentStatus("loading");
 
       if (!clientId) {
         throw new Error("Falta configurar PAYPAL_CLIENT_ID.");
@@ -290,7 +298,7 @@ export function PayPalCheckout({
 
         createOrder: async () => {
           try {
-            notifyStatus("loading", "Creando orden de PayPal...");
+            notifySilentStatus("loading");
 
             const current = latestPropsRef.current;
 
@@ -376,7 +384,7 @@ export function PayPalCheckout({
               );
             }
 
-            notifyStatus("loading", "Esperando aprobación del comprador.");
+            notifySilentStatus("loading");
 
             return String(orderId);
           } catch (error) {
@@ -388,7 +396,7 @@ export function PayPalCheckout({
 
         onApprove: async (data: any): Promise<void> => {
           try {
-            notifyStatus("loading", "Capturando orden de PayPal...");
+            notifySilentStatus("loading");
 
             const current = latestPropsRef.current;
 
@@ -426,7 +434,7 @@ export function PayPalCheckout({
               );
             }
 
-            notifyStatus("success", "Pago PayPal capturado correctamente.");
+            notifySilentStatus("success");
 
             if (onSuccessRef.current) {
               await onSuccessRef.current(responseData);
@@ -446,7 +454,7 @@ export function PayPalCheckout({
         },
 
         onCancel: (data: any) => {
-          notifyStatus("idle", "El comprador canceló el flujo de PayPal.");
+          notifySilentStatus("idle");
 
           if (onCancelRef.current) {
             onCancelRef.current(data);
@@ -472,7 +480,7 @@ export function PayPalCheckout({
 
       buttonsRef.current = buttons;
 
-      notifyStatus("ready", "Checkout PayPal listo.");
+      notifySilentStatus("ready");
     }
 
     initializePayPal().catch((error) => {
@@ -517,42 +525,6 @@ export function PayPalCheckout({
             border: "1px solid #dc2626",
             background: "#fef2f2",
             color: "#991b1b",
-            fontSize: 14,
-            lineHeight: 1.4,
-          }}
-        >
-          {checkoutMessage}
-        </div>
-      )}
-
-      {checkoutStatus === "success" && checkoutMessage && (
-        <div
-          role="status"
-          style={{
-            marginBottom: 12,
-            padding: "10px 12px",
-            borderRadius: 8,
-            border: "1px solid #16a34a",
-            background: "#f0fdf4",
-            color: "#166534",
-            fontSize: 14,
-            lineHeight: 1.4,
-          }}
-        >
-          {checkoutMessage}
-        </div>
-      )}
-
-      {checkoutStatus === "loading" && checkoutMessage && (
-        <div
-          role="status"
-          style={{
-            marginBottom: 12,
-            padding: "10px 12px",
-            borderRadius: 8,
-            border: "1px solid #d1d5db",
-            background: "#f9fafb",
-            color: "#374151",
             fontSize: 14,
             lineHeight: 1.4,
           }}
