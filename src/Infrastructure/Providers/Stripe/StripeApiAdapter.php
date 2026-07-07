@@ -55,6 +55,50 @@ final class StripeApiAdapter implements StripeGateway
         );
     }
 
+    public function createCustomer(
+        array $payload,
+        ?string $idempotencyKey = null,
+    ): array {
+        return $this->send(
+            method: 'post',
+            endpoint: '/v1/customers',
+            payload: $payload,
+            idempotencyKey: $idempotencyKey
+                ?? (string) Str::uuid(),
+        );
+    }
+
+    public function createSetupIntent(
+        array $payload,
+        ?string $idempotencyKey = null,
+    ): array {
+        return $this->send(
+            method: 'post',
+            endpoint: '/v1/setup_intents',
+            payload: $payload,
+            idempotencyKey: $idempotencyKey
+                ?? (string) Str::uuid(),
+        );
+    }
+
+    public function getSetupIntent(
+        string $setupIntentId,
+    ): array {
+        return $this->send(
+            method: 'get',
+            endpoint: "/v1/setup_intents/{$setupIntentId}",
+        );
+    }
+
+    public function getPaymentMethod(
+        string $paymentMethodId,
+    ): array {
+        return $this->send(
+            method: 'get',
+            endpoint: "/v1/payment_methods/{$paymentMethodId}",
+        );
+    }
+
     public function createRefund(array $payload, ?string $idempotencyKey = null): array
     {
         return $this->send(

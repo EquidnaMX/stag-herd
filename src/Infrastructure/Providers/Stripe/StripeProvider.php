@@ -13,6 +13,9 @@ final class StripeProvider extends AbstractPaymentProvider
 
     public function getMethods(): array
     {
-        return ['card'];
+        return [
+            'card',
+            'tokenized_card',
+        ];
     }
 }

@@ -10,6 +10,7 @@ use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers\MercadoPagoCa
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoWebhookParser;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalWebhookParser;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeCardHandler;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeTokenizedCardHandler;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeProvider;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeWebhookParser;
 
@@ -112,16 +113,22 @@ return [
                 'parser' => PayPalWebhookParser::class,
             ],
         ],
-
         'stripe' => [
             'provider' => StripeProvider::class,
-            'enabled' => env('STRIPE_ENABLED', false),
+
+            'enabled' => false,
 
             'methods' => [
                 'card' => [
                     'enabled' => true,
                     'label' => 'Tarjeta',
                     'handler' => StripeCardHandler::class,
+                ],
+
+                'tokenized_card' => [
+                    'enabled' => true,
+                    'label' => 'Tarjeta guardada',
+                    'handler' => StripeTokenizedCardHandler::class,
                 ],
             ],
 
@@ -132,13 +139,14 @@ return [
             ],
 
             'http' => [
-                'base_uri' => env('STRIPE_BASE_URI', 'https://api.stripe.com'),
+                'base_uri' => env('STRIPE_BASE_URI','https://api.stripe.com'),
                 'timeout' => 15,
             ],
 
             'webhooks' => [
                 'parser' => StripeWebhookParser::class,
-                'tolerance_seconds' => env('STRIPE_WEBHOOK_TOLERANCE', 300),
+                'tolerance_seconds' => env('STRIPE_WEBHOOK_TOLERANCE', 300
+                ),
             ],
         ],
     ],

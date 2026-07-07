@@ -44,35 +44,116 @@ final class StripeResultMapper
         ?string $fallbackCurrency = null,
         ?string $externalReference = null,
     ): PaymentResultData {
-        $providerStatus = $this->nullableString(Arr::get($response, 'status'));
+        $providerStatus = $this->nullableString(
+            Arr::get($response, 'status')
+        );
 
         return new PaymentResultData(
             provider: 'stripe',
             method: $method,
-            status: $this->statusMapper->map($providerStatus),
-            providerStatus: $providerStatus,
-            references: new ProviderReferencesData(
-                providerPaymentId: $this->nullableString(Arr::get($response, 'id')),
-                providerOrderId: $this->nullableString(Arr::get($response, 'metadata.external_reference')),
-                providerTransactionId: $this->nullableString(Arr::get($response, 'latest_charge')),
+
+            status: $this->statusMapper->map(
+                $providerStatus
             ),
+
+            providerStatus: $providerStatus,
+
+            references: new ProviderReferencesData(
+                providerPaymentId: $this->nullableString(
+                    Arr::get($response, 'id')
+                ),
+
+                providerOrderId: $this->nullableString(
+                    Arr::get(
+                        $response,
+                        'metadata.external_reference'
+                    )
+                ),
+
+                providerTransactionId: $this->nullableString(
+                    Arr::get(
+                        $response,
+                        'latest_charge'
+                    )
+                ),
+            ),
+
             amount: Arr::has($response, 'amount')
                 ? (int) Arr::get($response, 'amount')
                 : $fallbackAmount,
-            currency: strtoupper((string) (Arr::get($response, 'currency') ?? $fallbackCurrency ?? '')),
-            nextAction: $this->resolveNextAction($response),
-            reason: $this->nullableString(
-                Arr::get($response, 'last_payment_error.message')
-                    ?? Arr::get($response, 'cancellation_reason')
+
+            currency: strtoupper(
+                (string) (
+                    Arr::get($response, 'currency')
+                    ?? $fallbackCurrency
+                    ?? ''
+                )
             ),
-            metadata: array_filter([
-                'external_reference' => $externalReference
-                    ?? Arr::get($response, 'metadata.external_reference'),
-                'stripe_payment_intent_id' => Arr::get($response, 'id'),
-                'stripe_client_secret' => Arr::get($response, 'client_secret'),
-                'stripe_latest_charge' => Arr::get($response, 'latest_charge'),
-                'stripe_next_action_type' => Arr::get($response, 'next_action.type'),
-            ], fn($value) => $value !== null && $value !== ''),
+
+            nextAction: $this->resolveNextAction(
+                $response
+            ),
+
+            reason: $this->nullableString(
+                Arr::get(
+                    $response,
+                    'last_payment_error.message'
+                ) ?? Arr::get(
+                    $response,
+                    'cancellation_reason'
+                )
+            ),
+
+            metadata: array_filter(
+                [
+                    'external_reference' =>
+                    $externalReference
+                        ?? Arr::get(
+                            $response,
+                            'metadata.external_reference'
+                        ),
+
+                    'stripe_payment_intent_id' =>
+                    Arr::get(
+                        $response,
+                        'id'
+                    ),
+
+                    'stripe_client_secret' =>
+                    Arr::get(
+                        $response,
+                        'client_secret'
+                    ),
+
+                    'stripe_latest_charge' =>
+                    Arr::get(
+                        $response,
+                        'latest_charge'
+                    ),
+
+                    'stripe_next_action_type' =>
+                    Arr::get(
+                        $response,
+                        'next_action.type'
+                    ),
+
+                    'stripe_customer_id' =>
+                    Arr::get(
+                        $response,
+                        'customer'
+                    ),
+
+                    'stripe_payment_method_id' =>
+                    Arr::get(
+                        $response,
+                        'payment_method'
+                    ),
+                ],
+                fn($value) =>
+                $value !== null
+                    && $value !== ''
+            ),
+
             rawPayload: $response,
         );
     }
