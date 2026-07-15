@@ -1,10 +1,5 @@
 import { loadStripe, Stripe } from "@stripe/stripe-js";
-import {
-  FormEvent,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 
 export type StripeTokenizedCheckoutStatus =
   | "idle"
@@ -15,16 +10,9 @@ export type StripeTokenizedCheckoutStatus =
   | "success"
   | "error";
 
-type MetadataValue =
-  | string
-  | number
-  | boolean
-  | null;
+type MetadataValue = string | number | boolean | null;
 
-type Metadata = Record<
-  string,
-  MetadataValue
->;
+type Metadata = Record<string, MetadataValue>;
 
 export type StripeTokenizedPaymentResponse = {
   ok: boolean;
@@ -95,23 +83,17 @@ type Props = {
   ) => void;
 
   onSuccess?: (
-    response:
-      | StripeTokenizedPaymentResponse
-      | StripeConfirmResponse,
+    response: StripeTokenizedPaymentResponse | StripeConfirmResponse,
   ) => void | Promise<void>;
 
   onError?: (error: unknown) => void;
 };
 
-async function parseJsonResponse(
-  response: Response,
-): Promise<any> {
+async function parseJsonResponse(response: Response): Promise<any> {
   const text = await response.text();
 
   try {
-    return text
-      ? JSON.parse(text)
-      : null;
+    return text ? JSON.parse(text) : null;
   } catch {
     throw new Error(
       `El backend no devolvió JSON. Status ${response.status}. Respuesta: ${text.substring(
@@ -122,10 +104,7 @@ async function parseJsonResponse(
   }
 }
 
-function getBackendErrorMessage(
-  data: any,
-  fallback: string,
-): string {
+function getBackendErrorMessage(data: any, fallback: string): string {
   return (
     data?.message ||
     data?.error ||
@@ -135,28 +114,18 @@ function getBackendErrorMessage(
   );
 }
 
-function getErrorMessage(
-  error: unknown,
-  fallback: string,
-): string {
-  if (
-    error instanceof Error &&
-    error.message.trim() !== ""
-  ) {
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim() !== "") {
     return error.message;
   }
 
-  if (
-    error &&
-    typeof error === "object"
-  ) {
+  if (error && typeof error === "object") {
     const candidate = error as {
       message?: unknown;
     };
 
     if (
-      typeof candidate.message ===
-        "string" &&
+      typeof candidate.message === "string" &&
       candidate.message.trim() !== ""
     ) {
       return candidate.message;
@@ -188,40 +157,26 @@ async function postJson<T>(
     body: JSON.stringify(payload),
   });
 
-  const data =
-    await parseJsonResponse(response);
+  const data = await parseJsonResponse(response);
 
-  if (
-    !response.ok ||
-    data?.ok === false
-  ) {
+  if (!response.ok || data?.ok === false) {
     throw new Error(
-      getBackendErrorMessage(
-        data,
-        "No se pudo procesar el pago.",
-      ),
+      getBackendErrorMessage(data, "No se pudo procesar el pago."),
     );
   }
 
   return data as T;
 }
 
-function makeIdempotencyKey(
-  prefix: string,
-): string {
-  if (
-    typeof crypto !== "undefined" &&
-    "randomUUID" in crypto
-  ) {
-    return `${prefix}-${crypto.randomUUID()}`.slice(
-      0,
-      64,
-    );
+function makeIdempotencyKey(prefix: string): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`.slice(0, 64);
   }
 
-  return `${prefix}-${Date.now()}-${Math.random()
-    .toString(16)
-    .slice(2)}`.slice(0, 64);
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`.slice(
+    0,
+    64,
+  );
 }
 
 function resolveProviderStatus(
@@ -239,18 +194,12 @@ function resolveProviderStatus(
 function resolveClientSecret(
   response: StripeTokenizedPaymentResponse,
 ): string | null {
-  const metadata =
-    response.payment?.metadata ?? {};
+  const metadata = response.payment?.metadata ?? {};
 
   const clientSecret =
-    metadata.stripe_client_secret ??
-    metadata.client_secret ??
-    null;
+    metadata.stripe_client_secret ?? metadata.client_secret ?? null;
 
-  if (
-    typeof clientSecret !== "string" ||
-    clientSecret.trim() === ""
-  ) {
+  if (typeof clientSecret !== "string" || clientSecret.trim() === "") {
     return null;
   }
 
@@ -260,34 +209,25 @@ function resolveClientSecret(
 function resolvePaymentIntentId(
   response: StripeTokenizedPaymentResponse,
 ): string | null {
-  const metadata =
-    response.payment?.metadata ?? {};
+  const metadata = response.payment?.metadata ?? {};
 
-  const metadataPaymentIntentId =
-    metadata.stripe_payment_intent_id;
+  const metadataPaymentIntentId = metadata.stripe_payment_intent_id;
 
   if (
-    typeof response.payment_intent_id ===
-      "string" &&
+    typeof response.payment_intent_id === "string" &&
     response.payment_intent_id !== ""
   ) {
     return response.payment_intent_id;
   }
 
-  const referenceId =
-    response.payment?.references
-      ?.provider_payment_id;
+  const referenceId = response.payment?.references?.provider_payment_id;
 
-  if (
-    typeof referenceId === "string" &&
-    referenceId !== ""
-  ) {
+  if (typeof referenceId === "string" && referenceId !== "") {
     return referenceId;
   }
 
   if (
-    typeof metadataPaymentIntentId ===
-      "string" &&
+    typeof metadataPaymentIntentId === "string" &&
     metadataPaymentIntentId !== ""
   ) {
     return metadataPaymentIntentId;
@@ -299,48 +239,27 @@ function resolvePaymentIntentId(
 function resolveLocalPaymentId(
   response: StripeTokenizedPaymentResponse,
 ): string | number | null {
-  return (
-    response.payment_id ??
-    response.payment?.id ??
-    null
-  );
+  return response.payment_id ?? response.payment?.id ?? null;
 }
 
 function requiresCustomerAction(
   response: StripeTokenizedPaymentResponse,
 ): boolean {
-  const status =
-    resolveProviderStatus(response);
+  const status = resolveProviderStatus(response);
 
   return (
     status === "requires_action" ||
-    status ===
-      "requires_source_action" ||
-    Boolean(
-      response.next_action ||
-        response.payment?.next_action,
-    )
+    status === "requires_source_action" ||
+    Boolean(response.next_action || response.payment?.next_action)
   );
 }
 
-function isSuccessfulStatus(
-  status: string,
-): boolean {
-  return [
-    "succeeded",
-    "approved",
-    "completed",
-  ].includes(status);
+function isSuccessfulStatus(status: string): boolean {
+  return ["succeeded", "approved", "completed"].includes(status);
 }
 
-function isPendingStatus(
-  status: string,
-): boolean {
-  return [
-    "pending",
-    "processing",
-    "requires_capture",
-  ].includes(status);
+function isPendingStatus(status: string): boolean {
+  return ["pending", "processing", "requires_capture"].includes(status);
 }
 
 export function StripeTokenizedCardCheckout({
@@ -352,8 +271,7 @@ export function StripeTokenizedCardCheckout({
   paymentMethodId,
   payerReference,
   payerEmail,
-  description =
-    "Pago con tarjeta guardada",
+  description = "Pago con tarjeta guardada",
   offSession = false,
   processUrl,
   confirmIntentUrl,
@@ -366,19 +284,13 @@ export function StripeTokenizedCardCheckout({
   onSuccess,
   onError,
 }: Props) {
-  const [status, setStatus] =
-    useState<StripeTokenizedCheckoutStatus>(
-      "ready",
-    );
+  const [status, setStatus] = useState<StripeTokenizedCheckoutStatus>("ready");
 
-  const [message, setMessage] =
-    useState("");
+  const [message, setMessage] = useState("");
 
   const lockRef = useRef(false);
 
-  const stripePromise = useMemo<
-    Promise<Stripe | null> | null
-  >(() => {
+  const stripePromise = useMemo<Promise<Stripe | null> | null>(() => {
     if (!publicKey) {
       return null;
     }
@@ -387,37 +299,23 @@ export function StripeTokenizedCardCheckout({
   }, [publicKey]);
 
   function changeStatus(
-    nextStatus:
-      StripeTokenizedCheckoutStatus,
+    nextStatus: StripeTokenizedCheckoutStatus,
     nextMessage = "",
   ): void {
     setStatus(nextStatus);
     setMessage(nextMessage);
 
-    onStatusChange?.(
-      nextStatus,
-      nextMessage,
-    );
+    onStatusChange?.(nextStatus, nextMessage);
   }
 
   async function synchronizePayment(
-    initialResponse:
-      StripeTokenizedPaymentResponse,
+    initialResponse: StripeTokenizedPaymentResponse,
     paymentIntentId: string,
     stripeStatus?: string,
-  ): Promise<
-    | StripeTokenizedPaymentResponse
-    | StripeConfirmResponse
-  > {
-    const localPaymentId =
-      resolveLocalPaymentId(
-        initialResponse,
-      );
+  ): Promise<StripeTokenizedPaymentResponse | StripeConfirmResponse> {
+    const localPaymentId = resolveLocalPaymentId(initialResponse);
 
-    if (
-      !confirmIntentUrl ||
-      !localPaymentId
-    ) {
+    if (!confirmIntentUrl || !localPaymentId) {
       return initialResponse;
     }
 
@@ -426,28 +324,19 @@ export function StripeTokenizedCardCheckout({
       {
         payment_id: localPaymentId,
 
-        provider_payment_id:
-          paymentIntentId,
+        provider_payment_id: paymentIntentId,
 
-        stripe_status:
-          stripeStatus ?? null,
+        stripe_status: stripeStatus ?? null,
 
-        idempotency_key:
-          makeIdempotencyKey(
-            "stripe-tokenized-confirm",
-          ),
+        idempotency_key: makeIdempotencyKey("stripe-tokenized-confirm"),
       },
       csrfToken,
     );
   }
 
   async function completeAuthentication(
-    response:
-      StripeTokenizedPaymentResponse,
-  ): Promise<
-    | StripeTokenizedPaymentResponse
-    | StripeConfirmResponse
-  > {
+    response: StripeTokenizedPaymentResponse,
+  ): Promise<StripeTokenizedPaymentResponse | StripeConfirmResponse> {
     if (offSession) {
       throw new Error(
         "El banco requiere autenticación del cliente. Este pago no puede finalizarse automáticamente como off-session.",
@@ -455,16 +344,12 @@ export function StripeTokenizedCardCheckout({
     }
 
     if (!stripePromise) {
-      throw new Error(
-        "Falta configurar la llave pública de Stripe.",
-      );
+      throw new Error("Falta configurar la llave pública de Stripe.");
     }
 
-    const clientSecret =
-      resolveClientSecret(response);
+    const clientSecret = resolveClientSecret(response);
 
-    const paymentIntentId =
-      resolvePaymentIntentId(response);
+    const paymentIntentId = resolvePaymentIntentId(response);
 
     if (!clientSecret) {
       throw new Error(
@@ -473,9 +358,7 @@ export function StripeTokenizedCardCheckout({
     }
 
     if (!paymentIntentId) {
-      throw new Error(
-        "Stripe no regresó payment_intent_id.",
-      );
+      throw new Error("Stripe no regresó payment_intent_id.");
     }
 
     changeStatus(
@@ -483,19 +366,15 @@ export function StripeTokenizedCardCheckout({
       "El banco requiere una verificación adicional.",
     );
 
-    const stripe =
-      await stripePromise;
+    const stripe = await stripePromise;
 
     if (!stripe) {
-      throw new Error(
-        "No se pudo inicializar Stripe.",
-      );
+      throw new Error("No se pudo inicializar Stripe.");
     }
 
-    const result =
-      await stripe.handleNextAction({
-        clientSecret,
-      });
+    const result = await stripe.handleNextAction({
+      clientSecret,
+    });
 
     if (result.error) {
       throw new Error(
@@ -505,9 +384,7 @@ export function StripeTokenizedCardCheckout({
     }
 
     if (!result.paymentIntent) {
-      throw new Error(
-        "Stripe no regresó el PaymentIntent autenticado.",
-      );
+      throw new Error("Stripe no regresó el PaymentIntent autenticado.");
     }
 
     return synchronizePayment(
@@ -522,168 +399,102 @@ export function StripeTokenizedCardCheckout({
   ): Promise<void> {
     event.preventDefault();
 
-    if (
-      lockRef.current ||
-      disabled
-    ) {
+    if (lockRef.current || disabled) {
       return;
     }
 
     if (!processUrl) {
-      changeStatus(
-        "error",
-        "Falta configurar processUrl.",
-      );
+      changeStatus("error", "Falta configurar processUrl.");
 
       return;
     }
 
-    if (
-      !customerId.startsWith("cus_")
-    ) {
-      changeStatus(
-        "error",
-        "El customerId de Stripe no es válido.",
-      );
+    if (!customerId.startsWith("cus_")) {
+      changeStatus("error", "El customerId de Stripe no es válido.");
 
       return;
     }
 
-    if (
-      !paymentMethodId.startsWith("pm_")
-    ) {
-      changeStatus(
-        "error",
-        "El paymentMethodId de Stripe no es válido.",
-      );
+    if (!paymentMethodId.startsWith("pm_")) {
+      changeStatus("error", "El paymentMethodId de Stripe no es válido.");
 
       return;
     }
 
-    if (
-      !Number.isFinite(Number(amount)) ||
-      Number(amount) <= 0
-    ) {
-      changeStatus(
-        "error",
-        "El monto no es válido.",
-      );
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+      changeStatus("error", "El monto no es válido.");
 
       return;
     }
 
     lockRef.current = true;
 
-    changeStatus(
-      "processing",
-      "Procesando pago...",
-    );
+    changeStatus("processing", "Procesando pago...");
 
     try {
-      const response =
-        await postJson<StripeTokenizedPaymentResponse>(
-          processUrl,
-          {
-            amount,
-            currency,
+      const response = await postJson<StripeTokenizedPaymentResponse>(
+        processUrl,
+        {
+          amount,
+          currency,
 
-            external_reference:
-              externalReference,
+          external_reference: externalReference,
 
-            payer_reference:
-              payerReference ?? null,
+          payer_reference: payerReference ?? null,
 
-            payer_email:
-              payerEmail ?? null,
+          payer_email: payerEmail ?? null,
 
-            customer_id:
-              customerId,
+          customer_id: customerId,
 
-            payment_method_id:
-              paymentMethodId,
+          payment_method_id: paymentMethodId,
 
-            off_session:
-              offSession,
+          off_session: offSession,
 
-            description,
+          description,
 
-            return_url:
-              returnUrl ?? null,
+          return_url: returnUrl ?? null,
 
-            idempotency_key:
-              makeIdempotencyKey(
-                "stripe-tokenized-payment",
-              ),
+          idempotency_key: makeIdempotencyKey("stripe-tokenized-payment"),
 
-            metadata,
-          },
-          csrfToken,
-        );
+          metadata,
+        },
+        csrfToken,
+      );
 
       let finalResponse:
         | StripeTokenizedPaymentResponse
-        | StripeConfirmResponse =
-        response;
+        | StripeConfirmResponse = response;
 
-      if (
-        requiresCustomerAction(response)
-      ) {
-        finalResponse =
-          await completeAuthentication(
-            response,
-          );
+      if (requiresCustomerAction(response)) {
+        finalResponse = await completeAuthentication(response);
       } else {
-        const providerStatus =
-          resolveProviderStatus(response);
+        const providerStatus = resolveProviderStatus(response);
 
-        if (
-          isPendingStatus(
-            providerStatus,
-          )
-        ) {
-          changeStatus(
-            "pending",
-            "El pago está siendo procesado.",
-          );
+        if (isPendingStatus(providerStatus)) {
+          changeStatus("pending", "El pago está siendo procesado.");
 
-          await onSuccess?.(
-            finalResponse,
-          );
+          await onSuccess?.(finalResponse);
 
           return;
         }
 
-        if (
-          providerStatus &&
-          !isSuccessfulStatus(
-            providerStatus,
-          )
-        ) {
+        if (providerStatus && !isSuccessfulStatus(providerStatus)) {
           throw new Error(
             `Stripe no aprobó el pago. Estado: ${providerStatus}.`,
           );
         }
       }
 
-      changeStatus(
-        "success",
-        "Pago procesado correctamente.",
-      );
+      changeStatus("success", "Pago procesado correctamente.");
 
-      await onSuccess?.(
-        finalResponse,
-      );
+      await onSuccess?.(finalResponse);
     } catch (error) {
-      const errorMessage =
-        getErrorMessage(
-          error,
-          "No se pudo completar el pago.",
-        );
-
-      changeStatus(
-        "error",
-        errorMessage,
+      const errorMessage = getErrorMessage(
+        error,
+        "No se pudo completar el pago.",
       );
+
+      changeStatus("error", errorMessage);
 
       onError?.(error);
     } finally {
@@ -691,29 +502,16 @@ export function StripeTokenizedCardCheckout({
     }
   }
 
-  const processing =
-    status === "processing" ||
-    status === "authenticating";
+  const processing = status === "processing" || status === "authenticating";
 
   return (
     <form onSubmit={handleSubmit}>
-      {message && (
-        <p role="status">
-          {message}
-        </p>
-      )}
+      {message && <p role="status">{message}</p>}
 
-      <button
-        type="submit"
-        disabled={
-          disabled ||
-          processing
-        }
-      >
+      <button type="submit" disabled={disabled || processing}>
         {status === "processing"
           ? "Procesando..."
-          : status ===
-              "authenticating"
+          : status === "authenticating"
             ? "Verificando..."
             : buttonText}
       </button>

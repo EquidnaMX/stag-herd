@@ -139,14 +139,12 @@ return [
             ],
 
             'http' => [
-                'base_uri' => env('STRIPE_BASE_URI','https://api.stripe.com'),
+                'base_uri' => env('STRIPE_BASE_URI', 'https://api.stripe.com'),
                 'timeout' => 15,
             ],
 
             'webhooks' => [
                 'parser' => StripeWebhookParser::class,
-                'tolerance_seconds' => env('STRIPE_WEBHOOK_TOLERANCE', 300
-                ),
             ],
         ],
     ],

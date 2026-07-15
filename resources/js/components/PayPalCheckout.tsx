@@ -441,15 +441,6 @@ export function PayPalCheckout({
             }
           } catch (error) {
             notifyError(error, "No ha sido posible procesar el pago.");
-
-            /**
-             * Importante:
-             * No relanzar el error aquí.
-             *
-             * Si haces throw error dentro de onApprove,
-             * PayPal lo registra como:
-             * onApprove_non_resume_flow_merchant_callback_rejected
-             */
           }
         },
 

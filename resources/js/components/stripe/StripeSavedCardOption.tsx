@@ -32,29 +32,20 @@ type Props = {
   disabled?: boolean;
   name?: string;
 
-  onSelect: (
-    paymentMethod: StripeSavedPaymentMethod,
-  ) => void;
+  onSelect: (paymentMethod: StripeSavedPaymentMethod) => void;
 };
 
-function formatBrand(
-  brand?: string | null,
-): string {
+function formatBrand(brand?: string | null): string {
   if (!brand) {
     return "Tarjeta";
   }
 
-  const normalized = brand
-    .replace(/[_-]/g, " ")
-    .trim();
+  const normalized = brand.replace(/[_-]/g, " ").trim();
 
   return normalized
     .split(/\s+/)
     .map((word) => {
-      return (
-        word.charAt(0).toUpperCase() +
-        word.slice(1).toLowerCase()
-      );
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     })
     .join(" ");
 }
@@ -67,10 +58,7 @@ function formatExpiration(
     return null;
   }
 
-  return `${String(month).padStart(
-    2,
-    "0",
-  )}/${String(year).slice(-2)}`;
+  return `${String(month).padStart(2, "0")}/${String(year).slice(-2)}`;
 }
 
 export function StripeSavedCardOption({
@@ -80,8 +68,7 @@ export function StripeSavedCardOption({
   name = "stripe_saved_payment_method",
   onSelect,
 }: Props) {
-  const inputId =
-    `stripe-saved-card-${paymentMethod.id}`;
+  const inputId = `stripe-saved-card-${paymentMethod.id}`;
 
   const expiration = formatExpiration(
     paymentMethod.expMonth,
@@ -104,36 +91,18 @@ export function StripeSavedCardOption({
 
       <StripeBrandIcon
         brand={paymentMethod.brand}
-        title={formatBrand(
-          paymentMethod.brand,
-        )}
+        title={formatBrand(paymentMethod.brand)}
       />
 
       <span>
-        <strong>
-          {formatBrand(
-            paymentMethod.brand,
-          )}
-        </strong>
+        <strong>{formatBrand(paymentMethod.brand)}</strong>
 
-        {paymentMethod.lastFour
-          ? ` •••• ${paymentMethod.lastFour}`
-          : ""}
+        {paymentMethod.lastFour ? ` •••• ${paymentMethod.lastFour}` : ""}
       </span>
 
-      {expiration && (
-        <span>
-          {" "}
-          — {expiration}
-        </span>
-      )}
+      {expiration && <span> — {expiration}</span>}
 
-      {paymentMethod.isDefault && (
-        <span>
-          {" "}
-          — Predeterminada
-        </span>
-      )}
+      {paymentMethod.isDefault && <span> — Predeterminada</span>}
     </label>
   );
 }

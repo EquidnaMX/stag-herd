@@ -1,20 +1,19 @@
 import {
+  CardElement,
   Elements,
-  PaymentElement,
   useElements,
   useStripe,
 } from "@stripe/react-stripe-js";
-import { loadStripe, Stripe } from "@stripe/stripe-js";
+import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import {
-  CSSProperties,
-  FormEvent,
-  useEffect,
+  type CSSProperties,
+  type FormEvent,
   useMemo,
   useRef,
   useState,
 } from "react";
 
-type CheckoutStatus =
+export type StripeCardCheckoutStatus =
   | "idle"
   | "loading"
   | "ready"
@@ -23,7 +22,8 @@ type CheckoutStatus =
   | "error";
 
 type MetadataValue = string | number | boolean | null;
-type Metadata = Record<string, MetadataValue>;
+
+export type StripeCheckoutMetadata = Record<string, MetadataValue>;
 
 type StripeIntentResponse = {
   ok: boolean;
@@ -41,9 +41,13 @@ type StripeIntentResponse = {
   errors?: unknown;
 };
 
-type StripeConfirmResponse = {
+export type StripeConfirmResponse = {
   ok: boolean;
   message?: string;
+  payment_intent_id?: string;
+  provider_payment_id?: string;
+  status?: string | null;
+  provider_status?: string | null;
   payment?: unknown;
   errors?: unknown;
 };
@@ -53,34 +57,55 @@ type Props = {
   amount: number;
   currency: string;
   externalReference: string;
+
+  payerReference?: string;
   payerEmail?: string;
   description?: string;
+  metadata?: StripeCheckoutMetadata;
 
   createIntentUrl: string;
   confirmIntentUrl: string;
   csrfToken?: string;
-
   returnUrl?: string;
 
   className?: string;
   containerStyle?: CSSProperties;
 
-  onStatusChange?: (status: CheckoutStatus, message?: string) => void;
+  onStatusChange?: (status: StripeCardCheckoutStatus, message?: string) => void;
+
   onSuccess?: (payload: StripeConfirmResponse) => void | Promise<void>;
+
   onError?: (error: unknown) => void;
 };
 
-function readMetadataFromPage(): Metadata {
-  const metadata: Metadata = {};
+function readMetadataFromPage(): StripeCheckoutMetadata {
+  if (typeof document === "undefined") {
+    return {};
+  }
+
+  const metadata: StripeCheckoutMetadata = {};
 
   const elements = document.querySelectorAll<
     HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
   >("[data-stag-herd-metadata]");
 
   elements.forEach((element) => {
-    const key = element.dataset.stagHerdMetadata;
+    const key = element.dataset.stagHerdMetadata?.trim();
 
     if (!key) {
+      return;
+    }
+
+    if (
+      element instanceof HTMLInputElement &&
+      (element.type === "checkbox" || element.type === "radio")
+    ) {
+      if (!element.checked) {
+        return;
+      }
+
+      metadata[key] = element.value?.trim() || true;
+
       return;
     }
 
@@ -96,17 +121,32 @@ function readMetadataFromPage(): Metadata {
   return metadata;
 }
 
-async function parseJsonResponse(response: Response): Promise<any> {
+function mergeMetadata(
+  pageMetadata: StripeCheckoutMetadata,
+  providedMetadata: StripeCheckoutMetadata = {},
+): StripeCheckoutMetadata {
+  return {
+    ...pageMetadata,
+    ...providedMetadata,
+  };
+}
+
+async function parseJsonResponse(response: Response): Promise<unknown> {
   const text = await response.text();
 
+  if (!text.trim()) {
+    return null;
+  }
+
   try {
-    return text ? JSON.parse(text) : null;
+    return JSON.parse(text);
   } catch {
     throw new Error(
-      `El backend no devolvió JSON. Status ${response.status}. Respuesta: ${text.substring(
-        0,
-        300,
-      )}`,
+      [
+        "El backend no devolvió JSON.",
+        `Status ${response.status}.`,
+        `Respuesta: ${text.substring(0, 300)}`,
+      ].join(" "),
     );
   }
 }
@@ -118,17 +158,26 @@ async function postJson<T>(
 ): Promise<T> {
   const response = await fetch(url, {
     method: "POST",
+    credentials: "same-origin",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      ...(csrfToken ? { "X-CSRF-TOKEN": csrfToken } : {}),
+      "X-Requested-With": "XMLHttpRequest",
+      ...(csrfToken
+        ? {
+            "X-CSRF-TOKEN": csrfToken,
+          }
+        : {}),
     },
     body: JSON.stringify(payload),
   });
 
   const data = await parseJsonResponse(response);
 
-  if (!response.ok || data?.ok === false) {
+  if (
+    !response.ok ||
+    (data && typeof data === "object" && "ok" in data && data.ok === false)
+  ) {
     throw new Error(
       getBackendErrorMessage(data, "No se pudo procesar el pago."),
     );
@@ -137,26 +186,90 @@ async function postJson<T>(
   return data as T;
 }
 
-function getBackendErrorMessage(data: any, fallback: string): string {
-  return (
-    data?.message ||
-    data?.errors?.[0] ||
-    data?.error ||
-    data?.errors?.message ||
-    fallback
-  );
+function getBackendErrorMessage(data: unknown, fallback: string): string {
+  if (!data || typeof data !== "object") {
+    return fallback;
+  }
+
+  const response = data as {
+    message?: unknown;
+    error?: unknown;
+    errors?: unknown;
+  };
+
+  if (typeof response.message === "string" && response.message.trim()) {
+    return response.message;
+  }
+
+  if (typeof response.error === "string" && response.error.trim()) {
+    return response.error;
+  }
+
+  if (Array.isArray(response.errors)) {
+    const messages = response.errors
+      .map((error) => {
+        if (typeof error === "string") {
+          return error;
+        }
+
+        if (
+          error &&
+          typeof error === "object" &&
+          "message" in error &&
+          typeof error.message === "string"
+        ) {
+          return error.message;
+        }
+
+        return null;
+      })
+      .filter((message): message is string => Boolean(message));
+
+    if (messages.length > 0) {
+      return messages.join("\n");
+    }
+  }
+
+  if (
+    response.errors &&
+    typeof response.errors === "object" &&
+    "message" in response.errors &&
+    typeof response.errors.message === "string"
+  ) {
+    return response.errors.message;
+  }
+
+  if (response.errors && typeof response.errors === "object") {
+    const validationMessages = Object.values(response.errors).flatMap(
+      (value) => {
+        if (Array.isArray(value)) {
+          return value.filter(
+            (item): item is string => typeof item === "string",
+          );
+        }
+
+        return typeof value === "string" ? [value] : [];
+      },
+    );
+
+    if (validationMessages.length > 0) {
+      return validationMessages.join("\n");
+    }
+  }
+
+  return fallback;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message.trim() !== "") {
+  if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
 
-  if (error && typeof error === "object") {
-    const e = error as { message?: unknown };
+  if (error && typeof error === "object" && "message" in error) {
+    const message = error.message;
 
-    if (typeof e.message === "string" && e.message.trim() !== "") {
-      return e.message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
     }
   }
 
@@ -175,27 +288,29 @@ function makeIdempotencyKey(prefix: string): string {
 }
 
 function resolveClientSecret(response: StripeIntentResponse): string | null {
-  return (
-    response.client_secret ||
-    String(response.payment?.metadata?.stripe_client_secret ?? "") ||
-    String(response.payment?.metadata?.client_secret ?? "") ||
-    null
-  );
+  const clientSecret =
+    response.client_secret ??
+    response.payment?.metadata?.stripe_client_secret ??
+    response.payment?.metadata?.client_secret;
+
+  if (typeof clientSecret !== "string" || !clientSecret.trim()) {
+    return null;
+  }
+
+  return clientSecret;
 }
 
 function resolvePaymentIntentId(response: StripeIntentResponse): string | null {
-  return (
-    response.payment_intent_id ||
-    response.payment?.references?.provider_payment_id ||
-    String(response.payment?.metadata?.stripe_payment_intent_id ?? "") ||
-    null
-  );
-}
+  const paymentIntentId =
+    response.payment_intent_id ??
+    response.payment?.references?.provider_payment_id ??
+    response.payment?.metadata?.stripe_payment_intent_id;
 
-function resolveLocalPaymentId(
-  response: StripeIntentResponse,
-): string | number | null {
-  return response.payment_id ?? response.payment?.id ?? null;
+  if (typeof paymentIntentId !== "string" || !paymentIntentId.trim()) {
+    return null;
+  }
+
+  return paymentIntentId;
 }
 
 export function StripeCardCheckout({
@@ -203,209 +318,71 @@ export function StripeCardCheckout({
   amount,
   currency,
   externalReference,
+  payerReference,
   payerEmail,
-  description = "Pago desde Stripe Payment Element",
+  description,
+  metadata,
   createIntentUrl,
   confirmIntentUrl,
   csrfToken,
   returnUrl,
-
   className,
   containerStyle,
-
   onStatusChange,
   onSuccess,
   onError,
 }: Props) {
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
-  const [localPaymentId, setLocalPaymentId] = useState<string | number | null>(
-    null,
-  );
-  const [status, setStatus] = useState<CheckoutStatus>("idle");
-  const [message, setMessage] = useState<string>("");
+  const [status, setStatus] = useState<StripeCardCheckoutStatus>("idle");
+  const [message, setMessage] = useState("");
 
   const stripePromise = useMemo<Promise<Stripe | null> | null>(() => {
-    if (!publicKey) {
+    if (!publicKey.trim()) {
       return null;
     }
 
     return loadStripe(publicKey);
   }, [publicKey]);
 
-  const intentKey = useMemo(() => {
-    return JSON.stringify({
-      amount,
-      currency,
-      externalReference,
-      payerEmail,
-    });
-  }, [amount, currency, externalReference, payerEmail]);
+  const metadataKey = useMemo(() => JSON.stringify(metadata), [metadata]);
 
-  const statusRef = useRef<CheckoutStatus>("idle");
-
-  function changeStatus(nextStatus: CheckoutStatus, nextMessage = "") {
-    statusRef.current = nextStatus;
+  function changeStatus(
+    nextStatus: StripeCardCheckoutStatus,
+    nextMessage = "",
+  ): void {
     setStatus(nextStatus);
     setMessage(nextMessage);
+
     onStatusChange?.(nextStatus, nextMessage);
   }
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function createIntent() {
-      if (!publicKey) {
-        changeStatus("error", "Falta configurar la llave pública de Stripe.");
-        return;
-      }
-
-      if (!createIntentUrl) {
-        changeStatus(
-          "error",
-          "Falta configurar la URL para crear el PaymentIntent.",
-        );
-        return;
-      }
-
-      if (!amount || Number(amount) <= 0) {
-        changeStatus("error", "El monto no es válido.");
-        return;
-      }
-
-      try {
-        changeStatus("loading", "Preparando pago seguro con Stripe...");
-
-        const metadata = readMetadataFromPage();
-
-        const response = await postJson<StripeIntentResponse>(
-          createIntentUrl,
-          {
-            amount,
-            currency,
-            external_reference: externalReference,
-            payer_email: payerEmail,
-            description,
-            idempotency_key: makeIdempotencyKey("stripe-intent"),
-            metadata,
-          },
-          csrfToken,
-        );
-
-        const nextClientSecret = resolveClientSecret(response);
-        const nextPaymentIntentId = resolvePaymentIntentId(response);
-        const nextLocalPaymentId = resolveLocalPaymentId(response);
-
-        if (!nextClientSecret) {
-          throw new Error("Stripe no regresó client_secret.");
-        }
-
-        if (!nextPaymentIntentId) {
-          throw new Error("Stripe no regresó payment_intent_id.");
-        }
-
-        if (!nextLocalPaymentId) {
-          throw new Error("Stag Herd no regresó payment_id local.");
-        }
-
-        if (!cancelled) {
-          setClientSecret(nextClientSecret);
-          setPaymentIntentId(nextPaymentIntentId);
-          setLocalPaymentId(nextLocalPaymentId);
-          changeStatus("ready");
-        }
-      } catch (error) {
-        if (!cancelled) {
-          const errorMessage = getErrorMessage(
-            error,
-            "No se pudo preparar el pago con Stripe.",
-          );
-
-          changeStatus("error", errorMessage);
-          onError?.(error);
-        }
-      }
-    }
-
-    setClientSecret(null);
-    setPaymentIntentId(null);
-    setLocalPaymentId(null);
-
-    createIntent();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    intentKey,
-    publicKey,
-    createIntentUrl,
-    amount,
-    currency,
-    externalReference,
-    payerEmail,
-    description,
-    csrfToken,
-  ]);
-
-  const options = useMemo(() => {
-    if (!clientSecret) {
-      return undefined;
-    }
-
-    return {
-      clientSecret,
-      appearance: {
-        theme: "stripe" as const,
-        variables: {
-          borderRadius: "10px",
-          fontFamily: "Inter, system-ui, sans-serif",
-        },
-      },
-    };
-  }, [clientSecret]);
-
-  if (status === "loading") {
-    return (
-      <div className={className} style={containerStyle}>
-        <div className="stag-herd-stripe-message">
-          {message || "Preparando pago seguro..."}
-        </div>
-      </div>
-    );
-  }
-
-  if (status === "error") {
+  if (!stripePromise) {
     return (
       <div className={className} style={containerStyle}>
         <div className="stag-herd-stripe-error">
-          {message || "No se pudo cargar Stripe."}
+          Falta configurar la llave pública de Stripe.
         </div>
       </div>
     );
-  }
-
-  if (
-    !stripePromise ||
-    !clientSecret ||
-    !paymentIntentId ||
-    !localPaymentId ||
-    !options
-  ) {
-    return null;
   }
 
   return (
     <div className={className} style={containerStyle}>
-      <Elements key={clientSecret} stripe={stripePromise} options={options}>
+      <Elements stripe={stripePromise}>
         <StripeCardForm
+          amount={amount}
+          currency={currency}
+          externalReference={externalReference}
+          payerReference={payerReference}
+          payerEmail={payerEmail}
+          description={description}
+          metadata={JSON.parse(metadataKey || "{}")}
+          createIntentUrl={createIntentUrl}
           confirmIntentUrl={confirmIntentUrl}
           csrfToken={csrfToken}
-          payerEmail={payerEmail}
           returnUrl={returnUrl}
-          paymentIntentId={paymentIntentId}
-          localPaymentId={localPaymentId}
-          onStatusChange={onStatusChange}
+          status={status}
+          message={message}
+          onStatusChange={changeStatus}
           onSuccess={onSuccess}
           onError={onError}
         />
@@ -415,24 +392,41 @@ export function StripeCardCheckout({
 }
 
 function StripeCardForm({
+  amount,
+  currency,
+  externalReference,
+  payerReference,
+  payerEmail,
+  description,
+  metadata,
+  createIntentUrl,
   confirmIntentUrl,
   csrfToken,
-  payerEmail,
   returnUrl,
-  paymentIntentId,
-  localPaymentId,
+  status,
+  message,
   onStatusChange,
   onSuccess,
   onError,
 }: {
+  amount: number;
+  currency: string;
+  externalReference: string;
+  payerReference?: string;
+  payerEmail?: string;
+  description?: string;
+  metadata: StripeCheckoutMetadata;
+  createIntentUrl: string;
   confirmIntentUrl: string;
   csrfToken?: string;
-  payerEmail?: string;
   returnUrl?: string;
-  paymentIntentId: string;
-  localPaymentId: string | number;
-  onStatusChange?: (status: CheckoutStatus, message?: string) => void;
+  status: StripeCardCheckoutStatus;
+  message: string;
+
+  onStatusChange?: (status: StripeCardCheckoutStatus, message?: string) => void;
+
   onSuccess?: (payload: StripeConfirmResponse) => void | Promise<void>;
+
   onError?: (error: unknown) => void;
 }) {
   const stripe = useStripe();
@@ -440,16 +434,19 @@ function StripeCardForm({
 
   const [ready, setReady] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [message, setMessage] = useState("");
 
   const lockRef = useRef(false);
 
-  function changeStatus(status: CheckoutStatus, nextMessage = "") {
-    setMessage(nextMessage);
-    onStatusChange?.(status, nextMessage);
+  function changeStatus(
+    nextStatus: StripeCardCheckoutStatus,
+    nextMessage = "",
+  ): void {
+    onStatusChange?.(nextStatus, nextMessage);
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ): Promise<void> {
     event.preventDefault();
 
     if (lockRef.current || processing) {
@@ -466,52 +463,111 @@ function StripeCardForm({
       return;
     }
 
-    if (!confirmIntentUrl) {
-      changeStatus("error", "Falta configurar la URL para confirmar el pago.");
+    if (!createIntentUrl.trim()) {
+      changeStatus(
+        "error",
+        "Falta configurar la URL para crear el PaymentIntent.",
+      );
+      return;
+    }
+
+    const numericAmount = Number(amount);
+
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      changeStatus("error", "El monto no es válido.");
+      return;
+    }
+
+    if (!currency.trim()) {
+      changeStatus("error", "La moneda es obligatoria.");
+      return;
+    }
+
+    const cardElement = elements.getElement(CardElement);
+
+    if (!cardElement) {
+      changeStatus("error", "No se pudo cargar el campo de tarjeta.");
       return;
     }
 
     lockRef.current = true;
     setProcessing(true);
-    changeStatus("processing", "Procesando pago...");
 
     try {
-      const result = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          receipt_email: payerEmail,
-          return_url:
-            returnUrl ||
-            `${window.location.origin}${window.location.pathname}?provider=stripe`,
+      changeStatus("loading", "Preparando pago seguro con Stripe...");
+
+      const mergedMetadata = mergeMetadata(readMetadataFromPage(), metadata);
+
+      const intentResponse = await postJson<StripeIntentResponse>(
+        createIntentUrl,
+        {
+          amount: numericAmount,
+          currency: currency.toUpperCase(),
+          external_reference: externalReference || undefined,
+          payer_reference: payerReference || undefined,
+          payer_email: payerEmail || undefined,
+          description: description || undefined,
+          idempotency_key: makeIdempotencyKey("stripe-intent"),
+          metadata: mergedMetadata,
         },
-        redirect: "if_required",
+        csrfToken,
+      );
+
+      const clientSecret = resolveClientSecret(intentResponse);
+      const paymentIntentId = resolvePaymentIntentId(intentResponse);
+
+      if (!clientSecret) {
+        throw new Error("Stripe no regresó client_secret.");
+      }
+
+      if (!paymentIntentId) {
+        throw new Error("Stripe no regresó payment_intent_id.");
+      }
+
+      changeStatus("processing", "Procesando pago...");
+
+      const confirmResult = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardElement,
+          billing_details: {
+            ...(payerEmail
+              ? {
+                  email: payerEmail,
+                }
+              : {}),
+          },
+        },
       });
 
-      if (result.error) {
+      if (confirmResult.error) {
         throw new Error(
-          result.error.message || "No se pudo confirmar el pago con Stripe.",
+          confirmResult.error.message ||
+            "No se pudo confirmar el pago con Stripe.",
         );
       }
 
-      const confirmedPaymentIntentId =
-        result.paymentIntent?.id || paymentIntentId;
+      const paymentIntent = confirmResult.paymentIntent;
 
-      if (!confirmedPaymentIntentId) {
+      if (!paymentIntent?.id) {
         throw new Error("Stripe no regresó el PaymentIntent confirmado.");
       }
 
       const confirmResponse = await postJson<StripeConfirmResponse>(
         confirmIntentUrl,
         {
-          payment_id: localPaymentId,
-          provider_payment_id: confirmedPaymentIntentId,
-          stripe_status: result.paymentIntent?.status ?? null,
-          idempotency_key: makeIdempotencyKey("stripe-confirm"),
+          provider_payment_id: paymentIntent.id,
+          stripe_status: paymentIntent.status ?? null,
+          payer_email: payerEmail ?? undefined,
+          external_reference: externalReference || undefined,
+          payer_reference: payerReference || undefined,
+          description: description || undefined,
+          metadata,
         },
         csrfToken,
       );
 
       changeStatus("success", "Pago confirmado correctamente.");
+
       await onSuccess?.(confirmResponse);
     } catch (error) {
       const errorMessage = getErrorMessage(
@@ -529,27 +585,47 @@ function StripeCardForm({
 
   return (
     <form onSubmit={handleSubmit} className="stag-herd-stripe-form">
-      <PaymentElement
-        onReady={() => {
-          setReady(true);
-          changeStatus("ready");
-        }}
-        onLoadError={(event) => {
-          const errorMessage =
-            event?.error?.message ||
-            "No se pudo cargar el formulario de Stripe.";
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <CardElement
+          options={{
+            hidePostalCode: true,
+            disableLink: true,
+            style: {
+              base: {
+                fontSize: "16px",
+                color: "#0f172a",
+                "::placeholder": {
+                  color: "#94a3b8",
+                },
+              },
+              invalid: {
+                color: "#dc2626",
+              },
+            },
+          }}
+          onReady={() => {
+            setReady(true);
+            changeStatus("ready");
+          }}
+          onChange={(event) => {
+            if (event.error?.message) {
+              changeStatus("error", event.error.message);
+              return;
+            }
 
-          setReady(false);
-          changeStatus("error", errorMessage);
-        }}
-      />
+            if (status === "error") {
+              changeStatus("ready");
+            }
+          }}
+        />
+      </div>
 
       {message && <div className="stag-herd-stripe-message">{message}</div>}
 
       <button
         type="submit"
         disabled={!stripe || !elements || !ready || processing}
-        className="stag-herd-stripe-button"
+        className="mt-4 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {processing ? "Procesando..." : "Pagar con tarjeta"}
       </button>

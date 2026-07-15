@@ -14,16 +14,9 @@ function normalizeBrand(brand?: string | null): string {
     .replace(/[\s-]+/g, "_");
 }
 
-function GenericCardIcon(
-  props: SVGProps<SVGSVGElement>,
-) {
+function GenericCardIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg
-      viewBox="0 0 48 32"
-      role="img"
-      aria-label="Tarjeta"
-      {...props}
-    >
+    <svg viewBox="0 0 48 32" role="img" aria-label="Tarjeta" {...props}>
       <rect
         x="1"
         y="1"
@@ -58,23 +51,10 @@ function GenericCardIcon(
   );
 }
 
-function VisaIcon(
-  props: SVGProps<SVGSVGElement>,
-) {
+function VisaIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg
-      viewBox="0 0 64 40"
-      role="img"
-      aria-label="Visa"
-      {...props}
-    >
-      <rect
-        width="64"
-        height="40"
-        rx="5"
-        fill="#ffffff"
-        stroke="#d0d5dd"
-      />
+    <svg viewBox="0 0 64 40" role="img" aria-label="Visa" {...props}>
+      <rect width="64" height="40" rx="5" fill="#ffffff" stroke="#d0d5dd" />
 
       <text
         x="32"
@@ -92,37 +72,14 @@ function VisaIcon(
   );
 }
 
-function MastercardIcon(
-  props: SVGProps<SVGSVGElement>,
-) {
+function MastercardIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg
-      viewBox="0 0 64 40"
-      role="img"
-      aria-label="Mastercard"
-      {...props}
-    >
-      <rect
-        width="64"
-        height="40"
-        rx="5"
-        fill="#ffffff"
-        stroke="#d0d5dd"
-      />
+    <svg viewBox="0 0 64 40" role="img" aria-label="Mastercard" {...props}>
+      <rect width="64" height="40" rx="5" fill="#ffffff" stroke="#d0d5dd" />
 
-      <circle
-        cx="27"
-        cy="20"
-        r="11"
-        fill="#eb001b"
-      />
+      <circle cx="27" cy="20" r="11" fill="#eb001b" />
 
-      <circle
-        cx="37"
-        cy="20"
-        r="11"
-        fill="#f79e1b"
-      />
+      <circle cx="37" cy="20" r="11" fill="#f79e1b" />
 
       <path
         d="M32 11.9a11 11 0 0 1 0 16.2 11 11 0 0 1 0-16.2Z"
@@ -132,9 +89,7 @@ function MastercardIcon(
   );
 }
 
-function AmericanExpressIcon(
-  props: SVGProps<SVGSVGElement>,
-) {
+function AmericanExpressIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
       viewBox="0 0 64 40"
@@ -142,12 +97,7 @@ function AmericanExpressIcon(
       aria-label="American Express"
       {...props}
     >
-      <rect
-        width="64"
-        height="40"
-        rx="5"
-        fill="#2e77bc"
-      />
+      <rect width="64" height="40" rx="5" fill="#2e77bc" />
 
       <text
         x="32"
@@ -176,23 +126,10 @@ function AmericanExpressIcon(
   );
 }
 
-function DiscoverIcon(
-  props: SVGProps<SVGSVGElement>,
-) {
+function DiscoverIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg
-      viewBox="0 0 64 40"
-      role="img"
-      aria-label="Discover"
-      {...props}
-    >
-      <rect
-        width="64"
-        height="40"
-        rx="5"
-        fill="#ffffff"
-        stroke="#d0d5dd"
-      />
+    <svg viewBox="0 0 64 40" role="img" aria-label="Discover" {...props}>
+      <rect width="64" height="40" rx="5" fill="#ffffff" stroke="#d0d5dd" />
 
       <text
         x="32"
@@ -206,61 +143,21 @@ function DiscoverIcon(
         DISCOVER
       </text>
 
-      <circle
-        cx="37"
-        cy="20"
-        r="5"
-        fill="#f58220"
-        fillOpacity="0.85"
-      />
+      <circle cx="37" cy="20" r="5" fill="#f58220" fillOpacity="0.85" />
     </svg>
   );
 }
 
-function JcbIcon(
-  props: SVGProps<SVGSVGElement>,
-) {
+function JcbIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg
-      viewBox="0 0 64 40"
-      role="img"
-      aria-label="JCB"
-      {...props}
-    >
-      <rect
-        width="64"
-        height="40"
-        rx="5"
-        fill="#ffffff"
-        stroke="#d0d5dd"
-      />
+    <svg viewBox="0 0 64 40" role="img" aria-label="JCB" {...props}>
+      <rect width="64" height="40" rx="5" fill="#ffffff" stroke="#d0d5dd" />
 
-      <rect
-        x="13"
-        y="8"
-        width="13"
-        height="24"
-        rx="3"
-        fill="#0b4ea2"
-      />
+      <rect x="13" y="8" width="13" height="24" rx="3" fill="#0b4ea2" />
 
-      <rect
-        x="26"
-        y="8"
-        width="13"
-        height="24"
-        rx="3"
-        fill="#dc1f2d"
-      />
+      <rect x="26" y="8" width="13" height="24" rx="3" fill="#dc1f2d" />
 
-      <rect
-        x="39"
-        y="8"
-        width="13"
-        height="24"
-        rx="3"
-        fill="#159447"
-      />
+      <rect x="39" y="8" width="13" height="24" rx="3" fill="#159447" />
 
       <text
         x="32"
@@ -277,50 +174,16 @@ function JcbIcon(
   );
 }
 
-function UnionPayIcon(
-  props: SVGProps<SVGSVGElement>,
-) {
+function UnionPayIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg
-      viewBox="0 0 64 40"
-      role="img"
-      aria-label="UnionPay"
-      {...props}
-    >
-      <rect
-        width="64"
-        height="40"
-        rx="5"
-        fill="#ffffff"
-        stroke="#d0d5dd"
-      />
+    <svg viewBox="0 0 64 40" role="img" aria-label="UnionPay" {...props}>
+      <rect width="64" height="40" rx="5" fill="#ffffff" stroke="#d0d5dd" />
 
-      <rect
-        x="13"
-        y="8"
-        width="15"
-        height="24"
-        rx="3"
-        fill="#d71920"
-      />
+      <rect x="13" y="8" width="15" height="24" rx="3" fill="#d71920" />
 
-      <rect
-        x="25"
-        y="8"
-        width="15"
-        height="24"
-        rx="3"
-        fill="#005aa9"
-      />
+      <rect x="25" y="8" width="15" height="24" rx="3" fill="#005aa9" />
 
-      <rect
-        x="37"
-        y="8"
-        width="15"
-        height="24"
-        rx="3"
-        fill="#009b72"
-      />
+      <rect x="37" y="8" width="15" height="24" rx="3" fill="#009b72" />
 
       <text
         x="32"
@@ -375,10 +238,6 @@ export function StripeBrandIcon({
       return <UnionPayIcon {...commonProps} />;
 
     default:
-      return (
-        <GenericCardIcon
-          {...commonProps}
-        />
-      );
+      return <GenericCardIcon {...commonProps} />;
   }
 }

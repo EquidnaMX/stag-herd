@@ -1,8 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { StripeCardCheckout } from "./StripeCardCheckout";
 
@@ -16,28 +12,15 @@ import {
   StripeTokenizedCheckoutStatus,
 } from "./stripe/StripeTokenizedCardCheckout";
 
-export type {
-  StripeSavedPaymentMethod,
-} from "./stripe/StripeSavedCardOption";
+export type { StripeSavedPaymentMethod } from "./stripe/StripeSavedCardOption";
 
-type CheckoutMode =
-  | "saved_card"
-  | "new_card";
+type CheckoutMode = "saved_card" | "new_card";
 
-type CheckoutStatus =
-  | StripeTokenizedCheckoutStatus
-  | "loading";
+type CheckoutStatus = StripeTokenizedCheckoutStatus | "loading";
 
-type MetadataValue =
-  | string
-  | number
-  | boolean
-  | null;
+type MetadataValue = string | number | boolean | null;
 
-type Metadata = Record<
-  string,
-  MetadataValue
->;
+type Metadata = Record<string, MetadataValue>;
 
 type Props = {
   publicKey: string;
@@ -54,17 +37,13 @@ type Props = {
   /**
    * Tarjetas obtenidas desde la base de datos del host.
    */
-  paymentMethods:
-    StripeSavedPaymentMethod[];
+  paymentMethods: StripeSavedPaymentMethod[];
 
   /**
    * Identificador local de la tarjeta que debe
    * aparecer seleccionada.
    */
-  defaultPaymentMethodId?:
-    | string
-    | number
-    | null;
+  defaultPaymentMethodId?: string | number | null;
 
   /**
    * URLs para tarjeta nueva.
@@ -91,82 +70,48 @@ type Props = {
   newCardLabel?: string;
   savedCardButtonText?: string;
 
-  onPaymentMethodChange?: (
-    paymentMethod:
-      StripeSavedPaymentMethod,
-  ) => void;
+  onPaymentMethodChange?: (paymentMethod: StripeSavedPaymentMethod) => void;
 
-  onModeChange?: (
-    mode: CheckoutMode,
-  ) => void;
+  onModeChange?: (mode: CheckoutMode) => void;
 
-  onStatusChange?: (
-    status: CheckoutStatus,
-    message?: string,
-  ) => void;
+  onStatusChange?: (status: CheckoutStatus, message?: string) => void;
 
   onSuccess?: (
     response: unknown,
     context: {
       mode: CheckoutMode;
-      paymentMethod:
-        | StripeSavedPaymentMethod
-        | null;
+      paymentMethod: StripeSavedPaymentMethod | null;
     },
   ) => void | Promise<void>;
 
-  onError?: (
-    error: unknown,
-  ) => void;
+  onError?: (error: unknown) => void;
 };
 
 function findDefaultPaymentMethod(
-  paymentMethods:
-    StripeSavedPaymentMethod[],
+  paymentMethods: StripeSavedPaymentMethod[],
 
-  defaultPaymentMethodId?:
-    | string
-    | number
-    | null,
+  defaultPaymentMethodId?: string | number | null,
 ): StripeSavedPaymentMethod | null {
-  if (
-    paymentMethods.length === 0
-  ) {
+  if (paymentMethods.length === 0) {
     return null;
   }
 
-  if (
-    defaultPaymentMethodId !==
-      undefined &&
-    defaultPaymentMethodId !==
-      null
-  ) {
-    const explicitlySelected =
-      paymentMethods.find(
-        (paymentMethod) =>
-          String(
-            paymentMethod.id,
-          ) ===
-          String(
-            defaultPaymentMethodId,
-          ),
-      );
+  if (defaultPaymentMethodId !== undefined && defaultPaymentMethodId !== null) {
+    const explicitlySelected = paymentMethods.find(
+      (paymentMethod) =>
+        String(paymentMethod.id) === String(defaultPaymentMethodId),
+    );
 
     if (explicitlySelected) {
       return explicitlySelected;
     }
   }
 
-  const defaultCard =
-    paymentMethods.find(
-      (paymentMethod) =>
-        paymentMethod.isDefault,
-    );
-
-  return (
-    defaultCard ??
-    paymentMethods[0]
+  const defaultCard = paymentMethods.find(
+    (paymentMethod) => paymentMethod.isDefault,
   );
+
+  return defaultCard ?? paymentMethods[0];
 }
 
 export function StripeSavedCardsCheckout({
@@ -176,8 +121,7 @@ export function StripeSavedCardsCheckout({
   externalReference,
   payerReference,
   payerEmail,
-  description =
-    "Pago con Stripe",
+  description = "Pago con Stripe",
   paymentMethods,
   defaultPaymentMethodId,
   createIntentUrl,
@@ -187,10 +131,8 @@ export function StripeSavedCardsCheckout({
   returnUrl,
   metadata = {},
   allowNewCard = true,
-  savedCardsTitle =
-    "Selecciona una tarjeta",
-  newCardLabel =
-    "Usar otra tarjeta",
+  savedCardsTitle = "Selecciona una tarjeta",
+  newCardLabel = "Usar otra tarjeta",
   savedCardButtonText = "Pagar",
   onPaymentMethodChange,
   onModeChange,
@@ -198,152 +140,87 @@ export function StripeSavedCardsCheckout({
   onSuccess,
   onError,
 }: Props) {
-  const initialPaymentMethod =
-    useMemo(
-      () =>
-        findDefaultPaymentMethod(
-          paymentMethods,
-          defaultPaymentMethodId,
-        ),
-      [
-        paymentMethods,
-        defaultPaymentMethodId,
-      ],
-    );
+  const initialPaymentMethod = useMemo(
+    () => findDefaultPaymentMethod(paymentMethods, defaultPaymentMethodId),
+    [paymentMethods, defaultPaymentMethodId],
+  );
 
-  const initialMode:
-    CheckoutMode =
-    initialPaymentMethod
-      ? "saved_card"
-      : "new_card";
+  const initialMode: CheckoutMode = initialPaymentMethod
+    ? "saved_card"
+    : "new_card";
 
-  const [mode, setMode] =
-    useState<CheckoutMode>(
-      initialMode,
-    );
+  const [mode, setMode] = useState<CheckoutMode>(initialMode);
 
-  const [
-    selectedPaymentMethod,
-    setSelectedPaymentMethod,
-  ] = useState<
-    StripeSavedPaymentMethod | null
-  >(initialPaymentMethod);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] =
+    useState<StripeSavedPaymentMethod | null>(initialPaymentMethod);
 
-  const [processing, setProcessing] =
-    useState(false);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
-    const resolved =
-      findDefaultPaymentMethod(
-        paymentMethods,
-        defaultPaymentMethodId,
-      );
-
-    setSelectedPaymentMethod(
-      resolved,
+    const resolved = findDefaultPaymentMethod(
+      paymentMethods,
+      defaultPaymentMethodId,
     );
+
+    setSelectedPaymentMethod(resolved);
 
     if (!resolved) {
       setMode("new_card");
 
-      onModeChange?.(
-        "new_card",
-      );
+      onModeChange?.("new_card");
 
       return;
     }
 
-    if (
-      mode === "saved_card"
-    ) {
+    if (mode === "saved_card") {
       return;
     }
 
     if (!allowNewCard) {
       setMode("saved_card");
 
-      onModeChange?.(
-        "saved_card",
-      );
+      onModeChange?.("saved_card");
     }
-  }, [
-    paymentMethods,
-    defaultPaymentMethodId,
-    allowNewCard,
-  ]);
+  }, [paymentMethods, defaultPaymentMethodId, allowNewCard]);
 
-  function selectSavedCard(
-    paymentMethod:
-      StripeSavedPaymentMethod,
-  ): void {
-    setSelectedPaymentMethod(
-      paymentMethod,
-    );
+  function selectSavedCard(paymentMethod: StripeSavedPaymentMethod): void {
+    setSelectedPaymentMethod(paymentMethod);
 
     setMode("saved_card");
 
-    onModeChange?.(
-      "saved_card",
-    );
+    onModeChange?.("saved_card");
 
-    onPaymentMethodChange?.(
-      paymentMethod,
-    );
+    onPaymentMethodChange?.(paymentMethod);
   }
 
   function selectNewCard(): void {
     setMode("new_card");
 
-    onModeChange?.(
-      "new_card",
-    );
+    onModeChange?.("new_card");
   }
 
-  const hasSavedCards =
-    paymentMethods.length > 0;
+  const hasSavedCards = paymentMethods.length > 0;
 
   return (
     <section>
       {hasSavedCards && (
-        <fieldset
-          disabled={processing}
-        >
-          <legend>
-            {savedCardsTitle}
-          </legend>
+        <fieldset disabled={processing}>
+          <legend>{savedCardsTitle}</legend>
 
-          {paymentMethods.map(
-            (paymentMethod) => (
-              <div
-                key={
-                  paymentMethod.id
+          {paymentMethods.map((paymentMethod) => (
+            <div key={paymentMethod.id}>
+              <StripeSavedCardOption
+                paymentMethod={paymentMethod}
+                selected={
+                  mode === "saved_card" &&
+                  String(selectedPaymentMethod?.id ?? "") ===
+                    String(paymentMethod.id)
                 }
-              >
-                <StripeSavedCardOption
-                  paymentMethod={
-                    paymentMethod
-                  }
-                  selected={
-                    mode ===
-                      "saved_card" &&
-                    String(
-                      selectedPaymentMethod
-                        ?.id ?? "",
-                    ) ===
-                      String(
-                        paymentMethod.id,
-                      )
-                  }
-                  disabled={
-                    processing
-                  }
-                  onSelect={
-                    selectSavedCard
-                  }
-                />
-              </div>
-            ),
-          )}
+                disabled={processing}
+                onSelect={selectSavedCard}
+              />
+            </div>
+          ))}
 
           {allowNewCard && (
             <div>
@@ -352,160 +229,76 @@ export function StripeSavedCardsCheckout({
                   id="stripe-new-card-option"
                   type="radio"
                   name="stripe_saved_payment_method"
-                  checked={
-                    mode ===
-                    "new_card"
-                  }
-                  disabled={
-                    processing
-                  }
-                  onChange={
-                    selectNewCard
-                  }
+                  checked={mode === "new_card"}
+                  disabled={processing}
+                  onChange={selectNewCard}
                 />
 
-                <span>
-                  {newCardLabel}
-                </span>
+                <span>{newCardLabel}</span>
               </label>
             </div>
           )}
         </fieldset>
       )}
 
-      {mode === "saved_card" &&
-        selectedPaymentMethod && (
-          <StripeTokenizedCardCheckout
-            publicKey={
-              publicKey
-            }
-            amount={amount}
-            currency={currency}
-            externalReference={
-              externalReference
-            }
-            customerId={
-              selectedPaymentMethod
-                .customerId
-            }
-            paymentMethodId={
-              selectedPaymentMethod
-                .paymentMethodId
-            }
-            payerReference={
-              payerReference
-            }
-            payerEmail={
-              payerEmail
-            }
-            description={
-              description
-            }
-            processUrl={
-              tokenizedCardUrl
-            }
-            confirmIntentUrl={
-              confirmIntentUrl
-            }
-            csrfToken={
-              csrfToken
-            }
-            returnUrl={
-              returnUrl
-            }
-            metadata={
-              metadata
-            }
-            buttonText={
-              savedCardButtonText
-            }
-            onStatusChange={(
-              status,
-              message,
-            ) => {
-              setProcessing(
-                status ===
-                  "processing" ||
-                  status ===
-                    "authenticating",
-              );
+      {mode === "saved_card" && selectedPaymentMethod && (
+        <StripeTokenizedCardCheckout
+          publicKey={publicKey}
+          amount={amount}
+          currency={currency}
+          externalReference={externalReference}
+          customerId={selectedPaymentMethod.customerId}
+          paymentMethodId={selectedPaymentMethod.paymentMethodId}
+          payerReference={payerReference}
+          payerEmail={payerEmail}
+          description={description}
+          processUrl={tokenizedCardUrl}
+          confirmIntentUrl={confirmIntentUrl}
+          csrfToken={csrfToken}
+          returnUrl={returnUrl}
+          metadata={metadata}
+          buttonText={savedCardButtonText}
+          onStatusChange={(status, message) => {
+            setProcessing(
+              status === "processing" || status === "authenticating",
+            );
 
-              onStatusChange?.(
-                status,
-                message,
-              );
-            }}
-            onSuccess={async (
-              response,
-            ) => {
-              await onSuccess?.(
-                response,
-                {
-                  mode:
-                    "saved_card",
+            onStatusChange?.(status, message);
+          }}
+          onSuccess={async (response) => {
+            await onSuccess?.(response, {
+              mode: "saved_card",
 
-                  paymentMethod:
-                    selectedPaymentMethod,
-                },
-              );
-            }}
-            onError={onError}
-          />
-        )}
+              paymentMethod: selectedPaymentMethod,
+            });
+          }}
+          onError={onError}
+        />
+      )}
 
       {mode === "new_card" && (
         <StripeCardCheckout
           publicKey={publicKey}
           amount={amount}
           currency={currency}
-          externalReference={
-            externalReference
-          }
-          payerEmail={
-            payerEmail
-          }
-          description={
-            description
-          }
-          createIntentUrl={
-            createIntentUrl
-          }
-          confirmIntentUrl={
-            confirmIntentUrl
-          }
-          csrfToken={
-            csrfToken
-          }
-          returnUrl={
-            returnUrl
-          }
-          onStatusChange={(
-            status,
-            message,
-          ) => {
-            setProcessing(
-              status ===
-                "processing",
-            );
+          externalReference={externalReference}
+          payerEmail={payerEmail}
+          description={description}
+          createIntentUrl={createIntentUrl}
+          confirmIntentUrl={confirmIntentUrl}
+          csrfToken={csrfToken}
+          returnUrl={returnUrl}
+          onStatusChange={(status, message) => {
+            setProcessing(status === "processing");
 
-            onStatusChange?.(
-              status,
-              message,
-            );
+            onStatusChange?.(status, message);
           }}
-          onSuccess={async (
-            response,
-          ) => {
-            await onSuccess?.(
-              response,
-              {
-                mode:
-                  "new_card",
+          onSuccess={async (response) => {
+            await onSuccess?.(response, {
+              mode: "new_card",
 
-                paymentMethod:
-                  null,
-              },
-            );
+              paymentMethod: null,
+            });
           }}
           onError={onError}
         />

@@ -3,6 +3,8 @@
 namespace Equidna\StagHerd\Http\Controllers;
 
 use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
+use Equidna\StagHerd\Contracts\PaymentRepository;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeResultMapper;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
 use Equidna\StagHerd\Data\PaymentCancellationData;
@@ -29,6 +31,8 @@ class PaymentController extends Controller
         private readonly PaymentDisplayRepository $payments,
         private readonly ProviderRegistry $providers,
         private readonly StripeGateway $stripeGateway,
+        private readonly PaymentRepository $paymentRepository,
+        private readonly StripeResultMapper $stripeResultMapper,
     ) {
         //
     }
@@ -625,214 +629,106 @@ class PaymentController extends Controller
         }
     }
 
-    public function processStripeSetupIntent(
-        Request $request,
-    ): JsonResponse {
+    public function processStripeSetupIntent(Request $request): JsonResponse
+    {
         try {
             $data = $request->validate([
-                /*
-             * El host puede mandar un customer ya existente.
-             * Si no lo manda, stag-herd crea uno.
-             */
-                'customer_id' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-
-                'payer_reference' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-
-                'payer_email' => [
-                    'nullable',
-                    'email',
-                    'max:255',
-                ],
-
-                'payer_name' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-
-                'return_url' => [
-                    'nullable',
-                    'url',
-                    'max:500',
-                ],
-
-                'idempotency_key' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-
-                'metadata' => [
-                    'nullable',
-                    'array',
-                ],
+                'customer_id' => ['nullable', 'string', 'max:255'],
+                'payer_reference' => ['required', 'string', 'max:255'],
+                'payer_email' => ['nullable', 'email', 'max:255'],
+                'payer_name' => ['nullable', 'string', 'max:255'],
+                'return_url' => ['nullable', 'url', 'max:500'],
+                'idempotency_key' => ['nullable', 'string', 'max:255'],
+                'metadata' => ['nullable', 'array'],
             ]);
 
-            $payerReference = trim(
-                $data['payer_reference']
-            );
-
+            $payerReference = trim($data['payer_reference']);
             $customerId = isset($data['customer_id'])
                 ? trim((string) $data['customer_id'])
                 : null;
 
-            /*
-         * Si el host todavía no tiene un cus_..., creamos el
-         * Customer antes del SetupIntent.
-         */
             if (! $customerId) {
                 $customerIdempotencyKey = substr(
-                    'stag-herd-stripe-customer-'
-                        . hash(
-                            'sha256',
-                            $payerReference
-                        ),
+                    'stag-herd-stripe-customer-' . hash('sha256', $payerReference),
                     0,
                     255,
                 );
 
-                $customer = $this->stripeGateway
-                    ->createCustomer(
-                        payload: array_filter(
-                            [
-                                'email' =>
-                                $data['payer_email']
-                                    ?? null,
-
-                                'name' =>
-                                $data['payer_name']
-                                    ?? null,
-
-                                'metadata' => array_filter(
-                                    [
-                                        'payer_reference' =>
-                                        $payerReference,
-
-                                        'source' =>
-                                        'stag-herd-stripe-setup',
-                                    ],
-                                    fn($value) =>
-                                    $value !== null
-                                        && $value !== ''
-                                ),
-                            ],
-                            fn($value) =>
-                            $value !== null
-                                && $value !== ''
-                                && $value !== []
-                        ),
-
-                        idempotencyKey: $customerIdempotencyKey,
-                    );
-
-                $customerId = data_get(
-                    $customer,
-                    'id'
+                $customer = $this->stripeGateway->createCustomer(
+                    payload: array_filter(
+                        [
+                            'email' => $data['payer_email'] ?? null,
+                            'name' => $data['payer_name'] ?? null,
+                            'metadata' => array_filter(
+                                [
+                                    'payer_reference' => $payerReference,
+                                    'source' => 'stag-herd-stripe-setup',
+                                ],
+                                fn($value) => $value !== null && $value !== '',
+                            ),
+                        ],
+                        fn($value) => $value !== null && $value !== '' && $value !== [],
+                    ),
+                    idempotencyKey: $customerIdempotencyKey,
                 );
+
+                $customerId = data_get($customer, 'id');
 
                 if (! $customerId) {
                     return response()->json([
                         'ok' => false,
-                        'message' =>
-                        'Stripe no regresó customer_id.',
+                        'message' => 'Stripe no regresó customer_id.',
                         'customer' => $customer,
                     ], 422);
                 }
             }
 
-            if (! str_starts_with(
-                $customerId,
-                'cus_'
-            )) {
+            if (! str_starts_with($customerId, 'cus_')) {
                 return response()->json([
                     'ok' => false,
-                    'message' =>
-                    'El customer_id de Stripe no es válido.',
+                    'message' => 'El customer_id de Stripe no es válido.',
                 ], 422);
             }
 
             $idempotencyKey = substr(
                 (string) (
                     $data['idempotency_key']
-                    ?? $request->header(
-                        'X-Idempotency-Key'
-                    )
-                    ?? 'stag-herd-stripe-setup-'
-                    . Str::uuid()
+                    ?? $request->header('X-Idempotency-Key')
+                    ?? 'stag-herd-stripe-setup-' . Str::uuid()
                 ),
                 0,
                 255,
             );
 
-            $customMetadata = $this->cleanMetadata(
-                $data['metadata'] ?? []
-            );
+            $customMetadata = $this->cleanMetadata($data['metadata'] ?? []);
 
-            /*
-         * Al crear el SetupIntent con customer, Stripe asociará
-         * el PaymentMethod al Customer cuando la configuración
-         * termine correctamente.
-         */
-            $setupIntent = $this->stripeGateway
-                ->createSetupIntent(
-                    payload: array_filter(
-                        [
-                            'customer' => $customerId,
-
-                            'payment_method_types' => [
-                                'card',
+            $setupIntent = $this->stripeGateway->createSetupIntent(
+                payload: array_filter(
+                    [
+                        'customer' => $customerId,
+                        'payment_method_types' => ['card'],
+                        'usage' => 'off_session',
+                        'return_url' => $data['return_url'] ?? null,
+                        'metadata' => array_replace_recursive(
+                            $customMetadata,
+                            [
+                                'payer_reference' => $payerReference,
+                                'source' => 'stag-herd-stripe-setup',
                             ],
-
-                            'usage' => 'off_session',
-
-                            'return_url' =>
-                            $data['return_url']
-                                ?? null,
-
-                            'metadata' =>
-                            array_replace_recursive(
-                                $customMetadata,
-                                [
-                                    'payer_reference' =>
-                                    $payerReference,
-
-                                    'source' =>
-                                    'stag-herd-stripe-setup',
-                                ],
-                            ),
-                        ],
-                        fn($value) =>
-                        $value !== null
-                            && $value !== ''
-                            && $value !== []
-                    ),
-
-                    idempotencyKey: $idempotencyKey,
-                );
-
-            $setupIntentId = data_get(
-                $setupIntent,
-                'id'
+                        ),
+                    ],
+                    fn($value) => $value !== null && $value !== '' && $value !== [],
+                ),
+                idempotencyKey: $idempotencyKey,
             );
 
-            $clientSecret = data_get(
-                $setupIntent,
-                'client_secret'
-            );
+            $setupIntentId = data_get($setupIntent, 'id');
+            $clientSecret = data_get($setupIntent, 'client_secret');
 
             if (! $setupIntentId) {
                 return response()->json([
                     'ok' => false,
-                    'message' =>
-                    'Stripe no regresó setup_intent_id.',
+                    'message' => 'Stripe no regresó setup_intent_id.',
                     'setup_intent' => $setupIntent,
                 ], 422);
             }
@@ -840,471 +736,207 @@ class PaymentController extends Controller
             if (! $clientSecret) {
                 return response()->json([
                     'ok' => false,
-                    'message' =>
-                    'Stripe no regresó client_secret.',
+                    'message' => 'Stripe no regresó client_secret.',
                     'setup_intent' => $setupIntent,
                 ], 422);
             }
 
             return response()->json([
                 'ok' => true,
-
-                'message' =>
-                'SetupIntent de Stripe creado correctamente.',
-
-                /*
-             * El host debe guardar este customer_id relacionado
-             * con su usuario o cliente.
-             */
+                'message' => 'SetupIntent de Stripe creado correctamente.',
                 'customer_id' => $customerId,
-
-                'setup_intent_id' =>
-                $setupIntentId,
-
-                'client_secret' =>
-                $clientSecret,
-
-                'status' => data_get(
-                    $setupIntent,
-                    'status'
-                ),
+                'setup_intent_id' => $setupIntentId,
+                'client_secret' => $clientSecret,
+                'status' => data_get($setupIntent, 'status'),
             ]);
         } catch (Throwable $exception) {
             return response()->json([
                 'ok' => false,
-                'type' =>
-                class_basename($exception),
-                'message' =>
-                $exception->getMessage(),
-
-                'file' => config('app.debug')
-                    ? $exception->getFile()
-                    : null,
-
-                'line' => config('app.debug')
-                    ? $exception->getLine()
-                    : null,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
             ], 422);
         }
     }
 
-    public function processStripeSetupComplete(
-        Request $request,
-    ): JsonResponse {
+    public function processStripeSetupComplete(Request $request): JsonResponse
+    {
         try {
             $data = $request->validate([
-                'setup_intent_id' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-
-                'customer_id' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
+                'setup_intent_id' => ['required', 'string', 'max:255'],
+                'customer_id' => ['required', 'string', 'max:255'],
             ]);
 
-            $setupIntent = $this->stripeGateway
-                ->getSetupIntent(
-                    $data['setup_intent_id']
-                );
-
-            $setupIntentId = data_get(
-                $setupIntent,
-                'id'
+            $setupIntent = $this->stripeGateway->getSetupIntent(
+                $data['setup_intent_id'],
             );
 
-            $status = data_get(
-                $setupIntent,
-                'status'
-            );
-
-            $setupCustomerId = data_get(
-                $setupIntent,
-                'customer'
-            );
-
-            $paymentMethodId = data_get(
-                $setupIntent,
-                'payment_method'
-            );
+            $setupIntentId = data_get($setupIntent, 'id');
+            $status = data_get($setupIntent, 'status');
+            $setupCustomerId = data_get($setupIntent, 'customer');
+            $paymentMethodId = data_get($setupIntent, 'payment_method');
 
             if ($status !== 'succeeded') {
                 return response()->json([
                     'ok' => false,
-
-                    'message' =>
-                    'La tarjeta todavía no fue configurada correctamente.',
-
-                    'setup_intent_id' =>
-                    $setupIntentId,
-
+                    'message' => 'La tarjeta todavía no fue configurada correctamente.',
+                    'setup_intent_id' => $setupIntentId,
                     'status' => $status,
                 ], 422);
             }
 
-            /*
-         * Evita que se use un SetupIntent perteneciente a otro
-         * Customer.
-         */
-            if (
-                (string) $setupCustomerId
-                !== (string) $data['customer_id']
-            ) {
+            if ((string) $setupCustomerId !== (string) $data['customer_id']) {
                 return response()->json([
                     'ok' => false,
-                    'message' =>
-                    'El SetupIntent no pertenece al customer indicado.',
+                    'message' => 'El SetupIntent no pertenece al customer indicado.',
                 ], 422);
             }
 
             if (! $paymentMethodId) {
                 return response()->json([
                     'ok' => false,
-                    'message' =>
-                    'Stripe no regresó payment_method_id.',
+                    'message' => 'Stripe no regresó payment_method_id.',
                     'setup_intent' => $setupIntent,
                 ], 422);
             }
 
-            $paymentMethod = $this->stripeGateway
-                ->getPaymentMethod(
-                    (string) $paymentMethodId
-                );
+            $paymentMethod = $this->stripeGateway->getPaymentMethod(
+                (string) $paymentMethodId,
+            );
 
             return response()->json([
                 'ok' => true,
-
-                'message' =>
-                'Tarjeta tokenizada correctamente.',
-
-                /*
-             * Estos dos valores son los que el host debe guardar.
-             */
-                'customer_id' =>
-                (string) $setupCustomerId,
-
-                'payment_method_id' =>
-                (string) $paymentMethodId,
-
-                /*
-             * Información segura para mostrar la tarjeta.
-             */
+                'message' => 'Tarjeta tokenizada correctamente.',
+                'customer_id' => (string) $setupCustomerId,
+                'payment_method_id' => (string) $paymentMethodId,
                 'card' => [
-                    'brand' => data_get(
-                        $paymentMethod,
-                        'card.brand'
-                    ),
-
-                    'last_four' => data_get(
-                        $paymentMethod,
-                        'card.last4'
-                    ),
-
-                    'exp_month' => data_get(
-                        $paymentMethod,
-                        'card.exp_month'
-                    ),
-
-                    'exp_year' => data_get(
-                        $paymentMethod,
-                        'card.exp_year'
-                    ),
-
-                    'funding' => data_get(
-                        $paymentMethod,
-                        'card.funding'
-                    ),
-
-                    'country' => data_get(
-                        $paymentMethod,
-                        'card.country'
-                    ),
+                    'brand' => data_get($paymentMethod, 'card.brand'),
+                    'last_four' => data_get($paymentMethod, 'card.last4'),
+                    'exp_month' => data_get($paymentMethod, 'card.exp_month'),
+                    'exp_year' => data_get($paymentMethod, 'card.exp_year'),
+                    'funding' => data_get($paymentMethod, 'card.funding'),
+                    'country' => data_get($paymentMethod, 'card.country'),
                 ],
-
-                'setup_intent_id' =>
-                $setupIntentId,
-
+                'setup_intent_id' => $setupIntentId,
                 'status' => $status,
             ]);
         } catch (Throwable $exception) {
             return response()->json([
                 'ok' => false,
-                'type' =>
-                class_basename($exception),
-                'message' =>
-                $exception->getMessage(),
-
-                'file' => config('app.debug')
-                    ? $exception->getFile()
-                    : null,
-
-                'line' => config('app.debug')
-                    ? $exception->getLine()
-                    : null,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
             ], 422);
         }
     }
 
-    public function processStripeTokenizedCard(
-        Request $request,
-    ): JsonResponse {
+    public function processStripeTokenizedCard(Request $request): JsonResponse
+    {
         try {
             $data = $request->validate([
-                'amount' => [
-                    'required',
-                    'numeric',
-                    'min:0.01',
-                ],
-
-                'currency' => [
-                    'required',
-                    'string',
-                    'size:3',
-                ],
-
-                'external_reference' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-
-                'payer_reference' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-
-                'payer_email' => [
-                    'nullable',
-                    'email',
-                    'max:255',
-                ],
-
-                'description' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-
-                /*
-             * Referencias previamente guardadas por el host.
-             */
-                'customer_id' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-
-                'payment_method_id' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-
-                /*
-             * false:
-             * el cliente está usando la aplicación.
-             *
-             * true:
-             * el cliente no está presente.
-             */
-                'off_session' => [
-                    'nullable',
-                    'boolean',
-                ],
-
-                'return_url' => [
-                    'nullable',
-                    'url',
-                    'max:500',
-                ],
-
-                'idempotency_key' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-
-                'metadata' => [
-                    'nullable',
-                    'array',
-                ],
+                'amount' => ['required', 'numeric', 'min:0.01'],
+                'currency' => ['required', 'string', 'size:3'],
+                'external_reference' => ['nullable', 'string', 'max:255'],
+                'payer_reference' => ['nullable', 'string', 'max:255'],
+                'payer_email' => ['nullable', 'email', 'max:255'],
+                'description' => ['nullable', 'string', 'max:255'],
+                'customer_id' => ['required', 'string', 'max:255'],
+                'payment_method_id' => ['required', 'string', 'max:255'],
+                'off_session' => ['nullable', 'boolean'],
+                'return_url' => ['nullable', 'url', 'max:500'],
+                'idempotency_key' => ['nullable', 'string', 'max:255'],
+                'metadata' => ['nullable', 'array'],
             ]);
 
-            if (! str_starts_with(
-                $data['customer_id'],
-                'cus_'
-            )) {
+            if (! str_starts_with($data['customer_id'], 'cus_')) {
                 return response()->json([
                     'ok' => false,
-                    'message' =>
-                    'El customer_id de Stripe no es válido.',
+                    'message' => 'El customer_id de Stripe no es válido.',
                 ], 422);
             }
 
-            if (! str_starts_with(
-                $data['payment_method_id'],
-                'pm_'
-            )) {
+            if (! str_starts_with($data['payment_method_id'], 'pm_')) {
                 return response()->json([
                     'ok' => false,
-                    'message' =>
-                    'El payment_method_id de Stripe no es válido.',
+                    'message' => 'El payment_method_id de Stripe no es válido.',
                 ], 422);
             }
 
-            $externalReference =
-                $data['external_reference']
-                ?? 'STRIPE-TOKENIZED-'
-                . now()->format('YmdHis');
+            $externalReference = $data['external_reference']
+                ?? 'STRIPE-TOKENIZED-' . now()->format('YmdHis');
 
             $idempotencyKey = substr(
                 (string) (
                     $data['idempotency_key']
-                    ?? $request->header(
-                        'X-Idempotency-Key'
-                    )
-                    ?? 'stag-herd-stripe-tokenized-'
-                    . Str::uuid()
+                    ?? $request->header('X-Idempotency-Key')
+                    ?? 'stag-herd-stripe-tokenized-' . Str::uuid()
                 ),
                 0,
                 255,
             );
 
-            $metadata = $this->cleanMetadata(
-                $data['metadata'] ?? []
-            );
-
             $metadata = array_replace_recursive(
-                $metadata,
+                $this->cleanMetadata($data['metadata'] ?? []),
                 [
-                    'source' =>
-                    'stag-herd-stripe-tokenized-card',
-
-                    'external_reference' =>
-                    $externalReference,
-
+                    'source' => 'stag-herd-stripe-tokenized-card',
+                    'external_reference' => $externalReference,
                     'stripe' => [
-                        'customer' =>
-                        $data['customer_id'],
-
-                        'payment_method' =>
-                        $data['payment_method_id'],
-
-                        'off_session' =>
-                        (bool) (
-                            $data['off_session']
-                            ?? false
-                        ),
-
-                        'return_url' =>
-                        $data['return_url']
-                            ?? null,
-
-                        'idempotency_key' =>
-                        $idempotencyKey,
+                        'customer' => $data['customer_id'],
+                        'payment_method' => $data['payment_method_id'],
+                        'off_session' => (bool) ($data['off_session'] ?? false),
+                        'return_url' => $data['return_url'] ?? null,
+                        'idempotency_key' => $idempotencyKey,
                     ],
                 ],
             );
 
-            $metadata = $this->cleanMetadata(
-                $metadata
-            );
-
             $payment = StagHerd::createPayment(
                 new PaymentRequestData(
-                    amount: MoneyFormatter::fromDecimal(
-                        $data['amount']
-                    ),
-
-                    currency: strtoupper(
-                        $data['currency']
-                    ),
-
+                    amount: MoneyFormatter::fromDecimal($data['amount']),
+                    currency: strtoupper($data['currency']),
                     method: 'tokenized_card',
-
                     provider: 'stripe',
-
                     externalReference: $externalReference,
-
-                    payerReference: $data['payer_reference']
-                        ?? null,
-
-                    payerEmail: $data['payer_email']
-                        ?? null,
-
+                    payerReference: $data['payer_reference'] ?? null,
+                    payerEmail: $data['payer_email'] ?? null,
                     description: $data['description']
                         ?? 'Payment with stored Stripe card',
-
-                    returnUrl: $data['return_url']
-                        ?? null,
-
-                    metadata: $metadata,
-                )
+                    returnUrl: $data['return_url'] ?? null,
+                    metadata: $this->cleanMetadata($metadata),
+                ),
             );
 
             $paymentArray = $payment->toArray();
 
             return response()->json([
                 'ok' => true,
-
-                'message' =>
-                'Pago con tarjeta guardada procesado correctamente.',
-
-                'payment_id' =>
-                $payment->id,
-
-                'payment_intent_id' =>
-                data_get(
+                'message' => 'Pago con tarjeta guardada procesado correctamente.',
+                'payment_id' => $payment->id,
+                'payment_intent_id' => data_get(
                     $paymentArray,
-                    'references.provider_payment_id'
+                    'references.provider_payment_id',
                 ) ?? data_get(
                     $paymentArray,
-                    'metadata.stripe_payment_intent_id'
+                    'metadata.stripe_payment_intent_id',
                 ),
-
-                'status' =>
-                data_get(
-                    $paymentArray,
-                    'status'
-                ),
-
-                'provider_status' =>
-                data_get(
-                    $paymentArray,
-                    'provider_status'
-                ),
-
-                'next_action' =>
-                data_get(
-                    $paymentArray,
-                    'next_action'
-                ),
-
-                'payment' =>
-                $paymentArray,
+                'status' => data_get($paymentArray, 'status'),
+                'provider_status' => data_get($paymentArray, 'provider_status'),
+                'next_action' => data_get($paymentArray, 'next_action'),
+                'payment' => $paymentArray,
             ]);
         } catch (Throwable $exception) {
             return response()->json([
                 'ok' => false,
-                'type' =>
-                class_basename($exception),
-                'message' =>
-                $exception->getMessage(),
-
-                'file' => config('app.debug')
-                    ? $exception->getFile()
-                    : null,
-
-                'line' => config('app.debug')
-                    ? $exception->getLine()
-                    : null,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
             ], 422);
         }
     }
+
 
     public function processStripeIntent(Request $request): JsonResponse
     {
@@ -1313,6 +945,7 @@ class PaymentController extends Controller
                 'amount' => ['required', 'numeric', 'min:0.01'],
                 'currency' => ['required', 'string', 'size:3'],
                 'external_reference' => ['nullable', 'string', 'max:255'],
+                'payer_reference' => ['nullable', 'string', 'max:255'],
                 'payer_email' => ['nullable', 'email', 'max:255'],
                 'description' => ['nullable', 'string', 'max:255'],
 
@@ -1335,7 +968,8 @@ class PaymentController extends Controller
                 ?? 'STRIPE-' . now()->format('YmdHis');
 
             $metadata = $this->cleanMetadata($data['metadata'] ?? []);
-            $stripeMetadata = $this->cleanMetadata($data['stripe'] ?? []);
+            $stripeInput = $this->cleanMetadata($data['stripe'] ?? []);
+            $stripeMetadata = $this->cleanMetadata($data['stripe']['metadata'] ?? []);
 
             $idempotencyKey = substr(
                 (string) (
@@ -1347,41 +981,74 @@ class PaymentController extends Controller
                 255,
             );
 
-            $metadata = array_replace_recursive($metadata, [
-                'source' => 'stag-herd-stripe-host-ui',
+            $savePaymentMethod = filter_var(
+                data_get($metadata, 'save_payment_method', false),
+                FILTER_VALIDATE_BOOL
+            );
+
+            $intentMetadata = array_filter([
                 'external_reference' => $externalReference,
-                'stripe' => array_replace_recursive($stripeMetadata, [
-                    'idempotency_key' => $idempotencyKey,
-                ]),
-            ]);
+                'payer_reference' => $data['payer_reference'] ?? null,
+                'source' => 'stag-herd-stripe-host-ui',
+                'id_order' => data_get($metadata, 'id_order'),
+                'id_client' => data_get($metadata, 'id_client'),
+                'offer_id' => data_get($metadata, 'offer_id'),
+                'checkout_type' => data_get($metadata, 'checkout_type'),
+                'action' => data_get($metadata, 'action'),
+                'save_payment_method' => $savePaymentMethod ? 'true' : 'false',
+            ], fn($value) => $value !== null && $value !== '');
 
-            $metadata = $this->cleanMetadata($metadata);
+            $intentMetadata = array_replace_recursive($intentMetadata, $stripeMetadata);
 
-            $payment = StagHerd::createPayment(new PaymentRequestData(
-                amount: MoneyFormatter::fromDecimal($data['amount']),
-                currency: strtoupper($data['currency']),
-                method: 'card',
-                provider: 'stripe',
-                externalReference: $externalReference,
-                payerReference: data_get($metadata, 'id_client'),
-                payerEmail: $data['payer_email'] ?? null,
-                description: $data['description'] ?? 'Payment from Stripe Payment Element',
-                metadata: $metadata,
-            ));
+            $payload = [
+                'amount' => MoneyFormatter::fromDecimal($data['amount']),
+                'currency' => strtolower($data['currency']),
+                'payment_method_types' => ['card'],
+                'description' => $data['description'] ?? 'Payment from Stripe Card Element',
+                'receipt_email' => $data['payer_email'] ?? null,
+                'metadata' => $intentMetadata,
+            ];
 
-            $paymentArray = $payment->toArray();
+            if (! empty($stripeInput['customer'])) {
+                $payload['customer'] = $stripeInput['customer'];
+            }
 
-            $clientSecret = data_get($paymentArray, 'metadata.stripe_client_secret')
-                ?? data_get($paymentArray, 'metadata.client_secret');
+            if (! empty($stripeInput['capture_method'])) {
+                $payload['capture_method'] = $stripeInput['capture_method'];
+            }
 
-            $paymentIntentId = data_get($paymentArray, 'references.provider_payment_id')
-                ?? data_get($paymentArray, 'metadata.stripe_payment_intent_id');
+            if (! empty($stripeInput['statement_descriptor'])) {
+                $payload['statement_descriptor'] = $stripeInput['statement_descriptor'];
+            }
+
+            if (! empty($stripeInput['statement_descriptor_suffix'])) {
+                $payload['statement_descriptor_suffix'] = $stripeInput['statement_descriptor_suffix'];
+            }
+
+            if (! empty($stripeInput['setup_future_usage'])) {
+                $payload['setup_future_usage'] = $stripeInput['setup_future_usage'];
+            } elseif ($savePaymentMethod) {
+                $payload['setup_future_usage'] = 'off_session';
+            }
+
+            $payload = array_filter(
+                $payload,
+                fn($value) => $value !== null && $value !== ''
+            );
+
+            $intent = $this->stripeGateway->createPaymentIntent(
+                payload: $payload,
+                idempotencyKey: $idempotencyKey,
+            );
+
+            $clientSecret = data_get($intent, 'client_secret');
+            $paymentIntentId = data_get($intent, 'id');
 
             if (! $clientSecret) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'Stripe no regresó client_secret.',
-                    'payment' => $paymentArray,
+                    'stripe_response' => $intent,
                 ], 422);
             }
 
@@ -1389,17 +1056,28 @@ class PaymentController extends Controller
                 return response()->json([
                     'ok' => false,
                     'message' => 'Stripe no regresó payment_intent_id.',
-                    'payment' => $paymentArray,
+                    'stripe_response' => $intent,
                 ], 422);
             }
 
             return response()->json([
                 'ok' => true,
                 'message' => 'PaymentIntent de Stripe creado correctamente.',
-                'payment_id' => $payment->id,
                 'payment_intent_id' => $paymentIntentId,
                 'client_secret' => $clientSecret,
-                'payment' => $paymentArray,
+                'payment' => [
+                    'provider' => 'stripe',
+                    'method' => 'card',
+                    'status' => data_get($intent, 'status'),
+                    'provider_status' => data_get($intent, 'status'),
+                    'references' => [
+                        'provider_payment_id' => $paymentIntentId,
+                    ],
+                    'metadata' => [
+                        'stripe_client_secret' => $clientSecret,
+                        'stripe_payment_intent_id' => $paymentIntentId,
+                    ],
+                ],
             ]);
         } catch (Throwable $exception) {
             return response()->json([
@@ -1416,47 +1094,75 @@ class PaymentController extends Controller
     {
         try {
             $data = $request->validate([
-                'payment_id' => ['required', 'string', 'max:255'],
                 'provider_payment_id' => ['required', 'string', 'max:255'],
-
                 'stripe_status' => ['nullable', 'string', 'max:255'],
-                'idempotency_key' => ['nullable', 'string', 'max:255'],
-
                 'metadata' => ['nullable', 'array'],
+                'payer_email' => ['nullable', 'email', 'max:255'],
+                'external_reference' => ['nullable', 'string', 'max:255'],
+                'payer_reference' => ['nullable', 'string', 'max:255'],
+                'description' => ['nullable', 'string', 'max:255'],
             ]);
+
+            $providerPaymentId = (string) $data['provider_payment_id'];
+
+            $stripeResponse = $this->stripeGateway->getPaymentIntent($providerPaymentId);
+
+            $result = $this->stripeResultMapper->mapPaymentIntentResponseToResult(
+                method: 'card',
+                response: $stripeResponse,
+            );
+
+            $providerStatus = strtolower((string) ($result->providerStatus ?? ''));
+
+            if (! in_array($providerStatus, ['succeeded', 'processing', 'requires_capture'], true)) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Stripe todavía no confirmó el pago.',
+                    'provider_status' => $result->providerStatus,
+                    'stripe_response' => $stripeResponse,
+                ], 422);
+            }
 
             $metadata = $this->cleanMetadata($data['metadata'] ?? []);
 
             $metadata = array_replace_recursive($metadata, [
                 'source' => 'stag-herd-stripe-host-ui-confirm',
-                'stripe_payment_intent_id' => $data['provider_payment_id'],
+                'stripe_payment_intent_id' => $providerPaymentId,
                 'stripe_status_from_client' => $data['stripe_status'] ?? null,
-                'stripe' => [
-                    'confirm_idempotency_key' => substr(
-                        (string) (
-                            $data['idempotency_key']
-                            ?? $request->header('X-Idempotency-Key')
-                            ?? 'stag-herd-stripe-confirm-' . $data['provider_payment_id']
-                        ),
-                        0,
-                        255,
-                    ),
-                ],
             ]);
 
             $metadata = $this->cleanMetadata($metadata);
 
-            $payment = StagHerd::confirmPayment(new PaymentConfirmationData(
-                provider: 'stripe',
+            $requestData = new PaymentRequestData(
+                amount: (int) ($result->amount ?? 0),
+                currency: strtoupper((string) ($result->currency ?? 'MXN')),
                 method: 'card',
-                paymentId: (string) $data['payment_id'],
-                providerPaymentId: (string) $data['provider_payment_id'],
+                provider: 'stripe',
+                externalReference: $data['external_reference']
+                    ?? data_get($stripeResponse, 'metadata.external_reference'),
+                payerReference: $data['payer_reference']
+                    ?? data_get($stripeResponse, 'metadata.payer_reference')
+                    ?? data_get($metadata, 'id_client'),
+                payerEmail: $data['payer_email']
+                    ?? data_get($stripeResponse, 'receipt_email'),
+                description: $data['description']
+                    ?? data_get($stripeResponse, 'description')
+                    ?? 'Payment from Stripe Card Element',
+                returnUrl: data_get($metadata, 'return_url'),
+                cancelUrl: null,
                 metadata: $metadata,
-            ));
+            );
+
+            $payment = $this->paymentRepository->storeFromResult(
+                request: $requestData,
+                result: $result,
+            );
 
             return response()->json([
                 'ok' => true,
-                'message' => 'Pago Stripe confirmado y sincronizado correctamente.',
+                'message' => 'Pago Stripe confirmado y registrado correctamente.',
+                'provider_payment_id' => $providerPaymentId,
+                'provider_status' => $result->providerStatus,
                 'payment' => $payment->toArray(),
             ]);
         } catch (Throwable $exception) {

@@ -57,12 +57,6 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
             metadata: $request->metadata,
         );
 
-        /*
-         * tokenized_card se confirma al crear el PaymentIntent.
-         *
-         * Esta operación únicamente vuelve a consultar Stripe para
-         * sincronizar el estado real del pago.
-         */
         $response = $this->gateway->getPaymentIntent(
             $paymentIntentId
         );
@@ -244,9 +238,6 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
                 'card',
             ],
 
-            /*
-             * Una tarjeta guardada se confirma directamente.
-             */
             'confirm' => true,
 
             'description' =>
