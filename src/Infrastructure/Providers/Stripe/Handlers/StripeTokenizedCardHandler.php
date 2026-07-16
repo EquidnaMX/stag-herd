@@ -238,8 +238,7 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
                 'card',
             ],
 
-            'confirm' => true,
-
+            'confirm' => 'true',
             'description' =>
             $request->description
                 ?? $request->externalReference
@@ -266,7 +265,7 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
         ];
 
         if ($offSession) {
-            $payload['off_session'] = true;
+            $payload['off_session'] = 'true';
         }
 
         $returnUrl = $stripe['return_url']

@@ -13,6 +13,7 @@ use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\RefundRequestData;
 use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
+use Equidna\StagHerd\Exceptions\ProviderCommunicationException;
 use Equidna\StagHerd\Facades\StagHerd;
 use Equidna\StagHerd\Support\MoneyFormatter;
 use Equidna\StagHerd\Support\ProviderRegistry;
@@ -25,6 +26,7 @@ use Illuminate\View\View;
 use RuntimeException;
 use Throwable;
 
+//TODO: Separate this controller into multiple controllers for each provider (Stripe, PayPal, Mercado Pago, etc.)
 class PaymentController extends Controller
 {
     public function __construct(
@@ -937,7 +939,6 @@ class PaymentController extends Controller
         }
     }
 
-
     public function processStripeIntent(Request $request): JsonResponse
     {
         try {
@@ -960,6 +961,7 @@ class PaymentController extends Controller
                 'stripe.statement_descriptor' => ['nullable', 'string', 'max:22'],
                 'stripe.statement_descriptor_suffix' => ['nullable', 'string', 'max:22'],
                 'stripe.setup_future_usage' => ['nullable', 'string', 'max:50'],
+                'stripe.save_payment_method' => ['nullable', 'boolean'],
                 'stripe.return_url' => ['nullable', 'url', 'max:500'],
                 'stripe.metadata' => ['nullable', 'array'],
             ]);
@@ -982,9 +984,51 @@ class PaymentController extends Controller
             );
 
             $savePaymentMethod = filter_var(
-                data_get($metadata, 'save_payment_method', false),
+                $stripeInput['save_payment_method']
+                    ?? data_get($metadata, 'save_payment_method', false),
                 FILTER_VALIDATE_BOOL
             );
+
+            $customerId = ! empty($stripeInput['customer'])
+                ? trim((string) $stripeInput['customer'])
+                : null;
+
+            $payerReference = trim((string) ($data['payer_reference'] ?? ''));
+
+            if ($savePaymentMethod && $payerReference === '') {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'payer_reference es requerido para guardar la tarjeta.',
+                ], 422);
+            }
+
+            if ($savePaymentMethod || $customerId) {
+                $customerPayload = $this->buildStripeCustomerPayload(
+                    payerReference: $payerReference !== '' ? $payerReference : null,
+                    payerEmail: $data['payer_email'] ?? null,
+                    payerName: null,
+                    source: 'stag-herd-stripe-intent',
+                );
+
+                $customerId = $this->ensureStripeCustomerExists(
+                    customerId: $customerId,
+                    customerPayload: $customerPayload,
+                );
+
+                if (! $customerId) {
+                    return response()->json([
+                        'ok' => false,
+                        'message' => 'Stripe no regresó customer_id.',
+                    ], 422);
+                }
+            }
+
+            if ($customerId && ! str_starts_with($customerId, 'cus_')) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'El customer_id de Stripe no es válido.',
+                ], 422);
+            }
 
             $intentMetadata = array_filter([
                 'external_reference' => $externalReference,
@@ -1009,8 +1053,8 @@ class PaymentController extends Controller
                 'metadata' => $intentMetadata,
             ];
 
-            if (! empty($stripeInput['customer'])) {
-                $payload['customer'] = $stripeInput['customer'];
+            if (! empty($customerId)) {
+                $payload['customer'] = $customerId;
             }
 
             if (! empty($stripeInput['capture_method'])) {
@@ -1065,6 +1109,7 @@ class PaymentController extends Controller
                 'message' => 'PaymentIntent de Stripe creado correctamente.',
                 'payment_intent_id' => $paymentIntentId,
                 'client_secret' => $clientSecret,
+                'customer_id' => $customerId,
                 'payment' => [
                     'provider' => 'stripe',
                     'method' => 'card',
@@ -1076,6 +1121,7 @@ class PaymentController extends Controller
                     'metadata' => [
                         'stripe_client_secret' => $clientSecret,
                         'stripe_payment_intent_id' => $paymentIntentId,
+                        'stripe_customer_id' => $customerId,
                     ],
                 ],
             ]);
@@ -1125,10 +1171,29 @@ class PaymentController extends Controller
 
             $metadata = $this->cleanMetadata($data['metadata'] ?? []);
 
+            $metadata = $this->cleanMetadata($data['metadata'] ?? []);
+
+            $customerId = data_get($stripeResponse, 'customer');
+            $paymentMethodId = data_get($stripeResponse, 'payment_method');
+
+            $paymentMethod = null;
+
+            if (is_string($paymentMethodId) && str_starts_with($paymentMethodId, 'pm_')) {
+                $paymentMethod = $this->stripeGateway->getPaymentMethod($paymentMethodId);
+            }
+
             $metadata = array_replace_recursive($metadata, [
                 'source' => 'stag-herd-stripe-host-ui-confirm',
                 'stripe_payment_intent_id' => $providerPaymentId,
                 'stripe_status_from_client' => $data['stripe_status'] ?? null,
+                'stripe_customer_id' => $customerId,
+                'stripe_payment_method_id' => $paymentMethodId,
+                'card' => array_filter([
+                    'brand' => data_get($paymentMethod, 'card.brand'),
+                    'last4' => data_get($paymentMethod, 'card.last4'),
+                    'exp_month' => data_get($paymentMethod, 'card.exp_month'),
+                    'exp_year' => data_get($paymentMethod, 'card.exp_year'),
+                ], fn($value) => $value !== null && $value !== ''),
             ]);
 
             $metadata = $this->cleanMetadata($metadata);
@@ -1456,5 +1521,70 @@ class PaymentController extends Controller
         }
 
         return (array) $payment;
+    }
+
+    private function buildStripeCustomerPayload(
+        ?string $payerReference,
+        ?string $payerEmail,
+        ?string $payerName = null,
+        string $source = 'stag-herd-stripe',
+    ): array {
+        return array_filter(
+            [
+                'email' => $payerEmail ?: null,
+                'name' => $payerName ?: null,
+                'metadata' => array_filter(
+                    [
+                        'payer_reference' => $payerReference ?: null,
+                        'source' => $source,
+                    ],
+                    fn($value) => $value !== null && $value !== '',
+                ),
+            ],
+            fn($value) => $value !== null && $value !== '' && $value !== [],
+        );
+    }
+
+    private function createStripeCustomer(array $payload): array
+    {
+        return $this->stripeGateway->createCustomer(
+            payload: $payload,
+            idempotencyKey: 'stag-herd-stripe-customer-' . (string) Str::uuid(),
+        );
+    }
+
+    private function ensureStripeCustomerExists(
+        ?string $customerId,
+        array $customerPayload,
+    ): ?string {
+        if (! $customerId) {
+            $customer = $this->createStripeCustomer($customerPayload);
+
+            return data_get($customer, 'id');
+        }
+
+        try {
+            $customer = $this->stripeGateway->getCustomer($customerId);
+
+            if (data_get($customer, 'deleted') === true) {
+                $customer = $this->createStripeCustomer($customerPayload);
+
+                return data_get($customer, 'id');
+            }
+
+            return data_get($customer, 'id', $customerId);
+        } catch (ProviderCommunicationException $exception) {
+            $status = data_get($exception->getErrors(), 'status');
+            $code = data_get($exception->getErrors(), 'response.error.code');
+            $param = data_get($exception->getErrors(), 'response.error.param');
+
+            if ($status === 404 || ($status === 400 && $code === 'resource_missing' && $param === 'customer')) {
+                $customer = $this->createStripeCustomer($customerPayload);
+
+                return data_get($customer, 'id');
+            }
+
+            throw $exception;
+        }
     }
 }

@@ -6,6 +6,11 @@ use Equidna\Toolkit\Exceptions\BadRequestException;
 
 class ProviderCommunicationException extends BadRequestException
 {
+    public function getErrors(): array
+    {
+        return $this->errors ?? [];
+    }
+
     public static function requestFailed(
         string $provider,
         int $status,
