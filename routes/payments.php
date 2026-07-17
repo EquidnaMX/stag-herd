@@ -1,30 +1,37 @@
 <?php
 
+use Equidna\StagHerd\Http\Controllers\MercadoPagoController;
 use Equidna\StagHerd\Http\Controllers\PaymentController;
+use Equidna\StagHerd\Http\Controllers\PaymentOperationController;
+use Equidna\StagHerd\Http\Controllers\PayPalController;
+use Equidna\StagHerd\Http\Controllers\StripeController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['api'])
     ->prefix(config('stag-herd.demo.prefix', 'stag-herd/payments'))
     ->name('stag-herd.payments.')
-    ->group(function () {
+    ->group(function (): void {
         if (config('stag-herd.demo.enabled', false)) {
             Route::get('/', [PaymentController::class, 'index'])->name('index');
         }
-
         Route::post('/', [PaymentController::class, 'store'])->name('store');
-        Route::post('/brick/process', [PaymentController::class, 'processBrick'])->name('brick.process');
-        Route::post('/paypal/create', [PaymentController::class, 'processPayPalCreate'])->name('paypal.create');
-        Route::post('/paypal/capture', [PaymentController::class, 'processPayPalCapture'])->name('paypal.capture');
-        Route::post('/stripe/intent', [PaymentController::class, 'processStripeIntent'])->name('stripe.intent');
-        Route::post('/stripe/confirm', [PaymentController::class, 'processStripeConfirm'])->name('stripe.confirm');
-        Route::post('/stripe/setup-intent', [PaymentController::class, 'processStripeSetupIntent'])->name('stripe.setup-intent');
-        Route::post('/stripe/setup-complete', [PaymentController::class, 'processStripeSetupComplete'])->name('stripe.setup-complete');
-        Route::post('/stripe/tokenized-card', [PaymentController::class, 'processStripeTokenizedCard'])->name('stripe.tokenized-card');
-        Route::post('/provider/lookup', [PaymentController::class, 'providerLookup'])->name('provider.lookup');
-        Route::post('/provider/sync', [PaymentController::class, 'providerSync'])->name('provider.sync');
         Route::get('/{payment}', [PaymentController::class, 'show'])->name('show');
-        Route::post('/{payment}/sync', [PaymentController::class, 'sync'])->name('sync');
-        Route::post('/{payment}/lookup', [PaymentController::class, 'lookup'])->name('lookup');
-        Route::post('/{payment}/cancel', [PaymentController::class, 'cancel'])->name('cancel');
-        Route::post('/{payment}/refund', [PaymentController::class, 'refund'])->name('refund');
+        Route::post('/{payment}/lookup', [PaymentOperationController::class, 'lookup'])->name('lookup');
+        Route::post('/{payment}/cancel', [PaymentOperationController::class, 'cancel'])->name('cancel');
+        Route::post('/{payment}/refund', [PaymentOperationController::class, 'refund'])->name('refund');
+        Route::post('/{payment}/sync', [PaymentOperationController::class, 'sync'])->name('sync');
+        Route::post('/provider/lookup', [PaymentOperationController::class, 'providerLookup'])->name('provider.lookup');
+        Route::post('/provider/sync', [PaymentOperationController::class, 'providerSync'])->name('provider.sync');
+        Route::post('/mercado-pago/brick', [MercadoPagoController::class, 'processBrick'])->name('mercado-pago.brick');
+        Route::prefix('paypal')->name('paypal.')->controller(PayPalController::class)->group(function (): void {
+            Route::post('/create', 'createOrder')->name('create');
+            Route::post('/capture', 'captureOrder')->name('capture');
+        });
+        Route::prefix('stripe')->name('stripe.')->controller(StripeController::class)->group(function (): void {
+            Route::post('/setup-intent', 'createSetupIntent')->name('setup-intent');
+            Route::post('/setup-complete', 'completeSetupIntent')->name('setup-complete');
+            Route::post('/tokenized-card', 'processTokenizedCard')->name('tokenized-card');
+            Route::post('/intent', 'createPaymentIntent')->name('intent');
+            Route::post('/confirm', 'confirmPaymentIntent')->name('confirm');
+        });
     });
