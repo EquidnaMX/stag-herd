@@ -11,7 +11,7 @@ use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\RefundRequestData;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Support\StripeCardPaymentService;
 
-final class StripeCardHandler implements PaymentMethodHandler
+final class StripeApplePayHandler implements PaymentMethodHandler
 {
     public function __construct(
         private readonly StripeCardPaymentService $payments,
@@ -21,7 +21,7 @@ final class StripeCardHandler implements PaymentMethodHandler
 
     public function getMethod(): string
     {
-        return 'card';
+        return 'apple_pay';
     }
 
     public function createPayment(
@@ -31,8 +31,8 @@ final class StripeCardHandler implements PaymentMethodHandler
             request: $request,
             method: $this->getMethod(),
             options: [
-                'default_description' => 'Payment',
-                'default_source' => null,
+                'default_description' => 'Apple Pay payment',
+                'default_source' => 'stag-herd-stripe-apple-pay',
             ],
         );
     }

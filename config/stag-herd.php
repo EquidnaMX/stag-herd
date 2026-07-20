@@ -9,10 +9,12 @@ use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalCheckoutHand
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers\MercadoPagoCardHandler;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoWebhookParser;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalWebhookParser;
-use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeCardHandler;
-use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeTokenizedCardHandler;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeProvider;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeWebhookParser;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeApplePayHandler;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeCardHandler;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeGooglePayHandler;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeTokenizedCardHandler;
 
 return [
     'repositories' => [
@@ -123,6 +125,18 @@ return [
                     'enabled' => true,
                     'label' => 'Tarjeta',
                     'handler' => StripeCardHandler::class,
+                ],
+
+                'apple_pay' => [
+                    'enabled' => true,
+                    'label' => 'Apple Pay',
+                    'handler' => StripeApplePayHandler::class,
+                ],
+
+                'google_pay' => [
+                    'enabled' => true,
+                    'label' => 'Google Pay',
+                    'handler' => StripeGooglePayHandler::class,
                 ],
 
                 'tokenized_card' => [

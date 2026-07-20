@@ -15,6 +15,8 @@ final class StripeProvider extends AbstractPaymentProvider
     {
         return [
             'card',
+            'apple_pay',
+            'google_pay',
             'tokenized_card',
         ];
     }
