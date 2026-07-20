@@ -31,6 +31,8 @@ Route::middleware(['api'])
             Route::post('/setup-intent', 'createSetupIntent')->name('setup-intent');
             Route::post('/setup-complete', 'completeSetupIntent')->name('setup-complete');
             Route::post('/tokenized-card', 'processTokenizedCard')->name('tokenized-card');
+            Route::post('/apple-pay', 'processApplePay')->name('apple-pay');
+            Route::post('/google-pay', 'processGooglePay')->name('google-pay');
             Route::post('/intent', 'createPaymentIntent')->name('intent');
             Route::post('/confirm', 'confirmPaymentIntent')->name('confirm');
         });

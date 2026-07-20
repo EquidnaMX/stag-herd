@@ -641,6 +641,148 @@ class StripeController extends Controller
         }
     }
 
+    public function processApplePay(Request $request): JsonResponse
+    {
+        return $this->processWalletPayment(
+            request: $request,
+            method: 'apple_pay',
+            source: 'stag-herd-stripe-apple-pay',
+            successMessage: 'Pago con Apple Pay procesado correctamente.',
+            defaultDescription: 'Payment with Apple Pay',
+        );
+    }
+
+    public function processGooglePay(Request $request): JsonResponse
+    {
+        return $this->processWalletPayment(
+            request: $request,
+            method: 'google_pay',
+            source: 'stag-herd-stripe-google-pay',
+            successMessage: 'Pago con Google Pay procesado correctamente.',
+            defaultDescription: 'Payment with Google Pay',
+        );
+    }
+
+    /**
+     * @param 'apple_pay'|'google_pay' $method
+     */
+    private function processWalletPayment(
+        Request $request,
+        string $method,
+        string $source,
+        string $successMessage,
+        string $defaultDescription,
+    ): JsonResponse {
+        try {
+            $data = $request->validate([
+                'amount' => ['required', 'numeric', 'min:0.01'],
+                'currency' => ['required', 'string', 'size:3'],
+                'external_reference' => ['nullable', 'string', 'max:255'],
+                'payer_reference' => ['nullable', 'string', 'max:255'],
+                'payer_email' => ['nullable', 'email', 'max:255'],
+                'description' => ['nullable', 'string', 'max:255'],
+                'customer_id' => ['nullable', 'string', 'max:255'],
+                'payment_method_id' => ['required', 'string', 'max:255'],
+                'return_url' => ['nullable', 'url', 'max:500'],
+                'idempotency_key' => ['nullable', 'string', 'max:255'],
+                'metadata' => ['nullable', 'array'],
+            ]);
+
+            $customerId = isset($data['customer_id'])
+                ? trim((string) $data['customer_id'])
+                : null;
+
+            if ($customerId !== null && $customerId !== '' && ! str_starts_with($customerId, 'cus_')) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'El customer_id de Stripe no es válido.',
+                ], 422);
+            }
+
+            if (! str_starts_with($data['payment_method_id'], 'pm_')) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'El payment_method_id de Stripe no es válido.',
+                ], 422);
+            }
+
+            $externalReference = $data['external_reference']
+                ?? strtoupper($method) . '-' . now()->format('YmdHis');
+
+            $idempotencyKey = substr(
+                (string) (
+                    $data['idempotency_key']
+                    ?? $request->header('X-Idempotency-Key')
+                    ?? 'stag-herd-stripe-' . $method . '-' . Str::uuid()
+                ),
+                0,
+                255,
+            );
+
+            $metadata = array_replace_recursive(
+                $this->cleanMetadata($data['metadata'] ?? []),
+                [
+                    'source' => $source,
+                    'external_reference' => $externalReference,
+                    'wallet_type' => $method,
+                    'stripe' => array_filter([
+                        'customer' => $customerId,
+                        'payment_method' => $data['payment_method_id'],
+                        'confirm' => true,
+                        'return_url' => $data['return_url'] ?? null,
+                        'idempotency_key' => $idempotencyKey,
+                        'metadata' => [
+                            'wallet_type' => $method,
+                            'source' => $source,
+                        ],
+                    ], fn($value) => $value !== null && $value !== ''),
+                ],
+            );
+
+            $payment = StagHerd::createPayment(
+                new PaymentRequestData(
+                    amount: MoneyFormatter::fromDecimal($data['amount']),
+                    currency: strtoupper($data['currency']),
+                    method: $method,
+                    provider: 'stripe',
+                    externalReference: $externalReference,
+                    payerReference: $data['payer_reference'] ?? null,
+                    payerEmail: $data['payer_email'] ?? null,
+                    description: $data['description'] ?? $defaultDescription,
+                    returnUrl: $data['return_url'] ?? null,
+                    metadata: $this->cleanMetadata($metadata),
+                ),
+            );
+
+            $paymentArray = $payment->toArray();
+
+            return response()->json([
+                'ok' => true,
+                'message' => $successMessage,
+                'payment_id' => $payment->id,
+                'payment_intent_id' => data_get(
+                    $paymentArray,
+                    'references.provider_payment_id',
+                ) ?? data_get(
+                    $paymentArray,
+                    'metadata.stripe_payment_intent_id',
+                ),
+                'status' => data_get($paymentArray, 'status'),
+                'provider_status' => data_get($paymentArray, 'provider_status'),
+                'next_action' => data_get($paymentArray, 'next_action'),
+                'payment' => $paymentArray,
+            ]);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
+            ], 422);
+        }
+    }
+
     private function cleanMetadata(array $metadata): array
     {
         $clean = [];
