@@ -1,6 +1,6 @@
 <?php
 
-namespace Equidna\StagHerd\Infrastructure\Providers\Stripe\Support;
+namespace Equidna\StagHerd\Infrastructure\Providers\Stripe\Services;
 
 use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
 use Equidna\StagHerd\Data\PaymentCancellationData;

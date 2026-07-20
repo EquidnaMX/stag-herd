@@ -2,6 +2,7 @@
 
 namespace Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers;
 
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardPaymentService;
 use Equidna\StagHerd\Contracts\PaymentMethodHandler;
 use Equidna\StagHerd\Data\PaymentCancellationData;
 use Equidna\StagHerd\Data\PaymentConfirmationData;
@@ -9,7 +10,6 @@ use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\RefundRequestData;
-use Equidna\StagHerd\Infrastructure\Providers\Stripe\Support\StripeCardPaymentService;
 
 final class StripeCardHandler implements PaymentMethodHandler
 {

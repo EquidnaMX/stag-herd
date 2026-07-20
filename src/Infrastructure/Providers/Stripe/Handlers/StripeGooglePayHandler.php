@@ -9,7 +9,7 @@ use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\RefundRequestData;
-use Equidna\StagHerd\Infrastructure\Providers\Stripe\Support\StripeCardPaymentService;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardPaymentService;
 
 final class StripeGooglePayHandler implements PaymentMethodHandler
 {
