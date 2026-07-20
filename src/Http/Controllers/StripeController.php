@@ -7,6 +7,7 @@ use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Exceptions\ProviderCommunicationException;
 use Equidna\StagHerd\Facades\StagHerd;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardReuse;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeResultMapper;
 use Equidna\StagHerd\Support\MoneyFormatter;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +22,7 @@ class StripeController extends Controller
         private readonly StripeGateway $stripeGateway,
         private readonly PaymentRepository $paymentRepository,
         private readonly StripeResultMapper $stripeResultMapper,
+        private readonly StripeCardReuse $stripeCardReuse,
     ) {}
     public function createSetupIntent(Request $request): JsonResponse
     {
@@ -177,9 +179,13 @@ class StripeController extends Controller
                 ], 422);
             }
 
-            $paymentMethod = $this->stripeGateway->getPaymentMethod(
+            $resolvedPaymentMethod = $this->stripeCardReuse->resolve(
+                (string) $setupCustomerId,
                 (string) $paymentMethodId,
             );
+
+            $paymentMethodId = $resolvedPaymentMethod['payment_method_id'];
+            $paymentMethod = $resolvedPaymentMethod['payment_method'];
 
             return response()->json([
                 'ok' => true,
@@ -193,6 +199,7 @@ class StripeController extends Controller
                     'exp_year' => data_get($paymentMethod, 'card.exp_year'),
                     'funding' => data_get($paymentMethod, 'card.funding'),
                     'country' => data_get($paymentMethod, 'card.country'),
+                    'fingerprint' => $resolvedPaymentMethod['fingerprint'],
                 ],
                 'setup_intent_id' => $setupIntentId,
                 'status' => $status,
@@ -551,9 +558,24 @@ class StripeController extends Controller
             $paymentMethodId = data_get($stripeResponse, 'payment_method');
 
             $paymentMethod = null;
+            $resolvedPaymentMethod = null;
 
             if (is_string($paymentMethodId) && str_starts_with($paymentMethodId, 'pm_')) {
-                $paymentMethod = $this->stripeGateway->getPaymentMethod($paymentMethodId);
+                if (
+                    is_string($customerId) &&
+                    $customerId !== '' &&
+                    str_starts_with($customerId, 'cus_')
+                ) {
+                    $resolvedPaymentMethod = $this->stripeCardReuse->resolve(
+                        $customerId,
+                        $paymentMethodId,
+                    );
+
+                    $paymentMethodId = $resolvedPaymentMethod['payment_method_id'];
+                    $paymentMethod = $resolvedPaymentMethod['payment_method'];
+                } else {
+                    $paymentMethod = $this->stripeGateway->getPaymentMethod($paymentMethodId);
+                }
             }
 
             $metadata = array_replace_recursive($metadata, [
@@ -562,11 +584,15 @@ class StripeController extends Controller
                 'stripe_status_from_client' => $data['stripe_status'] ?? null,
                 'stripe_customer_id' => $customerId,
                 'stripe_payment_method_id' => $paymentMethodId,
+                'stripe_original_payment_method_id' => $resolvedPaymentMethod['original_payment_method_id'] ?? $paymentMethodId,
+                'stripe_payment_method_deduplicated' => $resolvedPaymentMethod['duplicated'] ?? false,
+                'stripe_payment_method_fingerprint' => $resolvedPaymentMethod['fingerprint'] ?? data_get($paymentMethod, 'card.fingerprint'),
                 'card' => array_filter([
                     'brand' => data_get($paymentMethod, 'card.brand'),
                     'last4' => data_get($paymentMethod, 'card.last4'),
                     'exp_month' => data_get($paymentMethod, 'card.exp_month'),
                     'exp_year' => data_get($paymentMethod, 'card.exp_year'),
+                    'fingerprint' => $resolvedPaymentMethod['fingerprint'] ?? data_get($paymentMethod, 'card.fingerprint'),
                 ], fn($value) => $value !== null && $value !== ''),
             ]);
 

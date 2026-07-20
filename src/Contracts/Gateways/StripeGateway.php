@@ -58,4 +58,9 @@ interface StripeGateway
         string $customerId,
         array $payload,
     ): array;
+
+    public function listCustomerPaymentMethods(
+        string $customerId,
+        string $type = 'card',
+    ): array;
 }

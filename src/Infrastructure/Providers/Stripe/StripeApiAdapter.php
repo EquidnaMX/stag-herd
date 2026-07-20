@@ -137,6 +137,20 @@ final class StripeApiAdapter implements StripeGateway
         );
     }
 
+    public function listCustomerPaymentMethods(
+        string $customerId,
+        string $type = 'card',
+    ): array {
+        return $this->send(
+            method: 'get',
+            endpoint: '/v1/payment_methods',
+            payload: [
+                'customer' => $customerId,
+                'type' => $type,
+            ],
+        );
+    }
+
     /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
