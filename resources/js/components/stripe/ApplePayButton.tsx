@@ -4,11 +4,21 @@ import {
 } from "@stripe/react-stripe-js";
 import { useEffect, useMemo, useState } from "react";
 
+type WalletBackendStartResponse = {
+  clientSecret: string;
+  providerResponse: any;
+  providerStatus?: string | null;
+};
+
+type WalletSuccessResponse = {
+  providerResponse: any;
+};
+
 type Props = {
-  amount: number; // in minor units, e.g. 1099
-  currency: string; // e.g. "usd"
-  country: string; // e.g. "US"
-  label: string; // e.g. "Total"
+  amount: number;
+  currency: string;
+  country: string;
+  label: string;
   requestPayerName?: boolean;
   requestPayerEmail?: boolean;
   requestShipping?: boolean;
@@ -19,10 +29,19 @@ type Props = {
     payerEmail?: string | null;
     wallet: "apple_pay";
     rawEvent: unknown;
-  }) => Promise<{ success: boolean; error?: string }>;
+  }) => Promise<WalletBackendStartResponse>;
+  onSuccess?: (result: WalletSuccessResponse) => void | Promise<void>;
   onAvailabilityChange?: (available: boolean) => void;
   onError?: (error: unknown) => void;
 };
+
+function normalizeStatus(status: unknown): string {
+  return String(status ?? "").toLowerCase();
+}
+
+function isFinalStatus(status: string): boolean {
+  return ["succeeded", "processing", "requires_capture"].includes(status);
+}
 
 export function ApplePayButton({
   amount,
@@ -34,6 +53,7 @@ export function ApplePayButton({
   requestShipping = false,
   disabled = false,
   onPaymentMethod,
+  onSuccess,
   onAvailabilityChange,
   onError,
 }: Props) {
@@ -81,7 +101,7 @@ export function ApplePayButton({
 
         pr.on("paymentmethod", async (event: any) => {
           try {
-            const response = await onPaymentMethod({
+            const start = await onPaymentMethod({
               paymentMethodId: event.paymentMethod.id,
               payerName: event.payerName ?? null,
               payerEmail: event.payerEmail ?? null,
@@ -89,16 +109,73 @@ export function ApplePayButton({
               rawEvent: event,
             });
 
-            if (response.success) {
-              event.complete("success");
-            } else {
+            const clientSecret = start?.clientSecret;
+            const status = normalizeStatus(
+              start?.providerStatus ??
+                start?.providerResponse?.provider_status ??
+                start?.providerResponse?.payment?.provider_status ??
+                start?.providerResponse?.status ??
+                start?.providerResponse?.payment?.status,
+            );
+
+            if (!clientSecret || typeof clientSecret !== "string") {
               event.complete("fail");
-              if (response.error) {
-                throw new Error(response.error);
-              }
+              throw new Error(
+                "El backend no regresó client_secret para Apple Pay.",
+              );
             }
+
+            if (status === "requires_action") {
+              event.complete("success");
+
+              const actionResult = await stripe.handleNextAction({
+                clientSecret,
+              });
+
+              if (actionResult.error) {
+                throw new Error(
+                  actionResult.error.message ||
+                    "No se pudo completar la autenticación de Apple Pay.",
+                );
+              }
+
+              const finalStatus = normalizeStatus(
+                actionResult.paymentIntent?.status,
+              );
+
+              if (!isFinalStatus(finalStatus)) {
+                throw new Error(
+                  `Stripe no confirmó Apple Pay. Estado: ${finalStatus}.`,
+                );
+              }
+
+              await onSuccess?.({
+                providerResponse: {
+                  ...start.providerResponse,
+                  payment_intent_id:
+                    actionResult.paymentIntent?.id ??
+                    start.providerResponse?.payment_intent_id,
+                  provider_status: finalStatus,
+                  status: finalStatus,
+                },
+              });
+
+              return;
+            }
+
+            if (!isFinalStatus(status)) {
+              event.complete("fail");
+              throw new Error(
+                `Stripe no confirmó Apple Pay. Estado: ${status}.`,
+              );
+            }
+
+            event.complete("success");
+
+            await onSuccess?.({
+              providerResponse: start.providerResponse,
+            });
           } catch (error) {
-            event.complete("fail");
             onError?.(error);
           }
         });
@@ -109,6 +186,7 @@ export function ApplePayButton({
       })
       .catch((error) => {
         if (!mounted) return;
+
         setPaymentRequest(null);
         setAvailable(false);
         onAvailabilityChange?.(false);
@@ -129,6 +207,7 @@ export function ApplePayButton({
     requestShipping,
     disabled,
     onPaymentMethod,
+    onSuccess,
     onAvailabilityChange,
     onError,
   ]);

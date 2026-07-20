@@ -728,7 +728,7 @@ class StripeController extends Controller
                     'stripe' => array_filter([
                         'customer' => $customerId,
                         'payment_method' => $data['payment_method_id'],
-                        'confirm' => true,
+                        'confirm' => 'true',
                         'return_url' => $data['return_url'] ?? null,
                         'idempotency_key' => $idempotencyKey,
                         'metadata' => [
@@ -756,6 +756,16 @@ class StripeController extends Controller
 
             $paymentArray = $payment->toArray();
 
+            $clientSecret = data_get($paymentArray, 'metadata.stripe_client_secret');
+
+            if (! $clientSecret) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Stripe no regresó client_secret para el wallet payment.',
+                    'payment' => $paymentArray,
+                ], 422);
+            }
+
             return response()->json([
                 'ok' => true,
                 'message' => $successMessage,
@@ -767,6 +777,7 @@ class StripeController extends Controller
                     $paymentArray,
                     'metadata.stripe_payment_intent_id',
                 ),
+                'client_secret' => $clientSecret,
                 'status' => data_get($paymentArray, 'status'),
                 'provider_status' => data_get($paymentArray, 'provider_status'),
                 'next_action' => data_get($paymentArray, 'next_action'),

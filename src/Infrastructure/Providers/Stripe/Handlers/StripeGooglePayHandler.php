@@ -33,6 +33,7 @@ final class StripeGooglePayHandler implements PaymentMethodHandler
             options: [
                 'default_description' => 'Google Pay payment',
                 'default_source' => 'stag-herd-stripe-google-pay',
+                'confirm' => 'true',
             ],
         );
     }

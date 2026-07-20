@@ -2,7 +2,6 @@
 
 namespace Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers;
 
-use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardPaymentService;
 use Equidna\StagHerd\Contracts\PaymentMethodHandler;
 use Equidna\StagHerd\Data\PaymentCancellationData;
 use Equidna\StagHerd\Data\PaymentConfirmationData;
@@ -10,6 +9,7 @@ use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\RefundRequestData;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardPaymentService;
 
 final class StripeApplePayHandler implements PaymentMethodHandler
 {
@@ -33,6 +33,7 @@ final class StripeApplePayHandler implements PaymentMethodHandler
             options: [
                 'default_description' => 'Apple Pay payment',
                 'default_source' => 'stag-herd-stripe-apple-pay',
+                'confirm' => 'true',
             ],
         );
     }
