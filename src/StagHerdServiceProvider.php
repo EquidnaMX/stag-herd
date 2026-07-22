@@ -2,21 +2,21 @@
 
 namespace Equidna\StagHerd;
 
-use Equidna\StagHerd\Application\PaymentService;
-use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
-use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
-use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
-use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
-use Equidna\StagHerd\Contracts\PaymentMethodHandler;
-use Equidna\StagHerd\Contracts\PaymentRepository;
-use Equidna\StagHerd\Contracts\WebhookIdempotencyStore;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentDisplayRepository;
-use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentRepository;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoApiAdapter;
+use Equidna\StagHerd\Infrastructure\Webhooks\RedisWebhookIdempotencyStore;
+use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentRepository;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalApiAdapter;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeApiAdapter;
-use Equidna\StagHerd\Infrastructure\Webhooks\RedisWebhookIdempotencyStore;
+use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
 use Equidna\StagHerd\Support\PaymentMethodHandlerRegistry;
+use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
+use Equidna\StagHerd\Contracts\WebhookIdempotencyStore;
+use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
+use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
+use Equidna\StagHerd\Contracts\PaymentMethodHandler;
+use Equidna\StagHerd\Contracts\PaymentRepository;
+use Equidna\StagHerd\Application\PaymentService;
 use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Support\ServiceProvider;
 
@@ -54,10 +54,6 @@ class StagHerdServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../database/migrations' => database_path('migrations'),
         ], 'stag-herd-migrations');
-
-        $this->publishes([
-            __DIR__ . '/../resources/views' => resource_path('views/stag-herd'),
-        ], 'stag-herd-views');
 
         $this->publishes([
             __DIR__ . '/../resources/js' => resource_path('js/stag-herd'),
@@ -104,7 +100,6 @@ class StagHerdServiceProvider extends ServiceProvider
             StripeApiAdapter::class,
         );
     }
-
 
     private function registerWebhooks(): void
     {

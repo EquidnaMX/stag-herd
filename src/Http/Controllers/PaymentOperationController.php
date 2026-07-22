@@ -2,24 +2,28 @@
 
 namespace Equidna\StagHerd\Http\Controllers;
 
+use Equidna\StagHerd\Http\Requests\Payments\ProviderLookupPaymentRequest;
+use Equidna\StagHerd\Http\Requests\Payments\ProviderSyncPaymentRequest;
+use Equidna\StagHerd\Http\Requests\Payments\CancelPaymentRequest;
+use Equidna\StagHerd\Http\Requests\Payments\RefundPaymentRequest;
 use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
-use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
+use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Data\PaymentCancellationData;
-use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
+use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\RefundRequestData;
 use Equidna\StagHerd\Facades\StagHerd;
-use Equidna\StagHerd\Support\MoneyFormatter;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Http\Request;
 use RuntimeException;
 use Throwable;
 
 class PaymentOperationController extends Controller
 {
     public function __construct(private readonly PaymentDisplayRepository $payments) {}
+
     public function lookup(Request $request, int|string $payment): RedirectResponse
     {
         try {
@@ -40,7 +44,7 @@ class PaymentOperationController extends Controller
         }
     }
 
-    public function cancel(Request $request, int|string $payment): RedirectResponse
+    public function cancel(CancelPaymentRequest $request, int|string $payment): RedirectResponse
     {
         try {
             $model = $this->payments->findForDisplay($payment);
@@ -52,8 +56,7 @@ class PaymentOperationController extends Controller
             $updated = StagHerd::cancelPayment(new PaymentCancellationData(
                 provider: $model->provider,
                 paymentId: (string) $model->id,
-                reason: $request->string('reason')->toString()
-                    ?: 'Cancelled from host UI',
+                reason: $request->cancelReason(),
             ));
 
             return $this->redirectWithResult($request, 'cancel', $updated->toArray());
@@ -62,7 +65,7 @@ class PaymentOperationController extends Controller
         }
     }
 
-    public function refund(Request $request, int|string $payment): RedirectResponse
+    public function refund(RefundPaymentRequest $request, int|string $payment): RedirectResponse
     {
         try {
             $model = $this->payments->findForDisplay($payment);
@@ -71,16 +74,11 @@ class PaymentOperationController extends Controller
                 throw new RuntimeException("No se encontró el pago {$payment}.");
             }
 
-            $amount = $request->input('amount');
-
             $updated = StagHerd::refundPayment(new RefundRequestData(
                 provider: $model->provider,
                 paymentId: (string) $model->id,
-                amount: $amount !== null && $amount !== ''
-                    ? MoneyFormatter::fromDecimal($amount)
-                    : null,
-                reason: $request->string('reason')->toString()
-                    ?: 'Refund from host UI',
+                amount: $request->refundAmount(),
+                reason: $request->refundReason(),
             ));
 
             return $this->redirectWithResult($request, 'refund', $updated->toArray());
@@ -125,41 +123,27 @@ class PaymentOperationController extends Controller
         }
     }
 
-    public function providerLookup(Request $request): RedirectResponse
+    public function providerLookup(ProviderLookupPaymentRequest $request): RedirectResponse
     {
-        $data = $request->validate([
-            'provider' => ['required', 'string'],
-            'search_type' => ['required', 'string', 'in:provider_payment_id,provider_order_id'],
-            'search_value' => ['required', 'string', 'max:255'],
-        ]);
-
-        $provider = strtolower($data['provider']);
-        $searchType = $data['search_type'];
-        $searchValue = trim($data['search_value']);
+        $provider = $request->provider();
+        $searchType = $request->searchType();
+        $searchValue = $request->searchValue();
 
         try {
             $response = match ($provider) {
                 'mercado_pago' => match ($searchType) {
-                    'provider_payment_id' => app(MercadoPagoGateway::class)
-                        ->getPayment($searchValue),
-
-                    'provider_order_id' => app(MercadoPagoGateway::class)
-                        ->searchPayments([
-                            'order.id' => $searchValue,
-                        ]),
-
+                    'provider_payment_id' => app(MercadoPagoGateway::class)->getPayment($searchValue),
+                    'provider_order_id' => app(MercadoPagoGateway::class)->searchPayments([
+                        'order.id' => $searchValue,
+                    ]),
                     default => throw new \InvalidArgumentException(
                         "Tipo de búsqueda no soportado: {$searchType}"
                     ),
                 },
 
                 'paypal' => match ($searchType) {
-                    'provider_payment_id' => app(PayPalGateway::class)
-                        ->getCapture($searchValue),
-
-                    'provider_order_id' => app(PayPalGateway::class)
-                        ->getOrder($searchValue),
-
+                    'provider_payment_id' => app(PayPalGateway::class)->getCapture($searchValue),
+                    'provider_order_id' => app(PayPalGateway::class)->getOrder($searchValue),
                     default => throw new \InvalidArgumentException(
                         "Tipo de búsqueda no soportado: {$searchType}"
                     ),
@@ -183,73 +167,13 @@ class PaymentOperationController extends Controller
         }
     }
 
-    public function providerSync(Request $request): RedirectResponse
+    public function providerSync(ProviderSyncPaymentRequest $request): RedirectResponse
     {
-        $data = $request->validate([
-            'provider' => ['required', 'string'],
-            'search_type' => ['required', 'string', 'in:provider_payment_id,provider_order_id'],
-            'search_value' => ['required', 'string', 'max:255'],
-
-            'method' => ['required', 'string'],
-            'amount' => ['required', 'numeric', 'min:0.01'],
-            'currency' => ['required', 'string', 'size:3'],
-
-            'metadata' => ['nullable', 'array'],
-
-            'external_reference' => ['nullable', 'string', 'max:255'],
-            'payer_reference' => ['nullable', 'string', 'max:255'],
-            'payer_email' => ['nullable', 'email', 'max:255'],
-            'description' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $provider = strtolower($data['provider']);
-        $searchType = $data['search_type'];
-        $searchValue = trim($data['search_value']);
-
-        $externalReference = ! empty($data['external_reference'])
-            ? $data['external_reference']
-            : null;
-
         try {
-            $lookup = new PaymentLookupData(
-                provider: $provider,
-                providerPaymentId: $searchType === 'provider_payment_id' ? $searchValue : null,
-                providerOrderId: $searchType === 'provider_order_id' ? $searchValue : null,
+            $payment = StagHerd::syncPayment(
+                $request->lookupData(),
+                $request->fallbackRequestData(),
             );
-
-            $metadata = $this->cleanMetadata($data['metadata'] ?? []);
-
-            $metadata = array_replace_recursive($metadata, [
-                'source' => 'stag-herd-provider-sync-host-ui',
-                'sync_reference_type' => $searchType,
-                'sync_reference_value' => $searchValue,
-            ]);
-
-            if ($externalReference) {
-                $metadata['external_reference'] = $externalReference;
-            }
-
-            $metadata = $this->cleanMetadata($metadata);
-
-            $fallbackRequest = new PaymentRequestData(
-                amount: MoneyFormatter::fromDecimal($data['amount']),
-                currency: strtoupper($data['currency']),
-                method: strtolower($data['method']),
-                provider: $provider,
-                externalReference: $externalReference,
-                payerReference: ! empty($data['payer_reference'])
-                    ? $data['payer_reference']
-                    : null,
-                payerEmail: ! empty($data['payer_email'])
-                    ? $data['payer_email']
-                    : null,
-                description: ! empty($data['description'])
-                    ? $data['description']
-                    : 'Payment synced from provider',
-                metadata: $metadata,
-            );
-
-            $payment = StagHerd::syncPayment($lookup, $fallbackRequest);
 
             return $this->redirectWithResult($request, 'provider_sync', $payment->toArray());
         } catch (Throwable $exception) {
@@ -311,32 +235,5 @@ class PaymentOperationController extends Controller
         return data_get($payment->metadata ?? [], 'external_reference')
             ?? data_get($payment->raw_payload ?? [], 'external_reference')
             ?? data_get($payment->raw_payload ?? [], 'purchase_units.0.reference_id');
-    }
-
-    private function cleanMetadata(array $metadata): array
-    {
-        $clean = [];
-
-        foreach ($metadata as $key => $value) {
-            if ($value === null || $value === '') {
-                continue;
-            }
-
-            if (is_array($value)) {
-                $nested = $this->cleanMetadata($value);
-
-                if ($nested === []) {
-                    continue;
-                }
-
-                $clean[$key] = $nested;
-
-                continue;
-            }
-
-            $clean[$key] = $value;
-        }
-
-        return $clean;
     }
 }

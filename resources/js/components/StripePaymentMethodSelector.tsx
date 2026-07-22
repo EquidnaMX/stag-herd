@@ -12,6 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Lock } from "lucide-react";
 
 export type StripeCardCheckoutStatus =
   | "idle"
@@ -22,6 +23,8 @@ export type StripeCardCheckoutStatus =
   | "error";
 
 type MetadataValue = string | number | boolean | null;
+
+type Metadata = Record<string, MetadataValue>;
 
 export type StripeCheckoutMetadata = Record<string, MetadataValue>;
 
@@ -60,8 +63,10 @@ type Props = {
 
   payerReference?: string;
   payerEmail?: string;
+
+  metadata?: Metadata;
+  existingCustomerId?: string | null;
   description?: string;
-  metadata?: StripeCheckoutMetadata;
 
   createIntentUrl: string;
   confirmIntentUrl: string;
@@ -320,8 +325,9 @@ export function StripeCardCheckout({
   externalReference,
   payerReference,
   payerEmail,
+  metadata = {},
+  existingCustomerId = null,
   description,
-  metadata,
   createIntentUrl,
   confirmIntentUrl,
   csrfToken,
@@ -376,6 +382,7 @@ export function StripeCardCheckout({
           payerEmail={payerEmail}
           description={description}
           metadata={JSON.parse(metadataKey || "{}")}
+          existingCustomerId={existingCustomerId}
           createIntentUrl={createIntentUrl}
           confirmIntentUrl={confirmIntentUrl}
           csrfToken={csrfToken}
@@ -399,6 +406,7 @@ function StripeCardForm({
   payerEmail,
   description,
   metadata,
+  existingCustomerId,
   createIntentUrl,
   confirmIntentUrl,
   csrfToken,
@@ -416,6 +424,7 @@ function StripeCardForm({
   payerEmail?: string;
   description?: string;
   metadata: StripeCheckoutMetadata;
+  existingCustomerId?: string | null;
   createIntentUrl: string;
   confirmIntentUrl: string;
   csrfToken?: string;
@@ -498,18 +507,38 @@ function StripeCardForm({
 
       const mergedMetadata = mergeMetadata(readMetadataFromPage(), metadata);
 
+      const shouldSavePaymentMethod =
+        mergedMetadata.save_payment_method === true ||
+        mergedMetadata.save_payment_method === "true" ||
+        mergedMetadata.save_payment_method === 1 ||
+        mergedMetadata.save_payment_method === "1";
+
+      const normalizedExistingCustomerId =
+        typeof existingCustomerId === "string" &&
+        existingCustomerId.trim() !== ""
+          ? existingCustomerId.trim()
+          : null;
+
+      const intentPayload: Record<string, unknown> = {
+        amount: numericAmount,
+        currency: currency.toUpperCase(),
+        external_reference: externalReference || undefined,
+        payer_reference: payerReference || undefined,
+        payer_email: payerEmail || undefined,
+        description: description || undefined,
+        idempotency_key: makeIdempotencyKey("stripe-intent"),
+        metadata: mergedMetadata,
+      };
+
+      if (shouldSavePaymentMethod && normalizedExistingCustomerId) {
+        intentPayload.stripe = {
+          customer: normalizedExistingCustomerId,
+        };
+      }
+
       const intentResponse = await postJson<StripeIntentResponse>(
         createIntentUrl,
-        {
-          amount: numericAmount,
-          currency: currency.toUpperCase(),
-          external_reference: externalReference || undefined,
-          payer_reference: payerReference || undefined,
-          payer_email: payerEmail || undefined,
-          description: description || undefined,
-          idempotency_key: makeIdempotencyKey("stripe-intent"),
-          metadata: mergedMetadata,
-        },
+        intentPayload,
         csrfToken,
       );
 
@@ -526,6 +555,11 @@ function StripeCardForm({
 
       changeStatus("processing", "Procesando pago...");
 
+      const cardholderName =
+        typeof mergedMetadata.card_display_name === "string"
+          ? mergedMetadata.card_display_name.trim()
+          : "";
+
       const confirmResult = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: cardElement,
@@ -533,6 +567,11 @@ function StripeCardForm({
             ...(payerEmail
               ? {
                   email: payerEmail,
+                }
+              : {}),
+            ...(cardholderName
+              ? {
+                  name: cardholderName,
                 }
               : {}),
           },
@@ -585,54 +624,101 @@ function StripeCardForm({
 
   return (
     <form onSubmit={handleSubmit} className="stag-herd-stripe-form">
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <CardElement
-          options={{
-            hidePostalCode: true,
-            disableLink: true,
-            style: {
-              base: {
-                fontSize: "16px",
-                color: "#0f172a",
-                "::placeholder": {
-                  color: "#94a3b8",
-                },
-              },
-              invalid: {
-                color: "#dc2626",
-              },
-            },
-          }}
-          onReady={() => {
-            setReady(true);
-            changeStatus("ready");
-          }}
-          onChange={(event) => {
-            if (event.error?.message) {
-              changeStatus("error", event.error.message);
-              return;
-            }
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900">
+            Información de pago
+          </h3>
 
-            if (status === "error") {
-              changeStatus("ready");
-            }
-          }}
-        />
+          <p className="mt-1 text-sm text-slate-500">
+            Ingresa los datos de tu tarjeta.
+          </p>
+        </div>
+
+        <div className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+          Pago seguro
+        </div>
       </div>
 
-      {message && <div className="stag-herd-stripe-message">{message}</div>}
+      <div className="mt-6">
+        <label className="mb-2 block text-sm font-medium text-slate-700">
+          Datos de la tarjeta
+        </label>
 
-      <button
-        type="submit"
-        disabled={!stripe || !elements || !ready || processing}
-        className="mt-4 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {processing ? "Procesando..." : "Pagar con tarjeta"}
-      </button>
+        <div
+          className={[
+            "rounded-xl bg-slate-50 px-4 py-4 transition-all duration-200",
+            status === "error"
+              ? "bg-red-50 ring-2 ring-red-100"
+              : "focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/10",
+          ].join(" ")}
+        >
+          <CardElement
+            options={{
+              hidePostalCode: true,
+              disableLink: true,
+              style: {
+                base: {
+                  fontSize: "16px",
+                  color: "#0f172a",
+                  fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+                  fontSmoothing: "antialiased",
+                  "::placeholder": {
+                    color: "#94a3b8",
+                  },
+                },
+                invalid: {
+                  color: "#dc2626",
+                  iconColor: "#dc2626",
+                },
+              },
+            }}
+            onReady={() => {
+              setReady(true);
+              changeStatus("ready");
+            }}
+            onChange={(event) => {
+              if (event.error?.message) {
+                changeStatus("error", event.error.message);
+                return;
+              }
 
-      <p className="stag-herd-stripe-secure-text">
-        Pago seguro procesado por Stripe.
-      </p>
+              if (event.complete) {
+                changeStatus("ready");
+                return;
+              }
+
+              if (status === "error") {
+                changeStatus("ready");
+              }
+            }}
+          />
+        </div>
+
+        {message && (
+          <div
+            role="alert"
+            className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            {message}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={!stripe || !elements || !ready || processing}
+          className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:brightness-95 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
+        >
+          {processing ? (
+            "Procesando pago..."
+          ) : (
+            <>
+              <Lock className="h-4 w-4" />
+              Pagar con tarjeta
+            </>
+          )}
+        </button>
+      </div>
     </form>
   );
 }

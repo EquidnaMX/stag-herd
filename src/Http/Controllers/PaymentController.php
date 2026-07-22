@@ -2,13 +2,12 @@
 
 namespace Equidna\StagHerd\Http\Controllers;
 
+use Equidna\StagHerd\Http\Requests\Payments\StorePaymentRequest;
 use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
-use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Facades\StagHerd;
-use Equidna\StagHerd\Support\MoneyFormatter;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 use RuntimeException;
 use Throwable;
@@ -16,6 +15,7 @@ use Throwable;
 class PaymentController extends Controller
 {
     public function __construct(private readonly PaymentDisplayRepository $payments) {}
+
     public function index(Request $request): View
     {
         $search = trim((string) $request->query('search'));
@@ -35,107 +35,10 @@ class PaymentController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StorePaymentRequest $request): RedirectResponse
     {
-        $data = $request->validate([
-            'provider' => ['required', 'string'],
-            'method' => ['required', 'string'],
-            'amount' => ['required', 'numeric', 'min:0.01'],
-            'currency' => ['required', 'string', 'size:3'],
-
-            'metadata' => ['nullable', 'array'],
-
-            'external_reference' => ['nullable', 'string', 'max:255'],
-            'payer_reference' => ['nullable', 'string', 'max:255'],
-            'payer_email' => ['nullable', 'email', 'max:255'],
-            'description' => ['nullable', 'string', 'max:255'],
-            'return_url' => ['nullable', 'url', 'max:500'],
-            'cancel_url' => ['nullable', 'url', 'max:500'],
-
-            'cash_status' => ['nullable', 'string', 'max:255'],
-
-            'mercado_pago_token' => ['nullable', 'string', 'max:500'],
-            'mercado_pago_payment_method_id' => ['nullable', 'string', 'max:255'],
-            'mercado_pago_issuer_id' => ['nullable', 'string', 'max:255'],
-            'mercado_pago_installments' => ['nullable', 'integer', 'min:1'],
-
-            'paypal_brand_name' => ['nullable', 'string', 'max:127'],
-            'paypal_landing_page' => ['nullable', 'string', 'max:50'],
-            'paypal_user_action' => ['nullable', 'string', 'max:50'],
-            'paypal_shipping_preference' => ['nullable', 'string', 'max:50'],
-            'paypal_invoice_id' => ['nullable', 'string', 'max:127'],
-        ]);
-
-        $provider = strtolower($data['provider']);
-        $method = strtolower($data['method']);
-
-        $externalReference = $data['external_reference'] ?? null;
-        $payerReference = $data['payer_reference'] ?? null;
-        $payerEmail = $data['payer_email'] ?? null;
-        $description = $data['description'] ?? null;
-        $returnUrl = $data['return_url'] ?? null;
-        $cancelUrl = $data['cancel_url'] ?? null;
-
-        $metadata = $this->cleanMetadata($data['metadata'] ?? []);
-        $metadata = array_replace_recursive($metadata, [
-            'source' => 'stag-herd-host-ui',
-        ]);
-
-        if (! empty($externalReference)) {
-            $metadata['external_reference'] = $externalReference;
-        }
-
-        if ($provider === 'cash') {
-            $metadata['cash_status'] = $data['cash_status'] ?? 'approved';
-        }
-
-        if ($provider === 'mercado_pago') {
-            $metadata['mercado_pago'] = array_filter([
-                'token' => $data['mercado_pago_token'] ?? null,
-                'payment_method_id' => $data['mercado_pago_payment_method_id'] ?? null,
-                'issuer_id' => $data['mercado_pago_issuer_id'] ?? null,
-                'installments' => isset($data['mercado_pago_installments'])
-                    ? (int) $data['mercado_pago_installments']
-                    : null,
-            ], fn($value) => $value !== null && $value !== '');
-        }
-
-        if ($provider === 'paypal') {
-            $metadata['paypal'] = array_filter([
-                'intent' => 'CAPTURE',
-                'brand_name' => $data['paypal_brand_name'] ?? config('app.name'),
-                'landing_page' => $data['paypal_landing_page'] ?? 'LOGIN',
-                'user_action' => $data['paypal_user_action'] ?? 'PAY_NOW',
-                'shipping_preference' => $data['paypal_shipping_preference'] ?? 'NO_SHIPPING',
-                'invoice_id' => $data['paypal_invoice_id'] ?? null,
-            ], fn($value) => $value !== null && $value !== '');
-        }
-
-        $resolvedExternalReference = ! empty($externalReference)
-            ? $externalReference
-            : strtoupper($provider) . '-' . now()->format('YmdHis');
-
-        if ($provider === 'paypal') {
-            $returnUrl = $returnUrl ?: $this->resolveHostUrl($request);
-            $cancelUrl = $cancelUrl ?: $this->resolveHostUrl($request);
-        }
-
         try {
-            $payment = StagHerd::createPayment(new PaymentRequestData(
-                amount: MoneyFormatter::fromDecimal($data['amount']),
-                currency: strtoupper($data['currency']),
-                method: $method,
-                provider: $provider,
-                externalReference: $resolvedExternalReference,
-                payerReference: ! empty($payerReference) ? $payerReference : null,
-                payerEmail: ! empty($payerEmail) ? $payerEmail : null,
-                description: ! empty($description)
-                    ? $description
-                    : 'Payment created from host UI',
-                returnUrl: ! empty($returnUrl) ? $returnUrl : null,
-                cancelUrl: ! empty($cancelUrl) ? $cancelUrl : null,
-                metadata: $metadata,
-            ));
+            $payment = StagHerd::createPayment($request->toPaymentRequestData());
 
             $model = $payment->id
                 ? $this->payments->findForDisplay($payment->id)
@@ -254,33 +157,6 @@ class PaymentController extends Controller
         }
 
         return null;
-    }
-
-    private function cleanMetadata(array $metadata): array
-    {
-        $clean = [];
-
-        foreach ($metadata as $key => $value) {
-            if ($value === null || $value === '') {
-                continue;
-            }
-
-            if (is_array($value)) {
-                $nested = $this->cleanMetadata($value);
-
-                if ($nested === []) {
-                    continue;
-                }
-
-                $clean[$key] = $nested;
-
-                continue;
-            }
-
-            $clean[$key] = $value;
-        }
-
-        return $clean;
     }
 
     private function displayPaymentToArray(object $payment): array

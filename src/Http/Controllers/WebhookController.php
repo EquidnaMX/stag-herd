@@ -20,8 +20,8 @@ use Throwable;
 class WebhookController extends Controller
 {
     public function __construct(
-        private readonly ProviderRegistry $providers,
         private readonly ProcessPaymentWebhook $processPaymentWebhook,
+        private readonly ProviderRegistry $providers,
     ) {
         //
     }
