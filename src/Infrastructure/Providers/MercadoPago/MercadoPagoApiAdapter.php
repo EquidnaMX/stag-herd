@@ -78,6 +78,15 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
         );
     }
 
+    public function createPreference(array $payload): array
+    {
+        return $this->send(
+            method: 'post',
+            endpoint: '/checkout/preferences',
+            payload: $payload,
+        );
+    }
+
     /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>

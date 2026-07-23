@@ -7,6 +7,7 @@ use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoProvider;
 use Equidna\StagHerd\Infrastructure\Providers\Cash\Handlers\CashPaymentHandler;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalCheckoutHandler;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers\MercadoPagoCardHandler;
+use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers\MercadoPagoCheckoutProHandler;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoWebhookParser;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalWebhookParser;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeProvider;
@@ -70,6 +71,13 @@ return [
                     'label' => 'Tarjeta',
                     'handler' => MercadoPagoCardHandler::class,
                 ],
+
+                'checkout_pro' => [
+                    'enabled' => true,
+                    'label' => 'Checkout Pro',
+                    'handler' => MercadoPagoCheckoutProHandler::class,
+                ],
+
             ],
 
             'credentials' => [

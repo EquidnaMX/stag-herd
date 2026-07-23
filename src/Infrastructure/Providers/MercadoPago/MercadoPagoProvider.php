@@ -13,6 +13,6 @@ final class MercadoPagoProvider extends AbstractPaymentProvider
 
     public function getMethods(): array
     {
-        return ['card'];
+        return ['card', 'checkout_pro'];
     }
 }

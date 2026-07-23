@@ -24,8 +24,8 @@ Route::middleware(['api'])
         }
 
         if (config('stag-herd.providers.mercado_pago.enabled', false)) {
-            Route::post('/mercado-pago/brick', [MercadoPagoController::class, 'processBrick'])
-                ->name('mercado-pago.brick');
+            Route::post('/mercado-pago/brick', [MercadoPagoController::class, 'processBrick'])->name('mercado-pago.brick');
+            Route::post('/mercado-pago/checkout-pro', [MercadoPagoController::class, 'createCheckoutPro'])->name('mercado-pago.checkout-pro');
         }
 
         if (config('stag-herd.providers.paypal.enabled', false)) {

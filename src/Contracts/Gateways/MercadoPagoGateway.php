@@ -38,4 +38,10 @@ interface MercadoPagoGateway
         ?int $amount = null,
         ?string $idempotencyKey = null,
     ): array;
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function createPreference(array $payload): array;
 }

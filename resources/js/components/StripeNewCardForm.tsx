@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { StripeCardCheckout } from "./StripePaymentMethodSelector";
-
 import {
   StripeSavedCardOption,
   type StripeSavedPaymentMethod,
@@ -11,6 +9,7 @@ import {
   StripeTokenizedCardCheckout,
   type StripeTokenizedCheckoutStatus,
 } from "./stripe/StripeSavedCardPayment";
+import { StripeCardCheckout } from "./stripe/StripeCardPayment";
 
 export type { StripeSavedPaymentMethod } from "./stripe/StripeSavedCardOption";
 

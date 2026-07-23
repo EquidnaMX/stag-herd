@@ -3,6 +3,7 @@
 namespace Equidna\StagHerd\Http\Controllers;
 
 use Equidna\StagHerd\Facades\StagHerd;
+use Equidna\StagHerd\Http\Requests\Payments\MercadoPago\CreateCheckoutProRequest;
 use Equidna\StagHerd\Http\Requests\Payments\MercadoPago\ProcessBrickRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
@@ -37,6 +38,33 @@ class MercadoPagoController extends Controller
                 'ok' => true,
                 'message' => 'Pago creado correctamente.',
                 'payment' => $payment->toArray(),
+            ]);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
+            ], 422);
+        }
+    }
+
+    public function createCheckoutPro(CreateCheckoutProRequest $request): JsonResponse
+    {
+        try {
+            $payment = StagHerd::createPayment(
+                $request->toPaymentRequestData(),
+            );
+
+            $checkoutUrl = data_get($payment->toArray(), 'next_action.url')
+                ?? data_get($payment->toArray(), 'link');
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Checkout Pro creado correctamente.',
+                'payment' => $payment->toArray(),
+                'checkout_url' => $checkoutUrl,
             ]);
         } catch (Throwable $exception) {
             return response()->json([
