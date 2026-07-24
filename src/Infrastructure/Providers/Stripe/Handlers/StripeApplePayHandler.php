@@ -10,7 +10,6 @@ use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\RefundRequestData;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardPaymentService;
-use Illuminate\Support\Facades\Log;
 
 final class StripeApplePayHandler implements PaymentMethodHandler
 {

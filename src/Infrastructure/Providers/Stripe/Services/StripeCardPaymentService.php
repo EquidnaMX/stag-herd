@@ -12,6 +12,7 @@ use Equidna\StagHerd\Data\RefundRequestData;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeResultMapper;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 final class StripeCardPaymentService
@@ -31,25 +32,6 @@ final class StripeCardPaymentService
         string $method,
         array $options = [],
     ): PaymentResultData {
-        Log::info('Stripe createPayment started', [
-            'method' => $method,
-            'provider' => $request->provider,
-            'amount' => $request->amount,
-            'currency' => $request->currency,
-            'external_reference' => $request->externalReference,
-            'payer_reference' => $request->payerReference,
-            'payer_email' => $request->payerEmail,
-            'description' => $request->description,
-            'return_url' => $request->returnUrl,
-            'cancel_url' => $request->cancelUrl,
-            'metadata_keys' => array_keys($request->metadata),
-            'stripe_metadata_keys' => array_keys($request->metadata['stripe'] ?? []),
-            'idempotency_key' => ($request->metadata['stripe']['idempotency_key']
-                ?? $request->metadata['idempotency_key']
-                ?? null),
-            'options' => $options,
-        ]);
-
         try {
             $this->validateBaseRequest($request);
 
@@ -60,51 +42,18 @@ final class StripeCardPaymentService
 
             $idempotencyKey = $this->resolveIdempotencyKey($request);
 
-            Log::info('Stripe createPayment payload built', [
-                'method' => $method,
-                'external_reference' => $request->externalReference,
-                'payload' => $payload,
-                'idempotency_key' => $idempotencyKey,
-            ]);
-
             $response = $this->gateway->createPaymentIntent(
                 payload: $payload,
                 idempotencyKey: $idempotencyKey,
             );
-
-            Log::info('Stripe createPayment gateway response', [
-                'method' => $method,
-                'external_reference' => $request->externalReference,
-                'payment_intent_id' => $response['id'] ?? null,
-                'status' => $response['status'] ?? null,
-                'has_client_secret' => !empty($response['client_secret'] ?? null),
-            ]);
 
             $result = $this->mapper->mapPaymentIntentToResult(
                 $request,
                 $response,
             );
 
-            Log::info('Stripe createPayment mapped result', [
-                'method' => $method,
-                'external_reference' => $request->externalReference,
-                'status' => $result->status->value,
-                'provider_status' => $result->providerStatus,
-                'reference' => $result->reference(),
-                'reason' => $result->reason,
-            ]);
-
             return $result;
         } catch (\Throwable $e) {
-            Log::error('Stripe createPayment failed', [
-                'method' => $method,
-                'external_reference' => $request->externalReference,
-                'message' => $e->getMessage(),
-                'exception' => get_class($e),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
-
             throw $e;
         }
     }

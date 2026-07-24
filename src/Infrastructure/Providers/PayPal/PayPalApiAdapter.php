@@ -204,7 +204,6 @@ class PayPalApiAdapter implements PayPalGateway
                     ->post('/v1/oauth2/token', [
                         'grant_type' => 'client_credentials',
                     ]);
-                dd($response->json());
 
                 if ($response->status() === 401) {
                     throw ProviderAuthenticationException::unauthorized(
