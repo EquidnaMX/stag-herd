@@ -15,6 +15,7 @@ use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeWebhookParser;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeApplePayHandler;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeCardHandler;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeGooglePayHandler;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeSpeiHandler;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeTokenizedCardHandler;
 
 return [
@@ -151,6 +152,12 @@ return [
                     'enabled' => true,
                     'label' => 'Tarjeta guardada',
                     'handler' => StripeTokenizedCardHandler::class,
+                ],
+
+                'spei' => [
+                    'enabled' => true,
+                    'label' => 'SPEI',
+                    'handler' => StripeSpeiHandler::class,
                 ],
             ],
 

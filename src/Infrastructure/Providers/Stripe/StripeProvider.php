@@ -17,6 +17,7 @@ final class StripeProvider extends AbstractPaymentProvider
             'card',
             'apple_pay',
             'google_pay',
+            'spei',
             'tokenized_card',
         ];
     }

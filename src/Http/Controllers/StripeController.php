@@ -2,12 +2,14 @@
 
 namespace Equidna\StagHerd\Http\Controllers;
 
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCustomerService;
 use Equidna\StagHerd\Http\Requests\Payments\Stripe\ConfirmPaymentIntentRequest;
 use Equidna\StagHerd\Http\Requests\Payments\Stripe\ProcessTokenizedCardRequest;
 use Equidna\StagHerd\Http\Requests\Payments\Stripe\ProcessWalletPaymentRequest;
 use Equidna\StagHerd\Http\Requests\Payments\Stripe\CompleteSetupIntentRequest;
 use Equidna\StagHerd\Http\Requests\Payments\Stripe\CreatePaymentIntentRequest;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardReuse;
+use Equidna\StagHerd\Http\Requests\Payments\Stripe\ProcessSpeiPaymentRequest;
 use Equidna\StagHerd\Http\Requests\Payments\Stripe\CreateSetupIntentRequest;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeResultMapper;
 use Equidna\StagHerd\Exceptions\ProviderCommunicationException;
@@ -27,6 +29,7 @@ class StripeController extends Controller
         private readonly PaymentRepository $paymentRepository,
         private readonly StripeCardReuse $stripeCardReuse,
         private readonly StripeGateway $stripeGateway,
+        private readonly StripeCustomerService $stripeCustomerService,
     ) {}
 
     public function createSetupIntent(CreateSetupIntentRequest $request): JsonResponse
@@ -200,6 +203,57 @@ class StripeController extends Controller
                 'status' => data_get($paymentArray, 'status'),
                 'provider_status' => data_get($paymentArray, 'provider_status'),
                 'next_action' => data_get($paymentArray, 'next_action'),
+                'payment' => $paymentArray,
+            ]);
+        } catch (Throwable $exception) {
+            return $this->errorResponse($exception);
+        }
+    }
+
+    public function processSpei(ProcessSpeiPaymentRequest $request): JsonResponse
+    {
+        try {
+            $payment = StagHerd::createPayment(
+                $request->toPaymentRequestData(),
+            );
+
+            $paymentArray = $payment->toArray();
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Pago SPEI de Stripe creado correctamente.',
+                'payment_id' => $payment->id,
+                'payment_intent_id' => data_get(
+                    $paymentArray,
+                    'references.provider_payment_id',
+                ) ?? data_get(
+                    $paymentArray,
+                    'metadata.stripe_payment_intent_id',
+                ),
+                'customer_id' => data_get(
+                    $paymentArray,
+                    'metadata.stripe_customer_id',
+                ),
+                'status' => data_get($paymentArray, 'status'),
+                'provider_status' => data_get($paymentArray, 'provider_status'),
+                'instructions_url' => data_get(
+                    $paymentArray,
+                    'metadata.stripe_bank_transfer_hosted_instructions_url',
+                ),
+                'spei' => [
+                    'reference' => data_get(
+                        $paymentArray,
+                        'metadata.stripe_bank_transfer_reference',
+                    ),
+                    'bank_transfer_type' => data_get(
+                        $paymentArray,
+                        'metadata.stripe_bank_transfer_type',
+                    ),
+                    'instructions' => data_get(
+                        $paymentArray,
+                        'metadata.stripe_bank_transfer_instructions',
+                    ),
+                ],
                 'payment' => $paymentArray,
             ]);
         } catch (Throwable $exception) {
@@ -507,27 +561,11 @@ class StripeController extends Controller
         ?string $payerName = null,
         string $source = 'stag-herd-stripe',
     ): array {
-        return array_filter(
-            [
-                'email' => $payerEmail ?: null,
-                'name' => $payerName ?: null,
-                'metadata' => array_filter(
-                    [
-                        'payer_reference' => $payerReference ?: null,
-                        'source' => $source,
-                    ],
-                    fn($value) => $value !== null && $value !== '',
-                ),
-            ],
-            fn($value) => $value !== null && $value !== '' && $value !== [],
-        );
-    }
-
-    private function createStripeCustomer(array $payload): array
-    {
-        return $this->stripeGateway->createCustomer(
-            payload: $payload,
-            idempotencyKey: 'stag-herd-stripe-customer-' . (string) Str::uuid(),
+        return $this->stripeCustomerService->buildPayload(
+            payerReference: $payerReference,
+            payerEmail: $payerEmail,
+            payerName: $payerName,
+            source: $source,
         );
     }
 
@@ -535,47 +573,9 @@ class StripeController extends Controller
         ?string $customerId,
         array $customerPayload,
     ): ?string {
-        if (! $customerId) {
-            $customer = $this->createStripeCustomer($customerPayload);
-
-            return data_get($customer, 'id');
-        }
-
-        try {
-            $customer = $this->stripeGateway->getCustomer($customerId);
-
-            if (data_get($customer, 'deleted') === true) {
-                $customer = $this->createStripeCustomer($customerPayload);
-
-                return data_get($customer, 'id');
-            }
-
-            $normalizedCustomerId = data_get($customer, 'id', $customerId);
-
-            if (
-                is_string($normalizedCustomerId)
-                && $normalizedCustomerId !== ''
-                && ! empty($customerPayload)
-            ) {
-                $this->stripeGateway->updateCustomer(
-                    $normalizedCustomerId,
-                    $customerPayload,
-                );
-            }
-
-            return $normalizedCustomerId;
-        } catch (ProviderCommunicationException $exception) {
-            $status = data_get($exception->getErrors(), 'status');
-            $code = data_get($exception->getErrors(), 'response.error.code');
-            $param = data_get($exception->getErrors(), 'response.error.param');
-
-            if ($status === 404 || ($status === 400 && $code === 'resource_missing' && $param === 'customer')) {
-                $customer = $this->createStripeCustomer($customerPayload);
-
-                return data_get($customer, 'id');
-            }
-
-            throw $exception;
-        }
+        return $this->stripeCustomerService->ensureExists(
+            customerId: $customerId,
+            customerPayload: $customerPayload,
+        );
     }
 }

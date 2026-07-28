@@ -31,7 +31,6 @@ final class StripeResultMapper
             fallbackAmount: $request->amount,
             fallbackCurrency: $request->currency,
             externalReference: $request->externalReference,
-            fallbackPayerEmail: $request->payerEmail,
         );
     }
 
@@ -44,7 +43,6 @@ final class StripeResultMapper
         ?int $fallbackAmount = null,
         ?string $fallbackCurrency = null,
         ?string $externalReference = null,
-        ?string $fallbackPayerEmail = null,
     ): PaymentResultData {
         $providerStatus = $this->nullableString(
             Arr::get($response, 'status')
@@ -139,6 +137,30 @@ final class StripeResultMapper
                         'next_action.type'
                     ),
 
+                    'stripe_bank_transfer_hosted_instructions_url' =>
+                    Arr::get(
+                        $response,
+                        'next_action.display_bank_transfer_instructions.hosted_instructions_url'
+                    ),
+
+                    'stripe_bank_transfer_reference' =>
+                    Arr::get(
+                        $response,
+                        'next_action.display_bank_transfer_instructions.reference'
+                    ),
+
+                    'stripe_bank_transfer_type' =>
+                    Arr::get(
+                        $response,
+                        'next_action.display_bank_transfer_instructions.type'
+                    ),
+
+                    'stripe_bank_transfer_instructions' =>
+                    Arr::get(
+                        $response,
+                        'next_action.display_bank_transfer_instructions'
+                    ),
+
                     'stripe_customer_id' =>
                     Arr::get(
                         $response,
@@ -157,12 +179,6 @@ final class StripeResultMapper
             ),
 
             rawPayload: $response,
-
-            payerEmail: $this->resolvePayerEmail(
-                response: $response,
-                fallbackPayerEmail: $fallbackPayerEmail,
-            ),
-
         );
     }
 
@@ -195,27 +211,6 @@ final class StripeResultMapper
                 'stripe_charge_id' => Arr::get($response, 'charge'),
             ], fn($value) => $value !== null && $value !== ''),
             rawPayload: $response,
-            payerEmail: $this->resolvePayerEmail(
-                response: $response,
-                fallbackPayerEmail: data_get($request->metadata, 'payer_email'),
-            ),
-        );
-    }
-
-    /**
-     * @param array<string, mixed> $response
-     */
-    private function resolvePayerEmail(
-        array $response,
-        ?string $fallbackPayerEmail = null,
-    ): ?string {
-        return $this->nullableString(
-            Arr::get($response, 'receipt_email')
-                ?? Arr::get($response, 'customer_details.email')
-                ?? Arr::get($response, 'charges.data.0.billing_details.email')
-                ?? Arr::get($response, 'payment_method.billing_details.email')
-                ?? Arr::get($response, 'last_payment_error.payment_method.billing_details.email')
-                ?? $fallbackPayerEmail
         );
     }
 
@@ -231,6 +226,27 @@ final class StripeResultMapper
                 'stripe_client_secret' => Arr::get($response, 'client_secret'),
                 'stripe_next_action_type' => Arr::get($response, 'next_action.type'),
             ]);
+        }
+
+        $bankTransferInstructions = Arr::get(
+            $response,
+            'next_action.display_bank_transfer_instructions',
+            [],
+        );
+
+        $hostedInstructionsUrl = Arr::get(
+            $bankTransferInstructions,
+            'hosted_instructions_url',
+        );
+
+        if ($hostedInstructionsUrl) {
+            return NextActionData::redirect((string) $hostedInstructionsUrl, array_filter([
+                'stripe_client_secret' => Arr::get($response, 'client_secret'),
+                'stripe_next_action_type' => Arr::get($response, 'next_action.type'),
+                'stripe_bank_transfer_reference' => Arr::get($bankTransferInstructions, 'reference'),
+                'stripe_bank_transfer_type' => Arr::get($bankTransferInstructions, 'type'),
+                'stripe_bank_transfer_financial_addresses' => Arr::get($bankTransferInstructions, 'financial_addresses'),
+            ], fn($value) => $value !== null && $value !== ''));
         }
 
         return NextActionData::none();
