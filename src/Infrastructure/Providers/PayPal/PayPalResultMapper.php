@@ -46,6 +46,7 @@ final class PayPalResultMapper
                 'paypal_status' => $providerStatus,
             ]),
             rawPayload: $response,
+            payerEmail: $this->resolvePayerEmail($response),
         );
     }
 
@@ -85,6 +86,7 @@ final class PayPalResultMapper
                 'paypal_status' => $providerStatus,
             ]),
             rawPayload: $response,
+            payerEmail: $this->resolvePayerEmail($response),
         );
     }
 
@@ -127,6 +129,7 @@ final class PayPalResultMapper
                 'paypal_status' => $providerStatus,
             ]),
             rawPayload: $response,
+            payerEmail: $this->resolvePayerEmail($response),
         );
     }
 
@@ -170,6 +173,7 @@ final class PayPalResultMapper
                 'paypal_status' => $providerStatus,
             ]),
             rawPayload: $response,
+            payerEmail: $this->resolvePayerEmail($response),
         );
     }
 
@@ -211,6 +215,7 @@ final class PayPalResultMapper
                 'paypal_refund_status' => Arr::get($response, 'status'),
             ]),
             rawPayload: $response,
+            payerEmail: $this->resolvePayerEmail($response),
         );
     }
 
@@ -329,6 +334,16 @@ final class PayPalResultMapper
         return $this->nullableString(
             Arr::get($response, 'amount.currency_code')
                 ?? Arr::get($response, 'resource.amount.currency_code')
+        );
+    }
+
+    private function resolvePayerEmail(array $response): ?string
+    {
+        return $this->nullableString(
+            Arr::get($response, 'payer.email_address')
+                ?? Arr::get($response, 'payment_source.paypal.email_address')
+                ?? Arr::get($response, 'resource.payer.email_address')
+                ?? Arr::get($response, 'resource.payment_source.paypal.email_address')
         );
     }
 

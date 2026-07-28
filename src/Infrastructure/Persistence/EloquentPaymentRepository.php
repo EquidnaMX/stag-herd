@@ -41,7 +41,7 @@ class EloquentPaymentRepository implements PaymentRepository
             'provider_status' => $result->providerStatus,
 
             'payer_reference' => $request->payerReference,
-            'payer_email' => $request->payerEmail,
+            'payer_email' => $result->payerEmail ?: $request->payerEmail,
 
             'provider_payment_id' => $references?->providerPaymentId,
             'provider_order_id' => $references?->providerOrderId
@@ -136,6 +136,8 @@ class EloquentPaymentRepository implements PaymentRepository
 
             'provider_order_id' => $references?->providerOrderId
                 ?? $model->provider_order_id,
+
+            'payer_email' => $result->payerEmail ?: $model->payer_email,
 
             'metadata' => $metadata,
             'raw_payload' => $result->rawPayload !== []

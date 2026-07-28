@@ -47,6 +47,7 @@ final class MercadoPagoResultMapper
                 'mercado_pago_date_approved' => Arr::get($response, 'date_approved'),
             ]),
             rawPayload: $response,
+            payerEmail: $this->resolvePayerEmail($response),
         );
     }
 
@@ -79,6 +80,7 @@ final class MercadoPagoResultMapper
                 'mercado_pago_date_approved' => Arr::get($response, 'date_approved'),
             ]),
             rawPayload: $response,
+            payerEmail: $this->resolvePayerEmail($response),
         );
     }
 
@@ -107,6 +109,7 @@ final class MercadoPagoResultMapper
                 'mercado_pago_preference_id' => $preferenceId,
             ]),
             rawPayload: $response,
+            payerEmail: $this->resolvePayerEmail($response) ?? $request->payerEmail,
         );
     }
 
@@ -132,6 +135,15 @@ final class MercadoPagoResultMapper
                 'mercado_pago_refund_status' => Arr::get($response, 'status'),
             ]),
             rawPayload: $response,
+            payerEmail: $this->resolvePayerEmail($response),
+        );
+    }
+
+    private function resolvePayerEmail(array $response): ?string
+    {
+        return $this->nullableString(
+            Arr::get($response, 'payer.email')
+                ?? Arr::get($response, 'additional_info.payer.email')
         );
     }
 

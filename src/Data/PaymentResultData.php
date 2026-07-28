@@ -20,6 +20,7 @@ final readonly class PaymentResultData
         public ?string $reason = null,
         public array $metadata = [],
         public array $rawPayload = [],
+        public ?string $payerEmail = null,
     ) {
         //
     }
@@ -33,6 +34,7 @@ final readonly class PaymentResultData
         ?string $currency = null,
         array $metadata = [],
         array $rawPayload = [],
+        ?string $payerEmail = null,
     ): self {
         return new self(
             provider: $provider,
@@ -45,6 +47,7 @@ final readonly class PaymentResultData
             nextAction: NextActionData::none(),
             metadata: $metadata,
             rawPayload: $rawPayload,
+            payerEmail: $payerEmail,
         );
     }
 
@@ -59,6 +62,7 @@ final readonly class PaymentResultData
         ?string $reason = null,
         array $metadata = [],
         array $rawPayload = [],
+        ?string $payerEmail = null,
     ): self {
         return new self(
             provider: $provider,
@@ -72,6 +76,7 @@ final readonly class PaymentResultData
             reason: $reason,
             metadata: $metadata,
             rawPayload: $rawPayload,
+            payerEmail: $payerEmail,
         );
     }
 
@@ -85,6 +90,7 @@ final readonly class PaymentResultData
         ?string $currency = null,
         array $metadata = [],
         array $rawPayload = [],
+        ?string $payerEmail = null,
     ): self {
         return new self(
             provider: $provider,
@@ -98,6 +104,7 @@ final readonly class PaymentResultData
             reason: $reason,
             metadata: $metadata,
             rawPayload: $rawPayload,
+            payerEmail: $payerEmail,
         );
     }
 
@@ -197,6 +204,7 @@ final readonly class PaymentResultData
             'currency' => $this->currency,
             'next_action' => $this->nextAction?->toArray(),
             'reason' => $this->reason,
+            'payer_email' => $this->payerEmail,
             'metadata' => $this->metadata,
             'raw_payload' => $this->rawPayload,
         ];
