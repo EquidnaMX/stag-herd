@@ -52,8 +52,8 @@ final class StripeResultMapper
             provider: 'stripe',
             method: $method,
 
-            status: $this->statusMapper->map(
-                $providerStatus
+            status: $this->statusMapper->mapPaymentIntent(
+                $response
             ),
 
             providerStatus: $providerStatus,

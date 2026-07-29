@@ -63,6 +63,7 @@ final readonly class ProcessPaymentWebhook
         if ($webhook->providerPaymentId) {
             return new PaymentLookupData(
                 provider: $payload->provider,
+                method: $webhook->method,
                 providerPaymentId: $webhook->providerPaymentId,
             );
         }
@@ -70,6 +71,7 @@ final readonly class ProcessPaymentWebhook
         if ($webhook->providerOrderId) {
             return new PaymentLookupData(
                 provider: $payload->provider,
+                method: $webhook->method,
                 providerOrderId: $webhook->providerOrderId,
             );
         }

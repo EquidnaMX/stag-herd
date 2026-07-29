@@ -36,7 +36,8 @@ final class StripeWebhookParser implements WebhookParser
             resourceType: $resourceType,
             resourceId: $eventId,
             providerPaymentId: $this->resolvePaymentIntentId($resourceType, $object),
-            providerOrderId: $this->nullableString(Arr::get($object, 'metadata.external_reference')),
+            providerOrderId: $this->resolveProviderOrderId($object),
+            method: $this->resolveMethod($object),
             rawPayload: $payload,
         );
     }
@@ -61,14 +62,78 @@ final class StripeWebhookParser implements WebhookParser
         return null;
     }
 
+    /**
+     * @param array<string, mixed> $object
+     */
+    private function resolveProviderOrderId(array $object): ?string
+    {
+        return $this->nullableString(
+            Arr::get($object, 'metadata.external_reference')
+                ?? Arr::get($object, 'charges.data.0.metadata.external_reference')
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $object
+     */
+    private function resolveMethod(array $object): ?string
+    {
+        $declaredFamily = $this->normalizeMethod(
+            Arr::get($object, 'metadata.payment_method_family')
+        );
+
+        if ($declaredFamily === 'spei') {
+            return 'spei';
+        }
+
+        $bankTransferType = $this->nullableString(
+            Arr::get($object, 'payment_method_options.customer_balance.bank_transfer.type')
+                ?? Arr::get($object, 'next_action.display_bank_transfer_instructions.type')
+                ?? Arr::get($object, 'payment_method_details.customer_balance.bank_transfer.type')
+                ?? Arr::get($object, 'charges.data.0.payment_method_details.customer_balance.bank_transfer.type')
+        );
+
+        if ($bankTransferType === 'mx_bank_transfer') {
+            return 'spei';
+        }
+
+        $paymentMethodDetailsType = $this->normalizeMethod(
+            Arr::get($object, 'payment_method_details.type')
+                ?? Arr::get($object, 'charges.data.0.payment_method_details.type')
+        );
+
+        if ($paymentMethodDetailsType === 'card') {
+            return $declaredFamily ?? 'card';
+        }
+
+        if ($paymentMethodDetailsType === 'customer_balance') {
+            return $bankTransferType === 'mx_bank_transfer' ? 'spei' : null;
+        }
+
+        $paymentMethodTypes = Arr::get($object, 'payment_method_types', []);
+
+        if (is_array($paymentMethodTypes)) {
+            $normalizedTypes = array_values(array_filter(array_map(
+                fn(mixed $type): ?string => $this->normalizeMethod($type),
+                $paymentMethodTypes,
+            )));
+
+            if (in_array('customer_balance', $normalizedTypes, true) && $bankTransferType === 'mx_bank_transfer') {
+                return 'spei';
+            }
+
+            if (in_array('card', $normalizedTypes, true)) {
+                return $declaredFamily ?? 'card';
+            }
+        }
+
+        return $declaredFamily;
+    }
+
     private function verifySignature(WebhookPayloadData $webhook): void
     {
         $secret = config('stag-herd.providers.stripe.credentials.webhook_secret');
 
-        /*
-         * Si no configuras STRIPE_WEBHOOK_SECRET, no valida firma.
-         * Para producción sí deberías configurarlo.
-         */
         if (! $secret) {
             return;
         }
@@ -150,5 +215,14 @@ final class StripeWebhookParser implements WebhookParser
         }
 
         return (string) $value;
+    }
+
+    private function normalizeMethod(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return strtolower(trim($value));
     }
 }

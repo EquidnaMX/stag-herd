@@ -14,6 +14,7 @@ final readonly class NormalizedWebhookData
         public string $resourceId,
         public ?string $providerPaymentId = null,
         public ?string $providerOrderId = null,
+        public ?string $method = null,
         public array $rawPayload = [],
     ) {
         //

@@ -86,6 +86,7 @@ final readonly class LookupPayment
 
         $providerPaymentId = $result->references?->providerPaymentId
             ?? $lookup->providerPaymentId;
+        $providerOrderId = $result->references?->providerOrderId;
 
         if (! $providerPaymentId) {
             throw PaymentNotFoundException::withProviderReference(
@@ -94,15 +95,16 @@ final readonly class LookupPayment
             );
         }
 
-        $payment ??= $this->payments->findByProviderPaymentId(
+        $payment ??= $this->findByProviderReferences(
             provider: $lookup->provider,
             providerPaymentId: $providerPaymentId,
+            providerOrderId: $providerOrderId,
         );
 
         if (! $payment) {
             throw PaymentNotFoundException::withProviderReference(
                 $lookup->provider,
-                $providerPaymentId,
+                $providerPaymentId ?? $providerOrderId,
             );
         }
 
@@ -134,19 +136,11 @@ final readonly class LookupPayment
         $providerOrderId = $result->references?->providerOrderId
             ?? $lookup->providerOrderId;
 
-        if (! $payment && $providerPaymentId) {
-            $payment = $this->payments->findByProviderPaymentId(
-                provider: $lookup->provider,
-                providerPaymentId: $providerPaymentId,
-            );
-        }
-
-        if (! $payment && $providerOrderId) {
-            $payment = $this->payments->findByProviderOrderId(
-                provider: $lookup->provider,
-                providerOrderId: $providerOrderId,
-            );
-        }
+        $payment ??= $this->findByProviderReferences(
+            provider: $lookup->provider,
+            providerPaymentId: $providerPaymentId,
+            providerOrderId: $providerOrderId,
+        );
 
         if (! $payment) {
             throw PaymentNotFoundException::withProviderReference(
@@ -217,7 +211,7 @@ final readonly class LookupPayment
         }
 
         $declaredMethods = array_values(array_unique(array_map(
-            static fn (string $method): string => strtolower($method),
+            static fn(string $method): string => strtolower($method),
             $this->providers->get($lookup->provider)->getMethods(),
         )));
 
@@ -237,6 +231,32 @@ final readonly class LookupPayment
         }
 
         throw InvalidPaymentPayloadException::missingField('method');
+    }
+
+    private function findByProviderReferences(
+        string $provider,
+        ?string $providerPaymentId = null,
+        ?string $providerOrderId = null,
+    ): ?Payment {
+        if ($providerPaymentId) {
+            $payment = $this->payments->findByProviderPaymentId(
+                provider: $provider,
+                providerPaymentId: $providerPaymentId,
+            );
+
+            if ($payment) {
+                return $payment;
+            }
+        }
+
+        if ($providerOrderId) {
+            return $this->payments->findByProviderOrderId(
+                provider: $provider,
+                providerOrderId: $providerOrderId,
+            );
+        }
+
+        return null;
     }
 
     private function normalizeMethod(?string $method): ?string

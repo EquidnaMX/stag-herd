@@ -95,6 +95,9 @@ final class StripeSpeiPaymentService
                 ?? $request->externalReference
                 ?? 'Payment with Stripe SPEI',
             'receipt_email' => $request->payerEmail,
+            'return_url' => $stripe['return_url']
+                ?? $request->returnUrl
+                ?? null,
             'metadata' => array_filter(
                 [
                     'external_reference' => $request->externalReference,

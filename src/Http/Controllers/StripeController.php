@@ -2,24 +2,22 @@
 
 namespace Equidna\StagHerd\Http\Controllers;
 
-use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCustomerService;
-use Equidna\StagHerd\Http\Requests\Payments\Stripe\ConfirmPaymentIntentRequest;
-use Equidna\StagHerd\Http\Requests\Payments\Stripe\ProcessTokenizedCardRequest;
-use Equidna\StagHerd\Http\Requests\Payments\Stripe\ProcessWalletPaymentRequest;
-use Equidna\StagHerd\Http\Requests\Payments\Stripe\CompleteSetupIntentRequest;
-use Equidna\StagHerd\Http\Requests\Payments\Stripe\CreatePaymentIntentRequest;
-use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardReuse;
-use Equidna\StagHerd\Http\Requests\Payments\Stripe\ProcessSpeiPaymentRequest;
-use Equidna\StagHerd\Http\Requests\Payments\Stripe\CreateSetupIntentRequest;
-use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeResultMapper;
-use Equidna\StagHerd\Exceptions\ProviderCommunicationException;
 use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Facades\StagHerd;
-use Illuminate\Routing\Controller;
+use Equidna\StagHerd\Http\Requests\Payments\Stripe\CompleteSetupIntentRequest;
+use Equidna\StagHerd\Http\Requests\Payments\Stripe\ConfirmPaymentIntentRequest;
+use Equidna\StagHerd\Http\Requests\Payments\Stripe\CreatePaymentIntentRequest;
+use Equidna\StagHerd\Http\Requests\Payments\Stripe\CreateSetupIntentRequest;
+use Equidna\StagHerd\Http\Requests\Payments\Stripe\ProcessSpeiPaymentRequest;
+use Equidna\StagHerd\Http\Requests\Payments\Stripe\ProcessTokenizedCardRequest;
+use Equidna\StagHerd\Http\Requests\Payments\Stripe\ProcessWalletPaymentRequest;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardReuse;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCustomerService;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeResultMapper;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Str;
+use Illuminate\Routing\Controller;
 use Throwable;
 
 class StripeController extends Controller
@@ -236,6 +234,7 @@ class StripeController extends Controller
                 ),
                 'status' => data_get($paymentArray, 'status'),
                 'provider_status' => data_get($paymentArray, 'provider_status'),
+                'next_action' => data_get($paymentArray, 'next_action'),
                 'instructions_url' => data_get(
                     $paymentArray,
                     'metadata.stripe_bank_transfer_hosted_instructions_url',
