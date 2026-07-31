@@ -17,6 +17,7 @@ final readonly class PaymentConfirmationData
         public ?string $externalReference = null,
         public ?string $reason = null,
         public array $metadata = [],
+        public string $credentialContext = 'default',
     ) {
         $this->validate();
     }
@@ -27,7 +28,7 @@ final readonly class PaymentConfirmationData
             $this->paymentId,
             $this->providerPaymentId,
             $this->externalReference,
-        ], fn(?string $value) => $value !== null && trim($value) !== '');
+        ], fn (?string $value) => $value !== null && trim($value) !== '');
 
         if (count($criteria) === 0) {
             throw InvalidPaymentPayloadException::missingField(

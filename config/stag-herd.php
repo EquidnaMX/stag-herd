@@ -11,6 +11,7 @@ use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers\MercadoPagoCh
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoWebhookParser;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalWebhookParser;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeProvider;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeBillingProvider;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeWebhookParser;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeApplePayHandler;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeCardHandler;
@@ -19,6 +20,15 @@ use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeSpeiHandler;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeTokenizedCardHandler;
 
 return [
+    'credential_contexts' => [],
+
+    'billing_providers' => [
+        'stripe' => [
+            'enabled' => true,
+            'provider' => StripeBillingProvider::class,
+        ],
+    ],
+
     'repositories' => [
         'payments' => null,
         'payment_display' => null,
@@ -33,7 +43,7 @@ return [
         ],
 
         'idempotency' => [
-            'driver' => env('STAG_HERD_WEBHOOK_IDEMPOTENCY_DRIVER', 'redis'),
+            'driver' => env('STAG_HERD_WEBHOOK_IDEMPOTENCY_DRIVER', 'database'),
             'ttl_seconds' => env('STAG_HERD_WEBHOOK_IDEMPOTENCY_TTL', 86400),
             'prefix' => 'stag-herd:webhooks',
         ],
@@ -126,6 +136,8 @@ return [
         ],
         'stripe' => [
             'provider' => StripeProvider::class,
+
+            'api_version' => env('STRIPE_API_VERSION', '2026-02-25.clover'),
 
             'enabled' => false,
 

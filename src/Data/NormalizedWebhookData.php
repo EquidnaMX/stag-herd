@@ -16,12 +16,29 @@ final readonly class NormalizedWebhookData
         public ?string $providerOrderId = null,
         public ?string $method = null,
         public array $rawPayload = [],
+        public ?string $providerEventId = null,
+        public string $credentialContext = 'default',
+        public ?string $status = null,
+        public ?string $customerId = null,
+        public ?string $subscriptionId = null,
+        public ?string $invoiceId = null,
+        public ?string $paymentStatus = null,
     ) {
         //
     }
 
     public function idempotencyKey(string $prefix): string
     {
+        if ($this->providerEventId !== null && $this->providerEventId !== '') {
+            return sprintf(
+                '%s:%s:%s:%s',
+                rtrim($prefix, ':'),
+                $this->provider,
+                $this->credentialContext,
+                $this->providerEventId,
+            );
+        }
+
         return sprintf(
             '%s:%s:%s:%s:%s',
             rtrim($prefix, ':'),

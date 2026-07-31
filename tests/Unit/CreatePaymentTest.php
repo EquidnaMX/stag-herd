@@ -9,9 +9,10 @@ use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\ProviderReferencesData;
 use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
 use Equidna\StagHerd\Domain\Payment;
+use Equidna\StagHerd\Exceptions\ProviderNotRegisteredException;
 use Equidna\StagHerd\Infrastructure\Providers\Cash\CashProvider;
 use Equidna\StagHerd\Support\ProviderRegistry;
-use PHPUnit\Framework\TestCase;
+use Equidna\StagHerd\Tests\TestCase;
 
 class CreatePaymentTest extends TestCase
 {
@@ -131,7 +132,7 @@ class CreatePaymentTest extends TestCase
             payments: $repository,
         );
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(ProviderNotRegisteredException::class);
 
         $action->handle(
             new PaymentRequestData(

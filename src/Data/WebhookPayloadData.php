@@ -16,6 +16,7 @@ final readonly class WebhookPayloadData
         public array $query = [],
         public string $rawBody = '',
         public ?string $ipAddress = null,
+        public string $credentialContext = 'default',
     ) {
         //
     }

@@ -21,24 +21,34 @@ final class StripeWebhookParser implements WebhookParser
         $eventType = (string) Arr::get($payload, 'type', 'unknown');
         $object = Arr::get($payload, 'data.object', []);
 
-        if (! is_array($object)) {
+        if (!is_array($object)) {
             throw InvalidPaymentPayloadException::invalidField(
                 'data.object',
                 'Stripe webhook data.object must be an object.'
             );
         }
 
-        $resourceType = (string) Arr::get($object, 'object', 'event');
+        $resourceType = str_replace('.', '_', (string) Arr::get($object, 'object', 'event'));
 
         return new NormalizedWebhookData(
             provider: 'stripe',
             eventType: $eventType,
             resourceType: $resourceType,
-            resourceId: $eventId,
+            resourceId: (string) Arr::get($object, 'id', $eventId),
             providerPaymentId: $this->resolvePaymentIntentId($resourceType, $object),
             providerOrderId: $this->resolveProviderOrderId($object),
             method: $this->resolveMethod($object),
             rawPayload: $payload,
+            providerEventId: $eventId,
+            credentialContext: $webhook->credentialContext,
+            status: $this->nullableString(Arr::get($object, 'status') ?? Arr::get($object, 'payment_status')),
+            customerId: $this->expandableId(Arr::get($object, 'customer')),
+            subscriptionId: $this->expandableId(
+                Arr::get($object, 'subscription')
+                    ?? ($resourceType === 'subscription' ? Arr::get($object, 'id') : null),
+            ),
+            invoiceId: $resourceType === 'invoice' ? $this->nullableString(Arr::get($object, 'id')) : null,
+            paymentStatus: $this->nullableString(Arr::get($object, 'payment_status')),
         );
     }
 
@@ -57,6 +67,10 @@ final class StripeWebhookParser implements WebhookParser
 
         if ($resourceType === 'refund') {
             return $this->nullableString(Arr::get($object, 'payment_intent'));
+        }
+
+        if (in_array($resourceType, ['checkout_session', 'invoice'], true)) {
+            return $this->expandableId(Arr::get($object, 'payment_intent'));
         }
 
         return null;
@@ -114,7 +128,7 @@ final class StripeWebhookParser implements WebhookParser
 
         if (is_array($paymentMethodTypes)) {
             $normalizedTypes = array_values(array_filter(array_map(
-                fn(mixed $type): ?string => $this->normalizeMethod($type),
+                fn (mixed $type): ?string => $this->normalizeMethod($type),
                 $paymentMethodTypes,
             )));
 
@@ -134,15 +148,15 @@ final class StripeWebhookParser implements WebhookParser
     {
         $secret = config('stag-herd.providers.stripe.credentials.webhook_secret');
 
-        if (! $secret) {
-            return;
+        if (!$secret) {
+            throw InvalidWebhookSignatureException::forProvider('stripe');
         }
 
         $signatureHeader = $this->header($webhook, 'stripe-signature');
         $timestamp = $this->signaturePart($signatureHeader, 't');
         $expectedSignatures = $this->signatureParts($signatureHeader, 'v1');
 
-        if (! $timestamp || $expectedSignatures === []) {
+        if (!$timestamp || $expectedSignatures === []) {
             throw InvalidWebhookSignatureException::forProvider('stripe');
         }
 
@@ -219,10 +233,17 @@ final class StripeWebhookParser implements WebhookParser
 
     private function normalizeMethod(mixed $value): ?string
     {
-        if (! is_string($value) || trim($value) === '') {
+        if (!is_string($value) || trim($value) === '') {
             return null;
         }
 
         return strtolower(trim($value));
+    }
+
+    private function expandableId(mixed $value): ?string
+    {
+        return is_array($value)
+            ? $this->nullableString($value['id'] ?? null)
+            : $this->nullableString($value);
     }
 }

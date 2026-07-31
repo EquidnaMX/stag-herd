@@ -10,6 +10,7 @@ use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\InvalidWebhookSignatureException;
 use Equidna\StagHerd\Exceptions\ProviderNotRegisteredException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
+use Equidna\StagHerd\Support\CredentialContextManager;
 use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,16 +23,21 @@ class WebhookController extends Controller
     public function __construct(
         private readonly ProcessPaymentWebhook $processPaymentWebhook,
         private readonly ProviderRegistry $providers,
+        private readonly CredentialContextManager $credentials,
     ) {
         //
     }
 
-    public function handle(Request $request, string $provider): JsonResponse
-    {
+    public function handle(
+        Request $request,
+        string $provider,
+        string $credentialContext = 'default',
+    ): JsonResponse {
         $provider = strtolower($provider);
 
         Log::info('StagHerd webhook received', [
             'provider' => $provider,
+            'credential_context_sha256' => hash('sha256', $credentialContext),
             'content_sha256' => hash('sha256', $request->getContent()),
             'request_id' => $request->header('x-request-id')
                 ?? $request->header('x-request-idempotency-key')
@@ -55,10 +61,15 @@ class WebhookController extends Controller
             query: $request->query->all(),
             rawBody: $request->getContent(),
             ipAddress: $request->ip(),
+            credentialContext: $credentialContext,
         );
 
         try {
-            $payment = $this->processPaymentWebhook->handle($payload);
+            $payment = $this->credentials->run(
+                $provider,
+                $credentialContext,
+                fn () => $this->processPaymentWebhook->handle($payload),
+            );
 
             return response()->json([
                 'message' => 'Webhook processed.',

@@ -46,6 +46,43 @@ Ejecutar migraciones:
 php artisan migrate
 ```
 
+## Billing provider-neutral
+
+El modulo Billing separa al sistema host de los SDKs de las pasarelas. El host
+envia un `credentialContext` opaco en cada operacion; una implementacion de
+`CredentialResolver` obtiene las credenciales para esa solicitud sin guardarlas
+en los DTOs ni en el dominio del host.
+
+Stripe soporta checkout hospedado de pago unico y suscripcion, consulta y
+cancelacion de suscripciones, productos, precios y Customer Portal. La version
+de API fijada es `2026-02-25.clover`.
+
+```php
+use Equidna\StagHerd\Application\BillingService;
+use Equidna\StagHerd\Data\BillingLineItemData;
+use Equidna\StagHerd\Data\CheckoutRequestData;
+use Equidna\StagHerd\Domain\Enums\CheckoutMode;
+
+$checkout = app(BillingService::class)->createCheckout(new CheckoutRequestData(
+    provider: 'stripe',
+    mode: CheckoutMode::SUBSCRIPTION,
+    credentialContext: $paymentMethodUuid,
+    lineItems: [new BillingLineItemData('price_provider_reference')],
+    successUrl: 'https://portal.example/success',
+    cancelUrl: 'https://portal.example/cancel',
+));
+```
+
+Los webhooks contextuales se reciben en:
+
+```txt
+POST /stag-herd/webhooks/{provider}/{credentialContext}
+```
+
+Requieren firma valida y usan el ID real del evento para idempotencia durable.
+El paquete conserva referencias y estados del proveedor, pero no contiene
+logica de fulfillment del sistema host.
+
 ## Configuración básica
 
 El archivo principal de configuración es:
