@@ -40,7 +40,7 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
                 'default_source' => 'stag-herd-tokenized-card',
                 'customer' => $customerId,
                 'payment_method' => $paymentMethodId,
-                'confirm' => true,
+                'confirm' => 'true',
                 'off_session' => $offSession ? true : null,
             ],
         );

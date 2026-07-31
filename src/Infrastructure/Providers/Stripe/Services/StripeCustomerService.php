@@ -40,48 +40,50 @@ final class StripeCustomerService
         ?string $customerId,
         array $customerPayload,
     ): ?string {
-        if (! $customerId) {
-            $customer = $this->create($customerPayload);
+        $customerId = $this->normalizeCustomerId($customerId);
 
-            return data_get($customer, 'id');
+        if ($customerId === null) {
+            $created = $this->create($customerPayload);
+
+            return data_get($created, 'id');
         }
 
         try {
             $customer = $this->stripeGateway->getCustomer($customerId);
 
-            if (data_get($customer, 'deleted') === true) {
-                $customer = $this->create($customerPayload);
-
-                return data_get($customer, 'id');
-            }
-
-            $normalizedCustomerId = data_get($customer, 'id', $customerId);
-
-            if (
-                is_string($normalizedCustomerId)
-                && $normalizedCustomerId !== ''
-                && ! empty($customerPayload)
-            ) {
-                $this->stripeGateway->updateCustomer(
-                    $normalizedCustomerId,
-                    $customerPayload,
-                );
-            }
-
-            return $normalizedCustomerId;
+            return data_get($customer, 'id', $customerId);
         } catch (ProviderCommunicationException $exception) {
-            $status = data_get($exception->getErrors(), 'status');
-            $code = data_get($exception->getErrors(), 'response.error.code');
-            $param = data_get($exception->getErrors(), 'response.error.param');
+            if ((int) $exception->getCode() === 404) {
+                $created = $this->create($customerPayload);
 
-            if ($status === 404 || ($status === 400 && $code === 'resource_missing' && $param === 'customer')) {
-                $customer = $this->create($customerPayload);
-
-                return data_get($customer, 'id');
+                return data_get($created, 'id');
             }
 
             throw $exception;
         }
+    }
+
+    private function normalizeCustomerId(?string $customerId): ?string
+    {
+        if (! is_string($customerId)) {
+            return null;
+        }
+
+        $customerId = trim($customerId);
+
+        if ($customerId === '') {
+            return null;
+        }
+
+        if (strtolower($customerId) === 'null') {
+            return null;
+        }
+
+        if (! str_starts_with($customerId, 'cus_')) {
+            return null;
+        }
+
+        return $customerId;
     }
 
     private function create(array $payload): array
