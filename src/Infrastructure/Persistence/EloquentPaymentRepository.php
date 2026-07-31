@@ -51,7 +51,7 @@ class EloquentPaymentRepository implements PaymentRepository
             'raw_payload' => $result->rawPayload,
         ]);
 
-        return $this->mapToDomain($model);
+        return $this->mapToDomain($model, $result->nextAction);
     }
 
     public function find(int|string $id): ?Payment
@@ -103,7 +103,7 @@ class EloquentPaymentRepository implements PaymentRepository
     ): Payment {
         $model = StagHerdPayment::query()->find($payment->id);
 
-        if (! $model) {
+        if (!$model) {
             return $payment;
         }
 
@@ -145,11 +145,13 @@ class EloquentPaymentRepository implements PaymentRepository
                 : $model->raw_payload,
         ]);
 
-        return $this->mapToDomain($model->refresh());
+        return $this->mapToDomain($model->refresh(), $result->nextAction);
     }
 
-    private function mapToDomain(StagHerdPayment $model): Payment
-    {
+    private function mapToDomain(
+        StagHerdPayment $model,
+        ?\Equidna\StagHerd\Data\NextActionData $nextAction = null,
+    ): Payment {
         $metadata = $model->metadata ?? [];
 
         return new Payment(
@@ -170,6 +172,7 @@ class EloquentPaymentRepository implements PaymentRepository
                 providerRefundId: data_get($metadata, 'provider_refund_id'),
             ),
             metadata: $metadata,
+            nextAction: $nextAction,
         );
     }
 

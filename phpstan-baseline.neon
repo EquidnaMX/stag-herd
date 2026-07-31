@@ -1,0 +1,471 @@
+parameters:
+	ignoreErrors:
+		-
+			message: "#^Match arm is unreachable because previous comparison is always true\\.$#"
+			count: 1
+			path: src/Application/Actions/LookupPayment.php
+
+		-
+			message: "#^Variable \\$providerPaymentId on left side of \\?\\? always exists and is not nullable\\.$#"
+			count: 1
+			path: src/Application/Actions/LookupPayment.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Contracts\\\\PaymentDisplayRepository\\:\\:paginateForDisplay\\(\\) return type with generic class Illuminate\\\\Pagination\\\\LengthAwarePaginator does not specify its types\\: TKey, TValue$#"
+			count: 1
+			path: src/Contracts/PaymentDisplayRepository.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Data\\\\NextActionData\\:\\:__construct\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Data/NextActionData.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Data\\\\NextActionData\\:\\:redirect\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Data/NextActionData.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Data\\\\NextActionData\\:\\:toArray\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Data/NextActionData.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Data\\\\PaymentResultData\\:\\:__construct\\(\\) has parameter \\$metadata with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Data/PaymentResultData.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Data\\\\PaymentResultData\\:\\:__construct\\(\\) has parameter \\$rawPayload with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Data/PaymentResultData.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Data\\\\PaymentResultData\\:\\:approved\\(\\) has parameter \\$metadata with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Data/PaymentResultData.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Data\\\\PaymentResultData\\:\\:approved\\(\\) has parameter \\$rawPayload with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Data/PaymentResultData.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Data\\\\PaymentResultData\\:\\:pending\\(\\) has parameter \\$metadata with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Data/PaymentResultData.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Data\\\\PaymentResultData\\:\\:pending\\(\\) has parameter \\$rawPayload with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Data/PaymentResultData.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Data\\\\PaymentResultData\\:\\:rejected\\(\\) has parameter \\$metadata with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Data/PaymentResultData.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Data\\\\PaymentResultData\\:\\:rejected\\(\\) has parameter \\$rawPayload with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Data/PaymentResultData.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Data\\\\PaymentResultData\\:\\:toArray\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Data/PaymentResultData.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Data\\\\ProviderReferencesData\\:\\:toArray\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Data/ProviderReferencesData.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Exceptions\\\\ProviderAuthenticationException\\:\\:unauthorized\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Exceptions/ProviderAuthenticationException.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Exceptions\\\\ProviderCommunicationException\\:\\:getErrors\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Exceptions/ProviderCommunicationException.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Exceptions\\\\ProviderCommunicationException\\:\\:invalidResponse\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Exceptions/ProviderCommunicationException.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Exceptions\\\\ProviderCommunicationException\\:\\:requestFailed\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Exceptions/ProviderCommunicationException.php
+
+		-
+			message: "#^Call to an undefined static method Equidna\\\\StagHerd\\\\Facades\\\\StagHerd\\:\\:createPayment\\(\\)\\.$#"
+			count: 2
+			path: src/Http/Controllers/MercadoPagoController.php
+
+		-
+			message: "#^Call to an undefined static method Equidna\\\\StagHerd\\\\Facades\\\\StagHerd\\:\\:createPayment\\(\\)\\.$#"
+			count: 1
+			path: src/Http/Controllers/PayPalController.php
+
+		-
+			message: "#^Call to an undefined static method Equidna\\\\StagHerd\\\\Facades\\\\StagHerd\\:\\:createPayment\\(\\)\\.$#"
+			count: 1
+			path: src/Http/Controllers/PaymentController.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Controllers\\\\PaymentController\\:\\:displayPaymentToArray\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Controllers/PaymentController.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Controllers\\\\PaymentController\\:\\:index\\(\\) should return Illuminate\\\\View\\\\View but returns Illuminate\\\\Contracts\\\\View\\\\View\\.$#"
+			count: 1
+			path: src/Http/Controllers/PaymentController.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Controllers\\\\PaymentController\\:\\:resolvePaypalLink\\(\\) has parameter \\$payload with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Controllers/PaymentController.php
+
+		-
+			message: "#^Call to an undefined static method Equidna\\\\StagHerd\\\\Facades\\\\StagHerd\\:\\:cancelPayment\\(\\)\\.$#"
+			count: 1
+			path: src/Http/Controllers/PaymentOperationController.php
+
+		-
+			message: "#^Call to an undefined static method Equidna\\\\StagHerd\\\\Facades\\\\StagHerd\\:\\:lookupPayment\\(\\)\\.$#"
+			count: 1
+			path: src/Http/Controllers/PaymentOperationController.php
+
+		-
+			message: "#^Call to an undefined static method Equidna\\\\StagHerd\\\\Facades\\\\StagHerd\\:\\:refundPayment\\(\\)\\.$#"
+			count: 1
+			path: src/Http/Controllers/PaymentOperationController.php
+
+		-
+			message: "#^Call to an undefined static method Equidna\\\\StagHerd\\\\Facades\\\\StagHerd\\:\\:syncPayment\\(\\)\\.$#"
+			count: 2
+			path: src/Http/Controllers/PaymentOperationController.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Controllers\\\\PaymentOperationController\\:\\:redirectWithResult\\(\\) has parameter \\$payment with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Controllers/PaymentOperationController.php
+
+		-
+			message: "#^Call to an undefined static method Equidna\\\\StagHerd\\\\Facades\\\\StagHerd\\:\\:createPayment\\(\\)\\.$#"
+			count: 3
+			path: src/Http/Controllers/StripeController.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Controllers\\\\StripeController\\:\\:buildStripeCustomerPayload\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Controllers/StripeController.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Controllers\\\\StripeController\\:\\:cleanMetadata\\(\\) has parameter \\$metadata with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Controllers/StripeController.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Controllers\\\\StripeController\\:\\:cleanMetadata\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Controllers/StripeController.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Controllers\\\\StripeController\\:\\:ensureStripeCustomerExists\\(\\) has parameter \\$customerPayload with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Controllers/StripeController.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\CancelPaymentRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/CancelPaymentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\MercadoPago\\\\CreateCheckoutProRequest\\:\\:metadata\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/MercadoPago/CreateCheckoutProRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\MercadoPago\\\\CreateCheckoutProRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/MercadoPago/CreateCheckoutProRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\MercadoPago\\\\ProcessBrickRequest\\:\\:metadata\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/MercadoPago/ProcessBrickRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\MercadoPago\\\\ProcessBrickRequest\\:\\:payerFromMercadoPago\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/MercadoPago/ProcessBrickRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\MercadoPago\\\\ProcessBrickRequest\\:\\:payerFromRoot\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/MercadoPago/ProcessBrickRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\MercadoPago\\\\ProcessBrickRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/MercadoPago/ProcessBrickRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\PayPal\\\\CaptureOrderRequest\\:\\:metadata\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/PayPal/CaptureOrderRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\PayPal\\\\CaptureOrderRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/PayPal/CaptureOrderRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\PayPal\\\\CreateOrderRequest\\:\\:checkoutContext\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/PayPal/CreateOrderRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\PayPal\\\\CreateOrderRequest\\:\\:metadata\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/PayPal/CreateOrderRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\PayPal\\\\CreateOrderRequest\\:\\:payload\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/PayPal/CreateOrderRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\PayPal\\\\CreateOrderRequest\\:\\:purchaseUnit\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/PayPal/CreateOrderRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\PayPal\\\\CreateOrderRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/PayPal/CreateOrderRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\PaymentFormRequest\\:\\:cleanMetadata\\(\\) has parameter \\$metadata with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/PaymentFormRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\PaymentFormRequest\\:\\:cleanMetadata\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/PaymentFormRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\ProviderLookupPaymentRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/ProviderLookupPaymentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\ProviderSyncPaymentRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/ProviderSyncPaymentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\RefundPaymentRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/RefundPaymentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\StorePaymentRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/StorePaymentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\Stripe\\\\CompleteSetupIntentRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/Stripe/CompleteSetupIntentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\Stripe\\\\ConfirmPaymentIntentRequest\\:\\:inputMetadata\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/Stripe/ConfirmPaymentIntentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\Stripe\\\\ConfirmPaymentIntentRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/Stripe/ConfirmPaymentIntentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\Stripe\\\\CreatePaymentIntentRequest\\:\\:basePayload\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/Stripe/CreatePaymentIntentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\Stripe\\\\CreatePaymentIntentRequest\\:\\:intentMetadata\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/Stripe/CreatePaymentIntentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\Stripe\\\\CreatePaymentIntentRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/Stripe/CreatePaymentIntentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\Stripe\\\\CreateSetupIntentRequest\\:\\:customMetadata\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/Stripe/CreateSetupIntentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\Stripe\\\\CreateSetupIntentRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/Stripe/CreateSetupIntentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\Stripe\\\\ProcessSpeiPaymentRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/Stripe/ProcessSpeiPaymentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\Stripe\\\\ProcessTokenizedCardRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/Stripe/ProcessTokenizedCardRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Http\\\\Requests\\\\Payments\\\\Stripe\\\\ProcessWalletPaymentRequest\\:\\:rules\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Http/Requests/Payments/Stripe/ProcessWalletPaymentRequest.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Persistence\\\\EloquentPaymentDisplayRepository\\:\\:paginateForDisplay\\(\\) return type with generic class Illuminate\\\\Pagination\\\\LengthAwarePaginator does not specify its types\\: TKey, TValue$#"
+			count: 1
+			path: src/Infrastructure/Persistence/EloquentPaymentDisplayRepository.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\MercadoPago\\\\Handlers\\\\MercadoPagoCardHandler\\:\\:resolveProviderPaymentId\\(\\) has parameter \\$metadata with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/MercadoPago/Handlers/MercadoPagoCardHandler.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\MercadoPago\\\\MercadoPagoResultMapper\\:\\:mapPaymentResponseToResult\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/MercadoPago/MercadoPagoResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\MercadoPago\\\\MercadoPagoResultMapper\\:\\:mapPaymentResponseToResultFromOperation\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/MercadoPago/MercadoPagoResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\MercadoPago\\\\MercadoPagoResultMapper\\:\\:mapPreferenceResponseToResult\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/MercadoPago/MercadoPagoResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\MercadoPago\\\\MercadoPagoResultMapper\\:\\:mapRefundResponseToResult\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/MercadoPago/MercadoPagoResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\MercadoPago\\\\MercadoPagoResultMapper\\:\\:resolveNextAction\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/MercadoPago/MercadoPagoResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\MercadoPago\\\\MercadoPagoResultMapper\\:\\:resolvePayerEmail\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/MercadoPago/MercadoPagoResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\Handlers\\\\PayPalCheckoutHandler\\:\\:resolveCaptureId\\(\\) has parameter \\$metadata with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/Handlers/PayPalCheckoutHandler.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\Handlers\\\\PayPalCheckoutHandler\\:\\:resolveIdempotencyKey\\(\\) has parameter \\$metadata with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/Handlers/PayPalCheckoutHandler.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\Handlers\\\\PayPalCheckoutHandler\\:\\:resolveOrderId\\(\\) has parameter \\$metadata with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/Handlers/PayPalCheckoutHandler.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\PayPalResultMapper\\:\\:resolveAmountFromCapture\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/PayPalResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\PayPalResultMapper\\:\\:resolveAmountFromOrder\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/PayPalResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\PayPalResultMapper\\:\\:resolveCaptureIdFromCapture\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/PayPalResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\PayPalResultMapper\\:\\:resolveCaptureIdFromOrder\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/PayPalResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\PayPalResultMapper\\:\\:resolveCurrencyFromCapture\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/PayPalResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\PayPalResultMapper\\:\\:resolveCurrencyFromOrder\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/PayPalResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\PayPalResultMapper\\:\\:resolveLink\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/PayPalResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\PayPalResultMapper\\:\\:resolveNextAction\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/PayPalResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\PayPalResultMapper\\:\\:resolveOrderIdFromCapture\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/PayPalResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\PayPalResultMapper\\:\\:resolveOrderIdFromOrder\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/PayPalResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\PayPal\\\\PayPalResultMapper\\:\\:resolvePayerEmail\\(\\) has parameter \\$response with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/PayPal/PayPalResultMapper.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\Stripe\\\\Services\\\\StripeCustomerService\\:\\:buildPayload\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/Stripe/Services/StripeCustomerService.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\Stripe\\\\Services\\\\StripeCustomerService\\:\\:create\\(\\) has parameter \\$payload with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/Stripe/Services/StripeCustomerService.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\Stripe\\\\Services\\\\StripeCustomerService\\:\\:create\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/Stripe/Services/StripeCustomerService.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\Stripe\\\\Services\\\\StripeCustomerService\\:\\:ensureExists\\(\\) has parameter \\$customerPayload with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/Stripe/Services/StripeCustomerService.php
+
+		-
+			message: "#^Method Equidna\\\\StagHerd\\\\Infrastructure\\\\Providers\\\\Stripe\\\\Services\\\\StripeSpeiPaymentService\\:\\:buildCreatePaymentIntentPayload\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Infrastructure/Providers/Stripe/Services/StripeSpeiPaymentService.php

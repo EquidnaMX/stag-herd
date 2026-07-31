@@ -49,6 +49,8 @@ final readonly class PayPalWebhookParser implements WebhookParser
             providerPaymentId: $providerPaymentId,
             providerOrderId: $providerOrderId,
             rawPayload: $webhook->payload,
+            providerEventId: (string) data_get($webhook->payload, 'id'),
+            credentialContext: $webhook->credentialContext,
         );
     }
 
@@ -56,7 +58,7 @@ final readonly class PayPalWebhookParser implements WebhookParser
     {
         $webhookId = config('stag-herd.providers.paypal.credentials.webhook_id');
 
-        if (! $webhookId) {
+        if (!$webhookId) {
             throw ProviderNotConfiguredException::missingCredential('paypal', 'webhook_id');
         }
 
@@ -70,7 +72,7 @@ final readonly class PayPalWebhookParser implements WebhookParser
             'webhook_event' => $webhook->payload,
         ];
 
-        if (! $this->gateway->verifyWebhookSignature($verificationPayload)) {
+        if (!$this->gateway->verifyWebhookSignature($verificationPayload)) {
             throw InvalidWebhookSignatureException::forProvider('paypal');
         }
     }
@@ -79,7 +81,7 @@ final readonly class PayPalWebhookParser implements WebhookParser
     {
         $eventType = data_get($webhook->payload, 'event_type');
 
-        if (! $eventType) {
+        if (!$eventType) {
             throw InvalidPaymentPayloadException::missingField('event_type');
         }
 
@@ -101,7 +103,7 @@ final readonly class PayPalWebhookParser implements WebhookParser
     {
         $captureId = data_get($webhook->payload, 'resource.id');
 
-        if (! $captureId) {
+        if (!$captureId) {
             throw InvalidPaymentPayloadException::missingField('resource.id');
         }
 

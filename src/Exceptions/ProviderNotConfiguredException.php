@@ -2,9 +2,9 @@
 
 namespace Equidna\StagHerd\Exceptions;
 
-use Equidna\Toolkit\Exceptions\ConfigurationException;
+use RuntimeException;
 
-class ProviderNotConfiguredException extends ConfigurationException
+class ProviderNotConfiguredException extends RuntimeException
 {
     public static function missingCredential(
         string $provider,

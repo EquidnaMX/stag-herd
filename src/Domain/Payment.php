@@ -2,11 +2,13 @@
 
 namespace Equidna\StagHerd\Domain;
 
+use Equidna\StagHerd\Data\NextActionData;
 use Equidna\StagHerd\Data\ProviderReferencesData;
 use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
 
 final readonly class Payment
 {
+    /** @param array<string, mixed> $metadata */
     public function __construct(
         public string|int $id,
         public string $provider,
@@ -20,6 +22,7 @@ final readonly class Payment
         public ?string $payerEmail = null,
         public ?ProviderReferencesData $references = null,
         public array $metadata = [],
+        public ?NextActionData $nextAction = null,
     ) {
         //
     }
@@ -41,6 +44,7 @@ final readonly class Payment
             payerEmail: $this->payerEmail,
             references: $this->references,
             metadata: $this->metadata,
+            nextAction: $this->nextAction,
         );
     }
 
@@ -113,6 +117,7 @@ final readonly class Payment
             'payer_email' => $this->payerEmail,
             'references' => $this->references?->toArray(),
             'metadata' => $this->metadata,
+            'next_action' => $this->nextAction?->toArray(),
         ];
     }
 }

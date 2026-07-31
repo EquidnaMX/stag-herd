@@ -16,6 +16,87 @@ final class StripeApiAdapter implements StripeGateway
 {
     private const PROVIDER = 'stripe';
 
+    private const API_VERSION = '2026-02-25.clover';
+
+    public function createCheckoutSession(array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->send(
+            method: 'post',
+            endpoint: '/v1/checkout/sessions',
+            payload: $payload,
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+        );
+    }
+
+    public function getCheckoutSession(string $checkoutSessionId): array
+    {
+        return $this->send(
+            method: 'get',
+            endpoint: "/v1/checkout/sessions/{$checkoutSessionId}",
+            payload: ['expand' => ['subscription', 'payment_intent']],
+        );
+    }
+
+    public function createProduct(array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->send(
+            method: 'post',
+            endpoint: '/v1/products',
+            payload: $payload,
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+        );
+    }
+
+    public function createPrice(array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->send(
+            method: 'post',
+            endpoint: '/v1/prices',
+            payload: $payload,
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+        );
+    }
+
+    public function getSubscription(string $subscriptionId): array
+    {
+        return $this->send(
+            method: 'get',
+            endpoint: "/v1/subscriptions/{$subscriptionId}",
+        );
+    }
+
+    public function updateSubscription(
+        string $subscriptionId,
+        array $payload,
+        ?string $idempotencyKey = null,
+    ): array {
+        return $this->send(
+            method: 'post',
+            endpoint: "/v1/subscriptions/{$subscriptionId}",
+            payload: $payload,
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+        );
+    }
+
+    public function cancelSubscription(string $subscriptionId, ?string $idempotencyKey = null): array
+    {
+        return $this->send(
+            method: 'delete',
+            endpoint: "/v1/subscriptions/{$subscriptionId}",
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+        );
+    }
+
+    public function createBillingPortalSession(array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->send(
+            method: 'post',
+            endpoint: '/v1/billing_portal/sessions',
+            payload: $payload,
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+        );
+    }
+
     public function createPaymentIntent(array $payload, ?string $idempotencyKey = null): array
     {
         return $this->send(
@@ -167,6 +248,7 @@ final class StripeApiAdapter implements StripeGateway
             $response = match (strtolower($method)) {
                 'get' => $request->get($endpoint, $payload),
                 'post' => $request->post($endpoint, $payload),
+                'delete' => $request->delete($endpoint, $payload),
                 default => throw ProviderCommunicationException::invalidResponse(
                     self::PROVIDER,
                     ['reason' => "Unsupported HTTP method [{$method}]."],
@@ -212,7 +294,7 @@ final class StripeApiAdapter implements StripeGateway
     {
         $secretKey = config('stag-herd.providers.stripe.credentials.secret_key');
 
-        if (! $secretKey) {
+        if (!$secretKey) {
             throw ProviderNotConfiguredException::missingCredential(
                 self::PROVIDER,
                 'secret_key',
@@ -226,7 +308,13 @@ final class StripeApiAdapter implements StripeGateway
             ->timeout((int) config('stag-herd.providers.stripe.http.timeout', 15))
             ->acceptJson()
             ->asForm()
-            ->withBasicAuth((string) $secretKey, '');
+            ->withBasicAuth((string) $secretKey, '')
+            ->withHeaders([
+                'Stripe-Version' => (string) config(
+                    'stag-herd.providers.stripe.api_version',
+                    self::API_VERSION,
+                ),
+            ]);
 
         if ($idempotencyKey !== null && $idempotencyKey !== '') {
             $request = $request->withHeaders([

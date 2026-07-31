@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-30
+
 ### Fixed
 
 - Fixed `RouteNotFoundException` for PayPal and MercadoPago payments by adding default confirmation routes.
@@ -15,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Provider-neutral Billing capabilities for hosted checkout, products/prices, subscriptions, invoices and Customer Portal.
+- Stripe Checkout support for `payment` and `subscription` modes using API version `2026-02-25.clover`.
+- Request-scoped opaque credential contexts for payment, billing and webhook operations.
+- Durable billing-resource and webhook-event persistence, with stale provider events ignored.
+- Normalized `CheckoutCompleted`, `SubscriptionStatusChanged`, `InvoicePaid` and `InvoicePaymentFailed` events.
 - Webhook payload validation framework for all providers
 - Rate limiting middleware for webhook endpoints
 - Audit logging for payment state transitions
@@ -26,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Contextual webhooks are available at `/stag-herd/webhooks/{provider}/{credentialContext}`.
+- Database-backed webhook idempotency is the default; Redis remains available as an explicit compatibility option.
 - Pinned `equidna/laravel-toolkit` dependency from wildcard to semantic versioning (`^1.0`)
 - Enhanced webhook verification with timestamp validation
 - Improved PHPDoc compliance across all classes
@@ -40,29 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Provider signatures are mandatory for contextual Stripe, PayPal and Mercado Pago webhooks.
+- Webhook idempotency uses the real provider event ID and is no longer bounded by a Redis TTL.
 - Added cryptographic signature verification for all webhook providers
 - Implemented constant-time comparison for security-critical operations
 - Added SSRF protection for PayPal webhook certificate validation
-
-## [1.0.0] - TBD
-
-### Added
-
-- Initial release
-- Multi-gateway payment adapter system
-- Support for 7 payment providers: Stripe, PayPal, Mercado Pago, Conekta, Kueski, Openpay, Clip
-- Webhook verification for all supported providers
-- Payment lifecycle event system (PaymentApproved, PaymentRejected)
-- Fluent payment builder API
-- PSR-12 compliant codebase
-- PHPStan level 6 static analysis
-- Comprehensive test suite with 30+ tests
-
-### Security
-
-- Webhook signature verification using provider-specific algorithms
-- Replay attack prevention with timestamp validation
-- Constant-time hash comparison
 
 [Unreleased]: https://github.com/EquidnaMX/stag-herd/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/EquidnaMX/stag-herd/releases/tag/v1.0.0

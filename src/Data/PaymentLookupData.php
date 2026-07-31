@@ -12,10 +12,12 @@ final readonly class PaymentLookupData
         public ?string $paymentId = null,
         public ?string $providerPaymentId = null,
         public ?string $providerOrderId = null,
+        public string $credentialContext = 'default',
     ) {
         $this->validate();
     }
 
+    /** @return 'payment_id'|'provider_payment_id'|'provider_order_id' */
     public function lookupType(): string
     {
         if ($this->paymentId !== null) {
@@ -50,7 +52,7 @@ final readonly class PaymentLookupData
             $this->paymentId,
             $this->providerPaymentId,
             $this->providerOrderId,
-        ], fn(?string $value) => $value !== null && $value !== '');
+        ], fn (?string $value) => $value !== null && $value !== '');
 
         if (count($criteria) === 0) {
             throw InvalidPaymentPayloadException::missingField(

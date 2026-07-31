@@ -4,6 +4,7 @@ namespace Equidna\StagHerd\Tests\Unit;
 
 use Equidna\StagHerd\Application\Actions\LookupPayment;
 use Equidna\StagHerd\Application\Actions\ProcessPaymentWebhook;
+use Equidna\StagHerd\Contracts\BillingResourceRepository;
 use Equidna\StagHerd\Contracts\PaymentProvider;
 use Equidna\StagHerd\Contracts\WebhookIdempotencyStore;
 use Equidna\StagHerd\Contracts\WebhookParser;
@@ -17,9 +18,11 @@ use Equidna\StagHerd\Data\RefundRequestData;
 use Equidna\StagHerd\Data\WebhookPayloadData;
 use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
 use Equidna\StagHerd\Domain\Payment;
+use Equidna\StagHerd\Events\PaymentApproved;
 use Equidna\StagHerd\Exceptions\DuplicateWebhookException;
 use Equidna\StagHerd\Support\ProviderRegistry;
 use Equidna\StagHerd\Tests\TestCase;
+use Illuminate\Support\Facades\Event;
 use RuntimeException;
 
 class ProcessPaymentWebhookTest extends TestCase
@@ -174,6 +177,41 @@ class ProcessPaymentWebhookTest extends TestCase
         $this->assertSame('card', $provider->lastLookupMethod);
     }
 
+    public function test_it_dispatches_a_normalized_approved_event_for_a_billing_payment(): void
+    {
+        config()->set('stag-herd.providers.stripe.webhooks.parser', FakeBillingPaymentWebhookParser::class);
+        Event::fake([PaymentApproved::class]);
+        $billingResources = new SpyBillingResourceRepository();
+        $repository = new InMemoryWebhookPaymentRepository(new Payment(
+            id: 'unused',
+            provider: 'stripe',
+            method: 'card',
+            amount: 1000,
+            currency: 'MXN',
+            status: PaymentStatusEnum::PENDING,
+        ));
+        $action = new ProcessPaymentWebhook(
+            lookupPayment: new LookupPayment(new ProviderRegistry(), $repository),
+            idempotency: new SpyWebhookIdempotencyStore(),
+            billingResources: $billingResources,
+        );
+
+        $payment = $action->handle(new WebhookPayloadData(
+            provider: 'stripe',
+            payload: ['id' => 'evt_1'],
+            headers: [],
+            query: [],
+            rawBody: '{}',
+            ipAddress: '127.0.0.1',
+            credentialContext: 'method-uuid',
+        ));
+
+        $this->assertSame(PaymentStatusEnum::APPROVED, $payment?->status);
+        $this->assertSame('purchase-uuid', $payment?->metadata['purchase_uuid'] ?? null);
+        $this->assertSame('payment', $billingResources->resourceType);
+        Event::assertDispatched(PaymentApproved::class);
+    }
+
     private function payload(): WebhookPayloadData
     {
         return new WebhookPayloadData(
@@ -184,6 +222,55 @@ class ProcessPaymentWebhookTest extends TestCase
             rawBody: '{}',
             ipAddress: '127.0.0.1',
         );
+    }
+}
+
+final class FakeBillingPaymentWebhookParser implements WebhookParser
+{
+    public function parse(WebhookPayloadData $webhook): NormalizedWebhookData
+    {
+        return new NormalizedWebhookData(
+            provider: 'stripe',
+            eventType: 'payment_intent.succeeded',
+            resourceType: 'payment_intent',
+            resourceId: 'pi_123',
+            providerPaymentId: 'pi_123',
+            method: 'card',
+            rawPayload: [
+                'created' => 200,
+                'data' => ['object' => [
+                    'id' => 'pi_123',
+                    'amount_received' => 12500,
+                    'currency' => 'mxn',
+                    'metadata' => [
+                        'purchase_uuid' => 'purchase-uuid',
+                        'payment_method_uuid' => 'method-uuid',
+                    ],
+                ]],
+            ],
+            providerEventId: 'evt_1',
+            credentialContext: $webhook->credentialContext,
+            status: 'succeeded',
+        );
+    }
+}
+
+final class SpyBillingResourceRepository implements BillingResourceRepository
+{
+    public ?string $resourceType = null;
+
+    public function upsert(
+        string $provider,
+        string $credentialContext,
+        string $resourceType,
+        string $providerResourceId,
+        ?string $status,
+        array $payload,
+        ?int $providerEventCreatedAt = null,
+    ): bool {
+        $this->resourceType = $resourceType;
+
+        return true;
     }
 }
 
@@ -234,7 +321,7 @@ final class SpyWebhookIdempotencyStore implements WebhookIdempotencyStore
     {
         $this->claimedKeys[] = $key;
 
-        if (! $this->claimResult) {
+        if (!$this->claimResult) {
             return false;
         }
 

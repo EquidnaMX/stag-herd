@@ -26,6 +26,8 @@ final class MercadoPagoWebhookParser implements WebhookParser
             providerPaymentId: $resourceType === 'payment' ? $resourceId : null,
             providerOrderId: in_array($resourceType, ['order', 'orders', 'merchant_order'], true) ? $resourceId : null,
             rawPayload: $webhook->payload,
+            providerEventId: (string) (data_get($webhook->payload, 'id') ?? $resourceId),
+            credentialContext: $webhook->credentialContext,
         );
     }
 
@@ -33,8 +35,8 @@ final class MercadoPagoWebhookParser implements WebhookParser
     {
         $secret = config('stag-herd.providers.mercado_pago.credentials.webhook_secret');
 
-        if (! $secret) {
-            return;
+        if (!$secret) {
+            throw InvalidWebhookSignatureException::forProvider('mercado_pago');
         }
 
         $signature = $this->header($webhook, 'x-signature');
@@ -43,7 +45,7 @@ final class MercadoPagoWebhookParser implements WebhookParser
             ?? $this->queryValue($webhook, 'data_id')
             ?? data_get($webhook->payload, 'data.id');
 
-        if (! $signature || ! $requestId || ! $dataId) {
+        if (!$signature || !$requestId || !$dataId) {
             throw InvalidWebhookSignatureException::forProvider('mercado_pago');
         }
 
@@ -51,7 +53,7 @@ final class MercadoPagoWebhookParser implements WebhookParser
         $timestamp = $parts['ts'] ?? null;
         $received = $parts['v1'] ?? null;
 
-        if (! $timestamp || ! $received) {
+        if (!$timestamp || !$received) {
             throw InvalidWebhookSignatureException::forProvider('mercado_pago');
         }
 
@@ -64,7 +66,7 @@ final class MercadoPagoWebhookParser implements WebhookParser
 
         $expected = hash_hmac('sha256', $manifest, (string) $secret);
 
-        if (! hash_equals($expected, $received)) {
+        if (!hash_equals($expected, $received)) {
             throw InvalidWebhookSignatureException::forProvider('mercado_pago');
         }
     }
@@ -76,7 +78,7 @@ final class MercadoPagoWebhookParser implements WebhookParser
             ?? $this->queryValue($webhook, 'type')
             ?? $this->queryValue($webhook, 'topic');
 
-        if (! $type) {
+        if (!$type) {
             throw InvalidPaymentPayloadException::missingField('type');
         }
 
@@ -90,7 +92,7 @@ final class MercadoPagoWebhookParser implements WebhookParser
             ?? $this->queryValue($webhook, 'data_id')
             ?? data_get($webhook->payload, 'id');
 
-        if (! $id) {
+        if (!$id) {
             throw InvalidPaymentPayloadException::missingField('data.id');
         }
 

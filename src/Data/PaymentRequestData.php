@@ -6,6 +6,7 @@ use Equidna\StagHerd\Support\MoneyFormatter;
 
 final readonly class PaymentRequestData
 {
+    /** @param array<string, mixed> $metadata */
     public function __construct(
         public int $amount,
         public string $currency,
@@ -19,10 +20,12 @@ final readonly class PaymentRequestData
         public ?string $returnUrl = null,
         public ?string $cancelUrl = null,
         public array $metadata = [],
+        public string $credentialContext = 'default',
     ) {
         //
     }
 
+    /** @param array<string, mixed> $metadata */
     public static function fromDecimalAmount(
         int|float|string $amount,
         string $currency,
@@ -36,6 +39,7 @@ final readonly class PaymentRequestData
         ?string $returnUrl = null,
         ?string $cancelUrl = null,
         array $metadata = [],
+        string $credentialContext = 'default',
     ): self {
         return new self(
             amount: MoneyFormatter::fromDecimal($amount),
@@ -50,9 +54,11 @@ final readonly class PaymentRequestData
             returnUrl: $returnUrl,
             cancelUrl: $cancelUrl,
             metadata: $metadata,
+            credentialContext: $credentialContext,
         );
     }
 
+    /** @param array<string, mixed> $data */
     public static function fromArray(array $data): self
     {
         return new self(
@@ -82,6 +88,7 @@ final readonly class PaymentRequestData
             metadata: isset($data['metadata']) && is_array($data['metadata'])
                 ? $data['metadata']
                 : [],
+            credentialContext: (string) ($data['credential_context'] ?? $data['credentialContext'] ?? 'default'),
         );
     }
 
@@ -100,9 +107,11 @@ final readonly class PaymentRequestData
             returnUrl: $this->returnUrl,
             cancelUrl: $this->cancelUrl,
             metadata: $this->metadata,
+            credentialContext: $this->credentialContext,
         );
     }
 
+    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [
@@ -118,6 +127,7 @@ final readonly class PaymentRequestData
             'return_url' => $this->returnUrl,
             'cancel_url' => $this->cancelUrl,
             'metadata' => $this->metadata,
+            'credential_context' => $this->credentialContext,
         ];
     }
 }
