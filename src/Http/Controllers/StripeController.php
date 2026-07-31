@@ -231,6 +231,9 @@ class StripeController extends Controller
                 'customer_id' => data_get(
                     $paymentArray,
                     'metadata.stripe_customer_id',
+                ) ?? data_get(
+                    $paymentArray,
+                    'metadata.stripe.customer',
                 ),
                 'status' => data_get($paymentArray, 'status'),
                 'provider_status' => data_get($paymentArray, 'provider_status'),
@@ -252,6 +255,11 @@ class StripeController extends Controller
                         $paymentArray,
                         'metadata.stripe_bank_transfer_instructions',
                     ),
+                    'amount' => data_get($paymentArray, 'amount'),
+                    'currency' => data_get($paymentArray, 'currency'),
+                    'clabe' => data_get($paymentArray, 'metadata.stripe_bank_transfer_instructions.financial_addresses.0.spei.clabe'),
+                    'bank_name' => data_get($paymentArray, 'metadata.stripe_bank_transfer_instructions.financial_addresses.0.spei.bank_name'),
+                    'bank_code' => data_get($paymentArray, 'metadata.stripe_bank_transfer_instructions.financial_addresses.0.spei.bank_code'),
                 ],
                 'payment' => $paymentArray,
             ]);
@@ -515,6 +523,7 @@ class StripeController extends Controller
             return $this->errorResponse($exception);
         }
     }
+
 
     private function errorResponse(Throwable $exception): JsonResponse
     {

@@ -90,7 +90,7 @@ final class StripeSpeiPaymentService
                     ],
                 ],
             ],
-            'confirm' => true,
+            'confirm' => 'true',
             'description' => $request->description
                 ?? $request->externalReference
                 ?? 'Payment with Stripe SPEI',
