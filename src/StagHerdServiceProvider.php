@@ -12,11 +12,13 @@ use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
 use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
 use Equidna\StagHerd\Contracts\PaymentMethodHandler;
+use Equidna\StagHerd\Contracts\PaymentMethodRepository;
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Contracts\WebhookIdempotencyStore;
 use Equidna\StagHerd\Infrastructure\Credentials\ConfigCredentialResolver;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentBillingResourceRepository;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentDisplayRepository;
+use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentMethodRepository;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentRepository;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoApiAdapter;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalApiAdapter;
@@ -91,6 +93,16 @@ class StagHerdServiceProvider extends ServiceProvider
             }
 
             return $app->make(EloquentPaymentDisplayRepository::class);
+        });
+
+        $this->app->bind(PaymentMethodRepository::class, function ($app) {
+            $repository = config('stag-herd.repositories.payment_methods');
+
+            if ($repository) {
+                return $app->make($repository);
+            }
+
+            return $app->make(EloquentPaymentMethodRepository::class);
         });
     }
 

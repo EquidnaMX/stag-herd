@@ -33,6 +33,7 @@ return [
         'payments' => null,
         'payment_display' => null,
         'webhooks' => null,
+        'payment_methods' => null,
     ],
 
     'webhooks' => [
