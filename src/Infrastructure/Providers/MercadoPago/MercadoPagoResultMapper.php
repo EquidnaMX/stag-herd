@@ -57,6 +57,14 @@ final class MercadoPagoResultMapper
     ): PaymentResultData {
         $providerStatus = $this->nullableString(Arr::get($response, 'status'));
 
+        $providerAmount = Arr::has($response, 'transaction_amount')
+            ? MoneyFormatter::fromDecimal(Arr::get($response, 'transaction_amount'))
+            : null;
+
+        $providerCurrency = $this->nullableString(Arr::get($response, 'currency_id'));
+
+        $isCheckoutPro = strtolower($method) === 'checkout_pro';
+
         return new PaymentResultData(
             provider: 'mercado_pago',
             method: $method,
@@ -67,10 +75,8 @@ final class MercadoPagoResultMapper
                 providerOrderId: $this->nullableString(Arr::get($response, 'order.id')),
                 providerTransactionId: $this->nullableString(Arr::get($response, 'transaction_details.transaction_id')),
             ),
-            amount: Arr::has($response, 'transaction_amount')
-                ? MoneyFormatter::fromDecimal(Arr::get($response, 'transaction_amount'))
-                : null,
-            currency: $this->nullableString(Arr::get($response, 'currency_id')),
+            amount: $isCheckoutPro ? null : $providerAmount,
+            currency: $isCheckoutPro ? null : $providerCurrency,
             nextAction: $this->resolveNextAction($response),
             reason: $this->nullableString(Arr::get($response, 'status_detail')),
             metadata: array_filter([
@@ -78,7 +84,9 @@ final class MercadoPagoResultMapper
                 'mercado_pago_payment_type_id' => Arr::get($response, 'payment_type_id'),
                 'mercado_pago_payment_method_id' => Arr::get($response, 'payment_method_id'),
                 'mercado_pago_date_approved' => Arr::get($response, 'date_approved'),
-            ]),
+                'mercado_pago_lookup_amount' => $providerAmount,
+                'mercado_pago_lookup_currency' => $providerCurrency,
+            ], fn(mixed $value): bool => $value !== null && $value !== ''),
             rawPayload: $response,
             payerEmail: $this->resolvePayerEmail($response),
         );
