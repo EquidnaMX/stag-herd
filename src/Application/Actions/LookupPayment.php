@@ -45,20 +45,28 @@ final readonly class LookupPayment
         }
 
         $providerPaymentId = $payment->references?->providerPaymentId;
+        $providerOrderId = $payment->references?->providerOrderId;
 
-        if (! $providerPaymentId) {
+        if (! $providerPaymentId && ! $providerOrderId) {
             return $payment;
         }
 
         $provider = $this->providers->get($payment->provider);
+        $method = $this->resolveLookupMethod($lookup, $payment);
 
-        $result = $provider->lookupPayment(
-            new PaymentLookupData(
+        $providerLookup = $providerPaymentId
+            ? new PaymentLookupData(
                 provider: $payment->provider,
-                method: $this->resolveLookupMethod($lookup, $payment),
+                method: $method,
                 providerPaymentId: $providerPaymentId,
             )
-        );
+            : new PaymentLookupData(
+                provider: $payment->provider,
+                method: $method,
+                providerOrderId: $providerOrderId,
+            );
+
+        $result = $provider->lookupPayment($providerLookup);
 
         return $this->applyProviderResult(
             payment: $payment,
