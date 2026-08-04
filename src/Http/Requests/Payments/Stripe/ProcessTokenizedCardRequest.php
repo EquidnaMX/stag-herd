@@ -3,6 +3,7 @@
 namespace Equidna\StagHerd\Http\Requests\Payments\Stripe;
 
 use Equidna\StagHerd\Data\PaymentRequestData;
+use Illuminate\Validation\Validator;
 
 class ProcessTokenizedCardRequest extends StripeFormRequest
 {
@@ -15,8 +16,8 @@ class ProcessTokenizedCardRequest extends StripeFormRequest
             'payer_reference' => ['nullable', 'string', 'max:255'],
             'payer_email' => ['nullable', 'email', 'max:255'],
             'description' => ['nullable', 'string', 'max:255'],
-            'customer_id' => ['required', 'string', 'max:255', 'regex:/^cus_/'],
-            'payment_method_id' => ['required', 'string', 'max:255', 'regex:/^pm_/'],
+            'customer_id' => ['nullable', 'string', 'max:255', 'regex:/^cus_/'],
+            'payment_method_id' => ['nullable', 'string', 'max:255', 'regex:/^pm_/'],
             'off_session' => ['nullable', 'boolean'],
             'return_url' => ['nullable', 'url', 'max:500'],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
@@ -39,6 +40,29 @@ class ProcessTokenizedCardRequest extends StripeFormRequest
         ]);
     }
 
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $customerId = $this->input('customer_id');
+            $paymentMethodId = $this->input('payment_method_id');
+            $payerReference = $this->input('payer_reference');
+
+            if ($customerId && ! $paymentMethodId) {
+                $validator->errors()->add(
+                    'payment_method_id',
+                    'payment_method_id is required when customer_id is provided.'
+                );
+            }
+
+            if (! $customerId && ! $payerReference) {
+                $validator->errors()->add(
+                    'payer_reference',
+                    'payer_reference is required when customer_id is not provided.'
+                );
+            }
+        });
+    }
+
     public function toPaymentRequestData(): PaymentRequestData
     {
         $data = $this->validated();
@@ -59,8 +83,8 @@ class ProcessTokenizedCardRequest extends StripeFormRequest
                 'source' => 'stag-herd-stripe-tokenized-card',
                 'external_reference' => $externalReference,
                 'stripe' => [
-                    'customer' => $data['customer_id'],
-                    'payment_method' => $data['payment_method_id'],
+                    'customer' => $data['customer_id'] ?? null,
+                    'payment_method' => $data['payment_method_id'] ?? null,
                     'off_session' => (bool) ($data['off_session'] ?? false),
                     'return_url' => $data['return_url'] ?? null,
                     'idempotency_key' => $idempotencyKey,

@@ -3,8 +3,11 @@
 namespace Equidna\StagHerd\Http\Controllers;
 
 use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
+use Equidna\StagHerd\Contracts\ManagesSavedPaymentMethods;
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Data\PaymentRequestData;
+use Equidna\StagHerd\Data\SavedPaymentMethodData;
+use Equidna\StagHerd\Data\SavedPaymentMethodUpsertData;
 use Equidna\StagHerd\Facades\StagHerd;
 use Equidna\StagHerd\Http\Requests\Payments\Stripe\CompleteSetupIntentRequest;
 use Equidna\StagHerd\Http\Requests\Payments\Stripe\ConfirmPaymentIntentRequest;
@@ -16,8 +19,10 @@ use Equidna\StagHerd\Http\Requests\Payments\Stripe\ProcessWalletPaymentRequest;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardReuse;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCustomerService;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeResultMapper;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeSavedPaymentMethodService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class StripeController extends Controller
@@ -28,6 +33,7 @@ class StripeController extends Controller
         private readonly StripeCardReuse $stripeCardReuse,
         private readonly StripeGateway $stripeGateway,
         private readonly StripeCustomerService $stripeCustomerService,
+        private readonly StripeSavedPaymentMethodService $stripeSavedPaymentMethods
     ) {}
 
     public function createSetupIntent(CreateSetupIntentRequest $request): JsonResponse
@@ -156,6 +162,14 @@ class StripeController extends Controller
             $paymentMethodId = $resolvedPaymentMethod['payment_method_id'];
             $paymentMethod = $resolvedPaymentMethod['payment_method'];
 
+            $savedPaymentMethod = $this->stripeSavedPaymentMethods->attemptPersist(
+                ownerReference: (string) data_get($setupIntent, 'metadata.payer_reference', ''),
+                customerId: (string) $setupCustomerId,
+                paymentMethodId: (string) $paymentMethodId,
+                paymentMethod: $paymentMethod,
+                sourcePayload: $setupIntent,
+            );
+
             return response()->json([
                 'ok' => true,
                 'message' => 'Tarjeta tokenizada correctamente.',
@@ -170,6 +184,7 @@ class StripeController extends Controller
                     'country' => data_get($paymentMethod, 'card.country'),
                     'fingerprint' => $resolvedPaymentMethod['fingerprint'],
                 ],
+                'saved_payment_method' => $savedPaymentMethod?->toArray(),
                 'setup_intent_id' => $setupIntentId,
                 'status' => $status,
             ]);
@@ -374,7 +389,17 @@ class StripeController extends Controller
                 ], 422);
             }
 
-            $metadata = $request->inputMetadata();
+            $requestMetadata = $request->inputMetadata();
+            $stripeIntentMetadata = data_get($stripeResponse, 'metadata');
+
+            if (! is_array($stripeIntentMetadata)) {
+                $stripeIntentMetadata = [];
+            }
+
+            $metadata = array_replace_recursive(
+                $stripeIntentMetadata,
+                $requestMetadata,
+            );
 
             $customerId = data_get($stripeResponse, 'customer');
             $paymentMethodId = data_get($stripeResponse, 'payment_method');
@@ -445,11 +470,29 @@ class StripeController extends Controller
                 result: $result,
             );
 
+            $savedPaymentMethod = null;
+
+            $shouldSavePaymentMethod = $this->boolFromValue(
+                data_get($metadata, 'save_payment_method')
+                    ?? data_get($stripeResponse, 'metadata.save_payment_method')
+            );
+
+            if ($shouldSavePaymentMethod) {
+                $savedPaymentMethod = $this->stripeSavedPaymentMethods->attemptPersist(
+                    ownerReference: (string) ($requestData->payerReference ?? ''),
+                    customerId: (string) ($customerId ?? ''),
+                    paymentMethodId: (string) ($paymentMethodId ?? ''),
+                    paymentMethod: is_array($paymentMethod) ? $paymentMethod : [],
+                    sourcePayload: $stripeResponse,
+                );
+            }
+
             return response()->json([
                 'ok' => true,
                 'message' => 'Pago Stripe confirmado y registrado correctamente.',
                 'provider_payment_id' => $providerPaymentId,
                 'provider_status' => $result->providerStatus,
+                'saved_payment_method' => $savedPaymentMethod?->toArray(),
                 'payment' => $payment->toArray(),
             ]);
         } catch (Throwable $exception) {
@@ -585,5 +628,18 @@ class StripeController extends Controller
             customerId: $customerId,
             customerPayload: $customerPayload,
         );
+    }
+
+    private function boolFromValue(mixed $value, bool $default = false): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_string($value) || is_numeric($value)) {
+            return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $default;
+        }
+
+        return $default;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers;
 
+use Equidna\StagHerd\Contracts\ManagesSavedPaymentMethods;
 use Equidna\StagHerd\Contracts\PaymentMethodHandler;
 use Equidna\StagHerd\Data\PaymentCancellationData;
 use Equidna\StagHerd\Data\PaymentConfirmationData;
@@ -9,6 +10,7 @@ use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\RefundRequestData;
+use Equidna\StagHerd\Data\SavedPaymentMethodLookupData;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardPaymentService;
 
@@ -16,6 +18,7 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
 {
     public function __construct(
         private readonly StripeCardPaymentService $payments,
+        private readonly ManagesSavedPaymentMethods $savedPaymentMethods,
     ) {
         //
     }
@@ -100,53 +103,103 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
             );
         }
 
-        $stripe = $request->metadata['stripe'] ?? [];
+        $stripe = is_array($request->metadata['stripe'] ?? null)
+            ? $request->metadata['stripe']
+            : [];
 
-        $customerId = $stripe['customer']
-            ?? $stripe['customer_id']
-            ?? null;
+        $customerId = $this->nullableString(
+            $stripe['customer'] ?? $stripe['customer_id'] ?? null
+        );
 
-        $paymentMethodId = $stripe['payment_method']
-            ?? $stripe['payment_method_id']
-            ?? null;
+        $paymentMethodId = $this->nullableString(
+            $stripe['payment_method'] ?? $stripe['payment_method_id'] ?? null
+        );
 
         $offSession = filter_var(
             $stripe['off_session'] ?? false,
             FILTER_VALIDATE_BOOL,
         );
 
-        if (
-            ! is_string($customerId)
-            || trim($customerId) === ''
-        ) {
+        if ($customerId !== null) {
+            if ($paymentMethodId === null) {
+                throw InvalidPaymentPayloadException::missingField(
+                    'metadata.stripe.payment_method'
+                );
+            }
+
+            if (! str_starts_with($customerId, 'cus_')) {
+                throw InvalidPaymentPayloadException::invalidField(
+                    'metadata.stripe.customer',
+                    'Stripe customer must contain a valid cus_... identifier.'
+                );
+            }
+
+            if (! str_starts_with($paymentMethodId, 'pm_')) {
+                throw InvalidPaymentPayloadException::invalidField(
+                    'metadata.stripe.payment_method',
+                    'Stripe payment method must contain a valid pm_... identifier.'
+                );
+            }
+
+            return [$customerId, $paymentMethodId, $offSession];
+        }
+
+        $ownerReference = trim((string) ($request->payerReference ?? ''));
+
+        if ($ownerReference === '') {
             throw InvalidPaymentPayloadException::missingField(
-                'metadata.stripe.customer'
+                'payer_reference'
             );
         }
 
         if (
-            ! is_string($paymentMethodId)
-            || trim($paymentMethodId) === ''
+            $paymentMethodId !== null
+            && ! str_starts_with($paymentMethodId, 'pm_')
         ) {
-            throw InvalidPaymentPayloadException::missingField(
-                'metadata.stripe.payment_method'
-            );
-        }
-
-        if (! str_starts_with($customerId, 'cus_')) {
-            throw InvalidPaymentPayloadException::invalidField(
-                'metadata.stripe.customer',
-                'Stripe customer must contain a valid cus_... identifier.'
-            );
-        }
-
-        if (! str_starts_with($paymentMethodId, 'pm_')) {
             throw InvalidPaymentPayloadException::invalidField(
                 'metadata.stripe.payment_method',
-                'Stripe payment method must contain a valid pm_... identifier.'
+                'Saved Stripe payment method lookup expects a valid pm_... identifier.'
             );
         }
 
-        return [$customerId, $paymentMethodId, $offSession];
+        $savedPaymentMethod = $this->savedPaymentMethods->resolveUsable(
+            new SavedPaymentMethodLookupData(
+                provider: 'stripe',
+                ownerReference: $ownerReference,
+                credentialContext: $request->credentialContext,
+                providerPaymentMethodId: $paymentMethodId,
+            )
+        );
+
+        if (! str_starts_with($savedPaymentMethod->providerCustomerId, 'cus_')) {
+            throw InvalidPaymentPayloadException::invalidField(
+                'saved_payment_method.provider_customer_id',
+                'Saved Stripe payment method resolved an invalid cus_... customer identifier.'
+            );
+        }
+
+        if (! str_starts_with($savedPaymentMethod->providerPaymentMethodId, 'pm_')) {
+            throw InvalidPaymentPayloadException::invalidField(
+                'saved_payment_method.provider_payment_method_id',
+                'Saved Stripe payment method resolved an invalid pm_... payment method identifier.'
+            );
+        }
+
+        return [
+            $savedPaymentMethod->providerCustomerId,
+            $savedPaymentMethod->providerPaymentMethodId,
+            $offSession,
+        ];
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
     }
 }

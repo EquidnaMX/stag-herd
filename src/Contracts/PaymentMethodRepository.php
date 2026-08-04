@@ -4,14 +4,17 @@ namespace Equidna\StagHerd\Contracts;
 
 interface PaymentMethodRepository
 {
-    public function upsert(array $attributes): void;
+    /** @param array<string, mixed> $attributes */
+    public function upsert(array $attributes): bool;
 
+    /** @return array<string, mixed>|null */
     public function findByProviderPaymentMethodId(
         string $provider,
         string $credentialContext,
         string $providerPaymentMethodId,
     ): ?array;
 
+    /** @return array<string, mixed>|null */
     public function findByFingerprint(
         string $provider,
         string $credentialContext,
@@ -19,11 +22,34 @@ interface PaymentMethodRepository
         string $fingerprint,
     ): ?array;
 
+    /** @return array<int, array<string, mixed>> */
     public function listByOwner(
         string $provider,
         string $credentialContext,
         string $ownerReference,
     ): array;
+
+    /** @return array<int, array<string, mixed>> */
+    public function listActiveByOwner(
+        string $provider,
+        string $credentialContext,
+        string $ownerReference,
+    ): array;
+
+    /** @return array<string, mixed>|null */
+    public function findActiveByOwner(
+        string $provider,
+        string $credentialContext,
+        string $ownerReference,
+        string $providerPaymentMethodId,
+    ): ?array;
+
+    /** @return array<string, mixed>|null */
+    public function findDefaultByOwner(
+        string $provider,
+        string $credentialContext,
+        string $ownerReference,
+    ): ?array;
 
     public function markAsDefault(
         string $provider,
