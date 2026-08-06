@@ -7,12 +7,19 @@ use Equidna\StagHerd\Data\NormalizedWebhookData;
 use Equidna\StagHerd\Data\WebhookPayloadData;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\InvalidWebhookSignatureException;
+use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 
 final class MercadoPagoWebhookParser implements WebhookParser
 {
     public function parse(WebhookPayloadData $webhook): NormalizedWebhookData
     {
         $this->verifySignature($webhook);
+
+        $providerType = $this->providerType($webhook);
+
+        if ($providerType === 'subscription_preapproval') {
+            return $this->subscriptionWebhook($webhook);
+        }
 
         $resourceType = $this->resourceType($webhook);
         $resourceId = $this->resourceId($webhook);
@@ -28,6 +35,41 @@ final class MercadoPagoWebhookParser implements WebhookParser
             rawPayload: $webhook->payload,
             providerEventId: (string) (data_get($webhook->payload, 'id') ?? $resourceId),
             credentialContext: $webhook->credentialContext,
+        );
+    }
+
+    private function subscriptionWebhook(WebhookPayloadData $webhook): NormalizedWebhookData
+    {
+        $subscriptionId = $this->resourceId($webhook);
+        $action = strtolower((string) (
+            data_get($webhook->payload, 'action')
+            ?? $this->queryValue($webhook, 'action')
+            ?? 'subscription.updated'
+        ));
+
+        $eventType = match (true) {
+            str_contains($action, 'created') => 'customer.subscription.created',
+            str_contains($action, 'cancel') => 'customer.subscription.deleted',
+            str_contains($action, 'paused') => 'customer.subscription.updated',
+            str_contains($action, 'resumed') => 'customer.subscription.updated',
+            default => 'customer.subscription.updated',
+        };
+
+        return new NormalizedWebhookData(
+            provider: 'mercado_pago',
+            eventType: $eventType,
+            resourceType: 'subscription',
+            resourceId: $subscriptionId,
+            providerPaymentId: null,
+            providerOrderId: null,
+            rawPayload: $webhook->payload,
+            providerEventId: (string) (data_get($webhook->payload, 'id') ?? $subscriptionId),
+            credentialContext: $webhook->credentialContext,
+            subscriptionId: $subscriptionId,
+            status: $this->nullableString(
+                data_get($webhook->payload, 'data.status')
+                    ?? data_get($webhook->payload, 'status')
+            ),
         );
     }
 
@@ -71,7 +113,7 @@ final class MercadoPagoWebhookParser implements WebhookParser
         }
     }
 
-    private function resourceType(WebhookPayloadData $webhook): string
+    private function providerType(WebhookPayloadData $webhook): string
     {
         $type = data_get($webhook->payload, 'type')
             ?? data_get($webhook->payload, 'topic')
@@ -83,6 +125,11 @@ final class MercadoPagoWebhookParser implements WebhookParser
         }
 
         return strtolower((string) $type);
+    }
+
+    private function resourceType(WebhookPayloadData $webhook): string
+    {
+        return $this->providerType($webhook);
     }
 
     private function resourceId(WebhookPayloadData $webhook): string
@@ -136,6 +183,11 @@ final class MercadoPagoWebhookParser implements WebhookParser
         }
 
         return $value !== null && $value !== '' ? (string) $value : null;
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        return $value === null || $value === '' ? null : (string) $value;
     }
 
     /**

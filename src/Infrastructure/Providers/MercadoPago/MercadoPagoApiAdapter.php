@@ -87,6 +87,59 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
         );
     }
 
+    public function createPreapprovalPlan(
+        array $payload,
+        ?string $idempotencyKey = null,
+    ): array {
+        return $this->send(
+            method: 'post',
+            endpoint: '/preapproval_plan',
+            payload: $payload,
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+        );
+    }
+
+    public function getPreapprovalPlan(string $planId): array
+    {
+        return $this->send(
+            method: 'get',
+            endpoint: "/preapproval_plan/{$planId}",
+        );
+    }
+
+    public function createPreapproval(
+        array $payload,
+        ?string $idempotencyKey = null,
+    ): array {
+        return $this->send(
+            method: 'post',
+            endpoint: '/preapproval',
+            payload: $payload,
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+        );
+    }
+
+    public function getPreapproval(string $subscriptionId): array
+    {
+        return $this->send(
+            method: 'get',
+            endpoint: "/preapproval/{$subscriptionId}",
+        );
+    }
+
+    public function updatePreapproval(
+        string $subscriptionId,
+        array $payload,
+        ?string $idempotencyKey = null,
+    ): array {
+        return $this->send(
+            method: 'put',
+            endpoint: "/preapproval/{$subscriptionId}",
+            payload: $payload,
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+        );
+    }
+
     /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>

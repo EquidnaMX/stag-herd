@@ -18,6 +18,57 @@ class PayPalApiAdapter implements PayPalGateway
 {
     private const PROVIDER = 'paypal';
 
+    public function createCatalogProduct(array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->send(
+            method: 'post',
+            endpoint: '/v1/catalogs/products',
+            payload: $payload,
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+        );
+    }
+
+    public function createPlan(array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->send(
+            method: 'post',
+            endpoint: '/v1/billing/plans',
+            payload: $payload,
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+        );
+    }
+
+    public function createSubscription(array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->send(
+            method: 'post',
+            endpoint: '/v1/billing/subscriptions',
+            payload: $payload,
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+        );
+    }
+
+    public function getSubscription(string $subscriptionId): array
+    {
+        return $this->send(
+            method: 'get',
+            endpoint: "/v1/billing/subscriptions/{$subscriptionId}",
+        );
+    }
+
+    public function cancelSubscription(
+        string $subscriptionId,
+        array $payload = [],
+        ?string $idempotencyKey = null,
+    ): array {
+        return $this->send(
+            method: 'post',
+            endpoint: "/v1/billing/subscriptions/{$subscriptionId}/cancel",
+            payload: $payload === [] ? ['reason' => 'Requested by merchant.'] : $payload,
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+        );
+    }
+
     public function createOrder(
         array $payload,
         ?string $idempotencyKey = null,

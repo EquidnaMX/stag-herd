@@ -44,4 +44,42 @@ interface MercadoPagoGateway
      * @return array<string, mixed>
      */
     public function createPreference(array $payload): array;
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function createPreapprovalPlan(
+        array $payload,
+        ?string $idempotencyKey = null,
+    ): array;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPreapprovalPlan(string $planId): array;
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function createPreapproval(
+        array $payload,
+        ?string $idempotencyKey = null,
+    ): array;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPreapproval(string $subscriptionId): array;
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function updatePreapproval(
+        string $subscriptionId,
+        array $payload,
+        ?string $idempotencyKey = null,
+    ): array;
 }

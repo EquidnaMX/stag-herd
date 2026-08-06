@@ -3,6 +3,7 @@
 use Equidna\StagHerd\Infrastructure\Providers\Cash\CashProvider;
 use Equidna\StagHerd\Infrastructure\Providers\Custom\CustomProvider;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalProvider;
+use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalBillingProvider;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoProvider;
 use Equidna\StagHerd\Infrastructure\Providers\Cash\Handlers\CashPaymentHandler;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalCheckoutHandler;
@@ -18,11 +19,20 @@ use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeCardHandler;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeGooglePayHandler;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeSpeiHandler;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeTokenizedCardHandler;
+use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoBillingProvider;
 
 return [
     'credential_contexts' => [],
 
     'billing_providers' => [
+        'mercado_pago' => [
+            'enabled' => true,
+            'provider' => MercadoPagoBillingProvider::class,
+        ],
+        'paypal' => [
+            'enabled' => true,
+            'provider' => PayPalBillingProvider::class,
+        ],
         'stripe' => [
             'enabled' => true,
             'provider' => StripeBillingProvider::class,
