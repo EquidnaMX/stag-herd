@@ -13,6 +13,6 @@ final class PayPalProvider extends AbstractPaymentProvider
 
     public function getMethods(): array
     {
-        return ['paypal'];
+        return ['paypal', 'tokenized_card'];
     }
 }

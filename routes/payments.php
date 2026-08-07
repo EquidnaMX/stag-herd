@@ -26,12 +26,14 @@ Route::middleware(['api'])
         if (config('stag-herd.providers.mercado_pago.enabled', false)) {
             Route::post('/mercado-pago/brick', [MercadoPagoController::class, 'processBrick'])->name('mercado-pago.brick');
             Route::post('/mercado-pago/checkout-pro', [MercadoPagoController::class, 'createCheckoutPro'])->name('mercado-pago.checkout-pro');
+            Route::post('/mercado-pago/tokenized-card', [MercadoPagoController::class, 'processTokenizedCard'])->name('mercado-pago.tokenized-card');
         }
 
         if (config('stag-herd.providers.paypal.enabled', false)) {
             Route::prefix('paypal')->name('paypal.')->controller(PayPalController::class)->group(function (): void {
                 Route::post('/create', 'createOrder')->name('create');
                 Route::post('/capture', 'captureOrder')->name('capture');
+                Route::post('/tokenized-card', 'processTokenizedCard')->name('tokenized-card');
             });
         }
 

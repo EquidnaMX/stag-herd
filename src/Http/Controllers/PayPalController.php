@@ -4,6 +4,7 @@ namespace Equidna\StagHerd\Http\Controllers;
 
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\CreateOrderRequest;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\CaptureOrderRequest;
+use Equidna\StagHerd\Http\Requests\Payments\PayPal\ProcessTokenizedCardRequest;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Support\ProviderRegistry;
 use Equidna\StagHerd\Facades\StagHerd;
@@ -59,9 +60,7 @@ class PayPalController extends Controller
     {
         try {
             $payment = StagHerd::createPayment(
-                $request->toPaymentRequestData(
-                    $this->resolveFirstEnabledMethodForProvider('paypal'),
-                ),
+                $request->toPaymentRequestData('paypal'),
             );
 
             return response()->json([
@@ -80,16 +79,26 @@ class PayPalController extends Controller
         }
     }
 
-    private function resolveFirstEnabledMethodForProvider(string $provider): string
+    public function processTokenizedCard(ProcessTokenizedCardRequest $request): JsonResponse
     {
-        $methods = $this->providers->methodsForProvider($provider);
+        try {
+            $payment = StagHerd::createPayment(
+                $request->toPaymentRequestData(),
+            );
 
-        if ($methods !== []) {
-            return $methods[0];
+            return response()->json([
+                'ok' => true,
+                'message' => 'Pago con tarjeta PayPal guardada procesado correctamente.',
+                'payment' => $payment->toArray(),
+            ]);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'No ha sido posible procesar el pago',
+                'errors' => [
+                    $exception->getMessage(),
+                ],
+            ], 422);
         }
-
-        throw new RuntimeException(
-            sprintf('Payment provider [%s] has no enabled methods configured.', strtolower($provider))
-        );
     }
 }

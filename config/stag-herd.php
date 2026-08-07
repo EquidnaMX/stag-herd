@@ -9,6 +9,7 @@ use Equidna\StagHerd\Infrastructure\Providers\Cash\Handlers\CashPaymentHandler;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalCheckoutHandler;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers\MercadoPagoCardHandler;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers\MercadoPagoCheckoutProHandler;
+use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers\MercadoPagoTokenizedCardHandler;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoWebhookParser;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalWebhookParser;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeProvider;
@@ -20,6 +21,7 @@ use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeGooglePayHan
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeSpeiHandler;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers\StripeTokenizedCardHandler;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoBillingProvider;
+use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalTokenizedCardHandler;
 
 return [
     'credential_contexts' => [],
@@ -100,6 +102,11 @@ return [
                     'handler' => MercadoPagoCheckoutProHandler::class,
                 ],
 
+                'tokenized_card' => [
+                    'enabled' => true,
+                    'label' => 'Tarjeta guardada',
+                    'handler' => MercadoPagoTokenizedCardHandler::class,
+                ],
             ],
 
             'credentials' => [
@@ -127,6 +134,12 @@ return [
                     'enabled' => true,
                     'label' => 'PayPal',
                     'handler' => PayPalCheckoutHandler::class,
+                ],
+
+                'tokenized_card' => [
+                    'enabled' => true,
+                    'label' => 'Tarjeta guardada',
+                    'handler' => PayPalTokenizedCardHandler::class,
                 ],
             ],
 
