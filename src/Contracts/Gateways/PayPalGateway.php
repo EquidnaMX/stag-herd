@@ -82,6 +82,16 @@ interface PayPalGateway
     ): array;
 
     /**
+     * @return array<string, mixed>
+     */
+    public function getPaymentToken(string $paymentTokenId): array;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function deletePaymentToken(string $paymentTokenId): array;
+
+    /**
      * Verifies a PayPal webhook signature against PayPal's API.
      *
      * @param array<string, mixed> $payload

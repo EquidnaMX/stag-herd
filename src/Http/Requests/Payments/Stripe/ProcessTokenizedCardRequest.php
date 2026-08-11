@@ -21,6 +21,7 @@ class ProcessTokenizedCardRequest extends StripeFormRequest
             'off_session' => ['nullable', 'boolean'],
             'return_url' => ['nullable', 'url', 'max:500'],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
+            'credential_context' => ['nullable', 'string', 'max:255'],
             'metadata' => ['nullable', 'array'],
         ];
     }
@@ -37,6 +38,7 @@ class ProcessTokenizedCardRequest extends StripeFormRequest
             'payment_method_id' => $this->normalizeNullableString($this->input('payment_method_id')),
             'return_url' => $this->normalizeNullableString($this->input('return_url')),
             'idempotency_key' => $this->normalizeNullableString($this->input('idempotency_key')),
+            'credential_context' => $this->normalizeNullableString($this->input('credential_context')),
         ]);
     }
 
@@ -103,6 +105,7 @@ class ProcessTokenizedCardRequest extends StripeFormRequest
             description: $data['description'] ?? 'Payment with stored Stripe card',
             returnUrl: $data['return_url'] ?? null,
             metadata: $this->cleanMetadata($metadata),
+            credentialContext: (string) ($data['credential_context'] ?? 'default'),
         );
     }
 }

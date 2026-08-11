@@ -3,6 +3,7 @@
 use Equidna\StagHerd\Http\Controllers\MercadoPagoController;
 use Equidna\StagHerd\Http\Controllers\PaymentController;
 use Equidna\StagHerd\Http\Controllers\PaymentOperationController;
+use Equidna\StagHerd\Http\Controllers\PaymentMethodController;
 use Equidna\StagHerd\Http\Controllers\PayPalController;
 use Equidna\StagHerd\Http\Controllers\StripeController;
 use Illuminate\Support\Facades\Route;
@@ -23,16 +24,26 @@ Route::middleware(['api'])
             Route::post('/provider/sync', [PaymentOperationController::class, 'providerSync'])->name('provider.sync');
         }
 
+        Route::prefix('payment-methods')->name('payment-methods.')->controller(PaymentMethodController::class)->group(function (): void {
+            Route::get('/', 'index')->name('index');
+            Route::post('/default', 'setDefault')->name('default');
+            Route::post('/deactivate', 'deactivate')->name('deactivate');
+        });
+
         if (config('stag-herd.providers.mercado_pago.enabled', false)) {
-            Route::post('/mercado-pago/brick', [MercadoPagoController::class, 'processBrick'])->name('mercado-pago.brick');
-            Route::post('/mercado-pago/checkout-pro', [MercadoPagoController::class, 'createCheckoutPro'])->name('mercado-pago.checkout-pro');
-            Route::post('/mercado-pago/tokenized-card', [MercadoPagoController::class, 'processTokenizedCard'])->name('mercado-pago.tokenized-card');
+            Route::prefix('mercado-pago')->name('mercado-pago.')->controller(MercadoPagoController::class)->group(function (): void {
+                Route::post('/brick', 'processBrick')->name('brick');
+                Route::post('/checkout-pro', 'createCheckoutPro')->name('checkout-pro');
+                Route::post('/payment-methods', 'registerPaymentMethod')->name('payment-methods.store');
+                Route::post('/tokenized-card', 'processTokenizedCard')->name('tokenized-card');
+            });
         }
 
         if (config('stag-herd.providers.paypal.enabled', false)) {
             Route::prefix('paypal')->name('paypal.')->controller(PayPalController::class)->group(function (): void {
                 Route::post('/create', 'createOrder')->name('create');
                 Route::post('/capture', 'captureOrder')->name('capture');
+                Route::post('/payment-methods', 'registerPaymentMethod')->name('payment-methods.store');
                 Route::post('/tokenized-card', 'processTokenizedCard')->name('tokenized-card');
             });
         }

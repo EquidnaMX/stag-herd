@@ -2,15 +2,15 @@
 
 namespace Equidna\StagHerd\Infrastructure\Providers\Stripe\Handlers;
 
-use Equidna\StagHerd\Contracts\ManagesSavedPaymentMethods;
+use Equidna\StagHerd\Contracts\ManagesPaymentMethods;
 use Equidna\StagHerd\Contracts\PaymentMethodHandler;
 use Equidna\StagHerd\Data\PaymentCancellationData;
 use Equidna\StagHerd\Data\PaymentConfirmationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
+use Equidna\StagHerd\Data\PaymentMethodLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\RefundRequestData;
-use Equidna\StagHerd\Data\SavedPaymentMethodLookupData;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardPaymentService;
 
@@ -18,7 +18,7 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
 {
     public function __construct(
         private readonly StripeCardPaymentService $payments,
-        private readonly ManagesSavedPaymentMethods $savedPaymentMethods,
+        private readonly ManagesPaymentMethods $paymentMethods,
     ) {
         //
     }
@@ -158,12 +158,12 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
         ) {
             throw InvalidPaymentPayloadException::invalidField(
                 'metadata.stripe.payment_method',
-                'Saved Stripe payment method lookup expects a valid pm_... identifier.'
+                'Stripe payment method lookup expects a valid pm_... identifier.'
             );
         }
 
-        $savedPaymentMethod = $this->savedPaymentMethods->resolveUsable(
-            new SavedPaymentMethodLookupData(
+        $paymentMethod = $this->paymentMethods->resolveUsablePaymentMethod(
+            new PaymentMethodLookupData(
                 provider: 'stripe',
                 ownerReference: $ownerReference,
                 credentialContext: $request->credentialContext,
@@ -171,23 +171,23 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
             )
         );
 
-        if (! str_starts_with($savedPaymentMethod->providerCustomerId, 'cus_')) {
+        if (! str_starts_with($paymentMethod->providerCustomerId, 'cus_')) {
             throw InvalidPaymentPayloadException::invalidField(
-                'saved_payment_method.provider_customer_id',
-                'Saved Stripe payment method resolved an invalid cus_... customer identifier.'
+                'payment_method.provider_payment_method_id',
+                'Stripe payment method resolved an invalid pm_... payment method identifier.'
             );
         }
 
-        if (! str_starts_with($savedPaymentMethod->providerPaymentMethodId, 'pm_')) {
+        if (! str_starts_with($paymentMethod->providerPaymentMethodId, 'pm_')) {
             throw InvalidPaymentPayloadException::invalidField(
-                'saved_payment_method.provider_payment_method_id',
-                'Saved Stripe payment method resolved an invalid pm_... payment method identifier.'
+                'payment_method.provider_payment_method_id',
+                'Payment method resolved an invalid pm_... payment method identifier.'
             );
         }
 
         return [
-            $savedPaymentMethod->providerCustomerId,
-            $savedPaymentMethod->providerPaymentMethodId,
+            $paymentMethod->providerCustomerId,
+            $paymentMethod->providerPaymentMethodId,
             $offSession,
         ];
     }

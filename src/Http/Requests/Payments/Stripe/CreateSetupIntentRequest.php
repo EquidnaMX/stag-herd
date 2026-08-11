@@ -13,6 +13,7 @@ class CreateSetupIntentRequest extends StripeFormRequest
             'payer_name' => ['nullable', 'string', 'max:255'],
             'return_url' => ['nullable', 'url', 'max:500'],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
+            'credential_context' => ['nullable', 'string', 'max:255'],
             'metadata' => ['nullable', 'array'],
         ];
     }
@@ -26,6 +27,7 @@ class CreateSetupIntentRequest extends StripeFormRequest
             'payer_name' => $this->normalizeNullableString($this->input('payer_name')),
             'return_url' => $this->normalizeNullableString($this->input('return_url')),
             'idempotency_key' => $this->normalizeNullableString($this->input('idempotency_key')),
+            'credential_context' => $this->normalizeNullableString($this->input('credential_context')),
         ]);
     }
 
@@ -62,12 +64,21 @@ class CreateSetupIntentRequest extends StripeFormRequest
         );
     }
 
+    public function credentialContext(): string
+    {
+        return (string) ($this->validated('credential_context') ?? 'default');
+    }
+
     public function customMetadata(): array
     {
         $metadata = $this->validated('metadata') ?? [];
 
-        return is_array($metadata)
+        $metadata = is_array($metadata)
             ? $this->cleanMetadata($metadata)
             : [];
+
+        return array_replace_recursive($metadata, [
+            'credential_context' => $this->credentialContext(),
+        ]);
     }
 }

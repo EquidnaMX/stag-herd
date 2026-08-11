@@ -16,14 +16,12 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             'payer_reference' => ['nullable', 'string', 'max:255'],
             'payer_email' => ['nullable', 'email', 'max:255'],
             'description' => ['nullable', 'string', 'max:255'],
-
             'token_id' => ['nullable', 'string', 'max:255'],
             'token_type' => ['nullable', 'string', 'max:64'],
-
             'return_url' => ['nullable', 'url', 'max:500'],
             'cancel_url' => ['nullable', 'url', 'max:500'],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
-
+            'credential_context' => ['nullable', 'string', 'max:255'],
             'metadata' => ['nullable', 'array'],
         ];
     }
@@ -41,6 +39,7 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             'return_url' => $this->normalizeNullableString($this->input('return_url')),
             'cancel_url' => $this->normalizeNullableString($this->input('cancel_url')),
             'idempotency_key' => $this->normalizeNullableString($this->input('idempotency_key')),
+            'credential_context' => $this->normalizeNullableString($this->input('credential_context')),
         ]);
     }
 
@@ -98,6 +97,7 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             returnUrl: $data['return_url'] ?? null,
             cancelUrl: $data['cancel_url'] ?? null,
             metadata: $this->cleanMetadata($metadata),
+            credentialContext: (string) ($data['credential_context'] ?? 'default'),
         );
     }
 }

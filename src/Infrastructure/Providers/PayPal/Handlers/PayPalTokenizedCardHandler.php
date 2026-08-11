@@ -3,16 +3,16 @@
 namespace Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers;
 
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
-use Equidna\StagHerd\Contracts\ManagesSavedPaymentMethods;
+use Equidna\StagHerd\Contracts\ManagesPaymentMethods;
 use Equidna\StagHerd\Contracts\PaymentMethodHandler;
 use Equidna\StagHerd\Data\PaymentCancellationData;
 use Equidna\StagHerd\Data\PaymentConfirmationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
+use Equidna\StagHerd\Data\PaymentMethodData;
+use Equidna\StagHerd\Data\PaymentMethodLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\RefundRequestData;
-use Equidna\StagHerd\Data\SavedPaymentMethodData;
-use Equidna\StagHerd\Data\SavedPaymentMethodLookupData;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalResultMapper;
@@ -25,7 +25,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler
     public function __construct(
         private readonly PayPalGateway $gateway,
         private readonly PayPalResultMapper $mapper,
-        private readonly ManagesSavedPaymentMethods $savedPaymentMethods,
+        private readonly ManagesPaymentMethods $paymentMethods,
     ) {
         //
     }
@@ -213,23 +213,23 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler
             throw InvalidPaymentPayloadException::missingField('payer_reference');
         }
 
-        $savedPaymentMethod = $this->savedPaymentMethods->resolveUsable(
-            new SavedPaymentMethodLookupData(
+        $paymentMethod = $this->paymentMethods->resolveUsablePaymentMethod(
+            new PaymentMethodLookupData(
                 provider: 'paypal',
                 ownerReference: $ownerReference,
                 credentialContext: $request->credentialContext,
             )
         );
 
-        return $this->resolveSavedPaymentSource($savedPaymentMethod);
+        return $this->resolveSavedPaymentSource($paymentMethod);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function resolveSavedPaymentSource(SavedPaymentMethodData $savedPaymentMethod): array
+    private function resolveSavedPaymentSource(PaymentMethodData $paymentMethod): array
     {
-        $payload = $savedPaymentMethod->payload;
+        $payload = $paymentMethod->payload;
 
         $paymentSource = Arr::get($payload, 'paypal.payment_source')
             ?? Arr::get($payload, 'payment_source')
@@ -239,11 +239,11 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler
             return $paymentSource;
         }
 
-        $tokenId = trim((string) $savedPaymentMethod->providerPaymentMethodId);
+        $tokenId = trim((string) $paymentMethod->providerPaymentMethodId);
 
         if ($tokenId === '') {
             throw InvalidPaymentPayloadException::missingField(
-                'saved_payment_method.provider_payment_method_id'
+                'payment_method.provider_payment_method_id'
             );
         }
 

@@ -4,7 +4,7 @@ namespace Equidna\StagHerd\Data;
 
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 
-final readonly class SavedPaymentMethodLookupData
+final readonly class PaymentMethodLookupData
 {
     public function __construct(
         public string $provider,

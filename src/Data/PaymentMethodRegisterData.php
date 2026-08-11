@@ -2,7 +2,7 @@
 
 namespace Equidna\StagHerd\Data;
 
-final readonly class SavedPaymentMethodUpsertData
+final readonly class PaymentMethodRegisterData
 {
     /** @param array<string, mixed> $payload */
     public function __construct(

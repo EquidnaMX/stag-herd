@@ -4,14 +4,12 @@ namespace Equidna\StagHerd;
 
 use Equidna\StagHerd\Application\BillingService;
 use Equidna\StagHerd\Application\PaymentService;
-use Equidna\StagHerd\Application\SavedPaymentMethodService;
 use Equidna\StagHerd\Contracts\BillingProvider;
 use Equidna\StagHerd\Contracts\BillingResourceRepository;
 use Equidna\StagHerd\Contracts\CredentialResolver;
 use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
-use Equidna\StagHerd\Contracts\ManagesSavedPaymentMethods;
 use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
 use Equidna\StagHerd\Contracts\PaymentMethodHandler;
 use Equidna\StagHerd\Contracts\PaymentMethodRepository;
@@ -32,6 +30,8 @@ use Equidna\StagHerd\Support\CredentialContextManager;
 use Equidna\StagHerd\Support\PaymentMethodHandlerRegistry;
 use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Support\ServiceProvider;
+use Equidna\StagHerd\Application\PaymentMethodService;
+use Equidna\StagHerd\Contracts\ManagesPaymentMethods;
 
 class StagHerdServiceProvider extends ServiceProvider
 {
@@ -212,8 +212,8 @@ class StagHerdServiceProvider extends ServiceProvider
     {
         $this->app->singleton(PaymentService::class);
         $this->app->singleton(BillingService::class);
-        $this->app->singleton(SavedPaymentMethodService::class);
-        $this->app->bind(ManagesSavedPaymentMethods::class, SavedPaymentMethodService::class);
+        $this->app->singleton(PaymentMethodService::class);
+        $this->app->bind(ManagesPaymentMethods::class, PaymentMethodService::class);
     }
 
     private function registerBilling(): void

@@ -140,6 +140,27 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
         );
     }
 
+    public function getCustomerCards(string $customerId): array
+    {
+        $response = $this->send(
+            method: 'get',
+            endpoint: "/v1/customers/{$customerId}/cards",
+        );
+
+        return array_values(array_filter(
+            is_array($response) ? $response : [],
+            static fn(mixed $card): bool => is_array($card),
+        ));
+    }
+
+    public function deleteCustomerCard(string $customerId, string $cardId): array
+    {
+        return $this->send(
+            method: 'delete',
+            endpoint: "/v1/customers/{$customerId}/cards/{$cardId}",
+        );
+    }
+
     /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
@@ -161,6 +182,7 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
                 'get' => $request->get($endpoint, $payload),
                 'post' => $request->post($endpoint, $payload),
                 'put' => $request->put($endpoint, $payload),
+                'delete' => $request->delete($endpoint, $payload),
                 default => throw ProviderCommunicationException::invalidResponse(
                     self::PROVIDER,
                     [

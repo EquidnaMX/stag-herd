@@ -3,22 +3,20 @@
 namespace Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers;
 
 use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
-use Equidna\StagHerd\Contracts\ManagesSavedPaymentMethods;
+use Equidna\StagHerd\Contracts\ManagesPaymentMethods;
 use Equidna\StagHerd\Contracts\PaymentMethodHandler;
 use Equidna\StagHerd\Data\PaymentCancellationData;
 use Equidna\StagHerd\Data\PaymentConfirmationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
+use Equidna\StagHerd\Data\PaymentMethodLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\RefundRequestData;
-use Equidna\StagHerd\Data\SavedPaymentMethodData;
-use Equidna\StagHerd\Data\SavedPaymentMethodLookupData;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoResultMapper;
 use Equidna\StagHerd\Support\MoneyFormatter;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
@@ -26,7 +24,7 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
     public function __construct(
         private readonly MercadoPagoGateway $gateway,
         private readonly MercadoPagoResultMapper $mapper,
-        private readonly ManagesSavedPaymentMethods $savedPaymentMethods,
+        private readonly ManagesPaymentMethods $paymentMethods,
     ) {
         //
     }
@@ -157,22 +155,22 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
             throw InvalidPaymentPayloadException::missingField('payer_reference');
         }
 
-        $savedPaymentMethod = $this->savedPaymentMethods->resolveUsable(
-            new SavedPaymentMethodLookupData(
+        $paymentMethod = $this->paymentMethods->resolveUsablePaymentMethod(
+            new PaymentMethodLookupData(
                 provider: 'mercado_pago',
                 ownerReference: $ownerReference,
                 credentialContext: $request->credentialContext,
             )
         );
 
-        $savedPayload = $savedPaymentMethod->payload;
+        $savedPayload = $paymentMethod->payload;
         $savedMercadoPago = is_array($savedPayload['mercado_pago'] ?? null)
             ? $savedPayload['mercado_pago']
             : [];
 
         $resolvedCustomerId = $this->nullableString(
             $savedMercadoPago['customer_id']
-                ?? $savedPaymentMethod->providerCustomerId
+                ?? $paymentMethod->providerCustomerId
                 ?? null
         );
 
@@ -183,19 +181,19 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
 
         $resolvedCardId = $this->nullableString(
             $savedMercadoPago['card_id']
-                ?? $savedPaymentMethod->providerPaymentMethodId
+                ?? $paymentMethod->providerPaymentMethodId
                 ?? null
         );
 
         if ($resolvedCustomerId === null) {
             throw InvalidPaymentPayloadException::missingField(
-                'saved_payment_method.provider_customer_id'
+                'payment_method.provider_customer_id'
             );
         }
 
         if ($resolvedPaymentMethodId === null) {
             throw InvalidPaymentPayloadException::missingField(
-                'saved_payment_method.payload.mercado_pago.payment_method_id'
+                'payment_method.payload.mercado_pago.payment_method_id'
             );
         }
 

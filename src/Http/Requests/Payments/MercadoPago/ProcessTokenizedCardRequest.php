@@ -19,6 +19,7 @@ class ProcessTokenizedCardRequest extends MercadoPagoFormRequest
 
             'idempotency_key' => ['nullable', 'string', 'max:64'],
             'device_id' => ['nullable', 'string', 'max:255'],
+            'credential_context' => ['nullable', 'string', 'max:255'],
 
             'metadata' => ['nullable', 'array'],
 
@@ -68,6 +69,7 @@ class ProcessTokenizedCardRequest extends MercadoPagoFormRequest
             'description' => $this->normalizeNullableString($this->input('description')),
             'idempotency_key' => $this->normalizeNullableString($this->input('idempotency_key')),
             'device_id' => $this->normalizeNullableString($this->input('device_id')),
+            'credential_context' => $this->normalizeNullableString($this->input('credential_context')),
             'token' => $this->normalizeNullableString($this->input('token')),
             'customer_id' => $this->normalizeNullableString($this->input('customer_id')),
             'card_id' => $this->normalizeNullableString($this->input('card_id')),
@@ -207,6 +209,11 @@ class ProcessTokenizedCardRequest extends MercadoPagoFormRequest
             ?? $this->validated('device_id');
     }
 
+    public function credentialContext(): string
+    {
+        return (string) ($this->validated('credential_context') ?? 'default');
+    }
+
     public function metadata(): array
     {
         $metadata = $this->cleanMetadata($this->validated('metadata') ?? []);
@@ -247,6 +254,7 @@ class ProcessTokenizedCardRequest extends MercadoPagoFormRequest
             payerEmail: $this->payerEmail(),
             description: $this->validated('description') ?? 'Payment with stored Mercado Pago card',
             metadata: $this->metadata(),
+            credentialContext: $this->credentialContext(),
         );
     }
 }

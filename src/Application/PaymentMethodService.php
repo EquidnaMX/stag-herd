@@ -2,41 +2,53 @@
 
 namespace Equidna\StagHerd\Application;
 
+use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
+use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
-use Equidna\StagHerd\Contracts\ManagesSavedPaymentMethods;
+use Equidna\StagHerd\Contracts\ManagesPaymentMethods;
 use Equidna\StagHerd\Contracts\PaymentMethodRepository;
-use Equidna\StagHerd\Data\SavedPaymentMethodData;
-use Equidna\StagHerd\Data\SavedPaymentMethodLookupData;
-use Equidna\StagHerd\Data\SavedPaymentMethodUpsertData;
-use Equidna\StagHerd\Exceptions\SavedPaymentMethodNotFoundException;
+use Equidna\StagHerd\Data\PaymentMethodData;
+use Equidna\StagHerd\Data\PaymentMethodDeactivateData;
+use Equidna\StagHerd\Data\PaymentMethodLookupData;
+use Equidna\StagHerd\Data\PaymentMethodRegisterData;
+use Equidna\StagHerd\Data\PaymentMethodSetDefaultData;
+use Equidna\StagHerd\Data\PaymentMethodsListData;
+use Equidna\StagHerd\Exceptions\PaymentMethodNotFoundException;
 use Equidna\StagHerd\Support\CredentialContextManager;
 
-final readonly class SavedPaymentMethodService implements ManagesSavedPaymentMethods
+final readonly class PaymentMethodService implements ManagesPaymentMethods
 {
     public function __construct(
         private PaymentMethodRepository $paymentMethods,
         private CredentialContextManager $credentials,
         private StripeGateway $stripeGateway,
+        private PayPalGateway $payPalGateway,
+        private MercadoPagoGateway $mercadoPagoGateway,
     ) {
         //
     }
 
-    public function upsert(SavedPaymentMethodUpsertData $request): SavedPaymentMethodData
-    {
+    public function registerPaymentMethod(
+        PaymentMethodRegisterData $request
+    ): PaymentMethodData {
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn(): SavedPaymentMethodData => $this->upsertWithinContext($request),
+            fn(): PaymentMethodData => $this->upsertWithinContext($request),
         );
     }
 
-    public function listActive(SavedPaymentMethodLookupData $request): array
-    {
+    /**
+     * @return array<int, PaymentMethodData>
+     */
+    public function listPaymentMethods(
+        PaymentMethodsListData $request
+    ): array {
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
             fn(): array => array_map(
-                static fn(array $record): SavedPaymentMethodData => SavedPaymentMethodData::fromArray($record),
+                static fn(array $record): PaymentMethodData => PaymentMethodData::fromArray($record),
                 $this->paymentMethods->listActiveByOwner(
                     strtolower($request->provider),
                     $request->credentialContext,
@@ -46,35 +58,43 @@ final readonly class SavedPaymentMethodService implements ManagesSavedPaymentMet
         );
     }
 
-    public function markDefault(SavedPaymentMethodLookupData $request): SavedPaymentMethodData
-    {
+    public function setDefaultPaymentMethod(
+        PaymentMethodSetDefaultData $request
+    ): PaymentMethodData {
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn(): SavedPaymentMethodData => $this->markDefaultWithinContext($request),
+            fn(): PaymentMethodData => $this->markDefaultWithinContext(
+                $request->toLookupData()
+            ),
         );
     }
 
-    public function deactivate(SavedPaymentMethodLookupData $request): SavedPaymentMethodData
-    {
+    public function deactivatePaymentMethod(
+        PaymentMethodDeactivateData $request
+    ): PaymentMethodData {
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn(): SavedPaymentMethodData => $this->deactivateWithinContext($request),
+            fn(): PaymentMethodData => $this->deactivateWithinContext(
+                $request->toLookupData()
+            ),
         );
     }
 
-    public function resolveUsable(SavedPaymentMethodLookupData $request): SavedPaymentMethodData
-    {
+    public function resolveUsablePaymentMethod(
+        PaymentMethodLookupData $request
+    ): PaymentMethodData {
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn(): SavedPaymentMethodData => $this->resolveUsableWithinContext($request),
+            fn(): PaymentMethodData => $this->resolveUsableWithinContext($request),
         );
     }
 
-    private function upsertWithinContext(SavedPaymentMethodUpsertData $request): SavedPaymentMethodData
-    {
+    private function upsertWithinContext(
+        PaymentMethodRegisterData $request
+    ): PaymentMethodData {
         $attributes = $request->toArray();
 
         if (($attributes['status'] ?? 'active') === 'active' && ($attributes['attached_at'] ?? null) === null) {
@@ -89,15 +109,15 @@ final readonly class SavedPaymentMethodService implements ManagesSavedPaymentMet
 
         $this->paymentMethods->upsert($attributes);
 
-        $savedMethod = $this->requireStoredMethod(
+        $paymentMethod = $this->requireStoredMethod(
             provider: $request->provider,
             credentialContext: $request->credentialContext,
             ownerReference: $request->ownerReference,
             providerPaymentMethodId: $request->providerPaymentMethodId,
         );
 
-        if ($savedMethod->status !== 'active') {
-            return $savedMethod;
+        if ($paymentMethod->status !== 'active') {
+            return $paymentMethod;
         }
 
         $shouldBecomeDefault = $request->isDefault
@@ -108,10 +128,10 @@ final readonly class SavedPaymentMethodService implements ManagesSavedPaymentMet
             ) === null;
 
         if (! $shouldBecomeDefault) {
-            return $savedMethod;
+            return $paymentMethod;
         }
 
-        return $this->markDefaultWithinContext(new SavedPaymentMethodLookupData(
+        return $this->markDefaultWithinContext(new PaymentMethodLookupData(
             provider: $request->provider,
             ownerReference: $request->ownerReference,
             credentialContext: $request->credentialContext,
@@ -119,39 +139,41 @@ final readonly class SavedPaymentMethodService implements ManagesSavedPaymentMet
         ));
     }
 
-    private function markDefaultWithinContext(SavedPaymentMethodLookupData $request): SavedPaymentMethodData
-    {
-        $savedMethod = $this->resolveExistingActiveMethod($request);
+    private function markDefaultWithinContext(
+        PaymentMethodLookupData $request
+    ): PaymentMethodData {
+        $paymentMethod = $this->resolveExistingActiveMethod($request);
 
         $this->syncProviderDefaultPaymentMethod(
-            provider: $savedMethod->provider,
-            providerCustomerId: $savedMethod->providerCustomerId,
-            providerPaymentMethodId: $savedMethod->providerPaymentMethodId,
+            provider: $paymentMethod->provider,
+            providerCustomerId: $paymentMethod->providerCustomerId,
+            providerPaymentMethodId: $paymentMethod->providerPaymentMethodId,
         );
 
         $this->paymentMethods->markAsDefault(
-            $savedMethod->provider,
-            $savedMethod->credentialContext,
-            $savedMethod->ownerReference,
-            $savedMethod->providerPaymentMethodId,
+            $paymentMethod->provider,
+            $paymentMethod->credentialContext,
+            $paymentMethod->ownerReference,
+            $paymentMethod->providerPaymentMethodId,
         );
 
         return $this->requireStoredMethod(
-            provider: $savedMethod->provider,
-            credentialContext: $savedMethod->credentialContext,
-            ownerReference: $savedMethod->ownerReference,
-            providerPaymentMethodId: $savedMethod->providerPaymentMethodId,
+            provider: $paymentMethod->provider,
+            credentialContext: $paymentMethod->credentialContext,
+            ownerReference: $paymentMethod->ownerReference,
+            providerPaymentMethodId: $paymentMethod->providerPaymentMethodId,
         );
     }
 
-    private function deactivateWithinContext(SavedPaymentMethodLookupData $request): SavedPaymentMethodData
-    {
-        $savedMethod = $this->resolveExistingActiveMethod($request);
+    private function deactivateWithinContext(
+        PaymentMethodLookupData $request
+    ): PaymentMethodData {
+        $paymentMethod = $this->resolveExistingActiveMethod($request);
 
         $nextDefault = null;
 
-        foreach ($this->listActiveByOwner($savedMethod) as $candidate) {
-            if ($candidate->providerPaymentMethodId === $savedMethod->providerPaymentMethodId) {
+        foreach ($this->listActiveByOwner($paymentMethod) as $candidate) {
+            if ($candidate->providerPaymentMethodId === $paymentMethod->providerPaymentMethodId) {
                 continue;
             }
 
@@ -161,20 +183,20 @@ final readonly class SavedPaymentMethodService implements ManagesSavedPaymentMet
         }
 
         $this->syncProviderDefaultPaymentMethod(
-            provider: $savedMethod->provider,
-            providerCustomerId: $savedMethod->providerCustomerId,
+            provider: $paymentMethod->provider,
+            providerCustomerId: $paymentMethod->providerCustomerId,
             providerPaymentMethodId: $nextDefault?->providerPaymentMethodId,
         );
 
-        $this->detachProviderPaymentMethod($savedMethod);
+        $this->detachProviderPaymentMethod($paymentMethod);
 
         $this->paymentMethods->markDetached(
-            $savedMethod->provider,
-            $savedMethod->credentialContext,
-            $savedMethod->providerPaymentMethodId,
+            $paymentMethod->provider,
+            $paymentMethod->credentialContext,
+            $paymentMethod->providerPaymentMethodId,
         );
 
-        if ($nextDefault instanceof SavedPaymentMethodData) {
+        if ($nextDefault instanceof PaymentMethodData) {
             $this->paymentMethods->markAsDefault(
                 $nextDefault->provider,
                 $nextDefault->credentialContext,
@@ -183,17 +205,18 @@ final readonly class SavedPaymentMethodService implements ManagesSavedPaymentMet
             );
         }
 
-        return SavedPaymentMethodData::fromArray(
+        return PaymentMethodData::fromArray(
             $this->paymentMethods->findByProviderPaymentMethodId(
-                $savedMethod->provider,
-                $savedMethod->credentialContext,
-                $savedMethod->providerPaymentMethodId,
+                $paymentMethod->provider,
+                $paymentMethod->credentialContext,
+                $paymentMethod->providerPaymentMethodId,
             ) ?? [],
         );
     }
 
-    private function resolveUsableWithinContext(SavedPaymentMethodLookupData $request): SavedPaymentMethodData
-    {
+    private function resolveUsableWithinContext(
+        PaymentMethodLookupData $request
+    ): PaymentMethodData {
         $record = $request->providerPaymentMethodId !== null
             ? $this->paymentMethods->findActiveByOwner(
                 strtolower($request->provider),
@@ -212,31 +235,32 @@ final readonly class SavedPaymentMethodService implements ManagesSavedPaymentMet
             )[0] ?? null);
 
         if (! is_array($record)) {
-            throw SavedPaymentMethodNotFoundException::forOwner(
+            throw PaymentMethodNotFoundException::forOwner(
                 strtolower($request->provider),
                 $request->ownerReference,
                 $request->providerPaymentMethodId,
             );
         }
 
-        $savedMethod = SavedPaymentMethodData::fromArray($record);
+        $paymentMethod = PaymentMethodData::fromArray($record);
 
         $this->paymentMethods->touchLastUsed(
-            $savedMethod->provider,
-            $savedMethod->credentialContext,
-            $savedMethod->providerPaymentMethodId,
+            $paymentMethod->provider,
+            $paymentMethod->credentialContext,
+            $paymentMethod->providerPaymentMethodId,
         );
 
         return $this->requireStoredMethod(
-            provider: $savedMethod->provider,
-            credentialContext: $savedMethod->credentialContext,
-            ownerReference: $savedMethod->ownerReference,
-            providerPaymentMethodId: $savedMethod->providerPaymentMethodId,
+            provider: $paymentMethod->provider,
+            credentialContext: $paymentMethod->credentialContext,
+            ownerReference: $paymentMethod->ownerReference,
+            providerPaymentMethodId: $paymentMethod->providerPaymentMethodId,
         );
     }
 
-    private function resolveExistingActiveMethod(SavedPaymentMethodLookupData $request): SavedPaymentMethodData
-    {
+    private function resolveExistingActiveMethod(
+        PaymentMethodLookupData $request
+    ): PaymentMethodData {
         $providerPaymentMethodId = $request->requireProviderPaymentMethodId();
 
         $record = $this->paymentMethods->findActiveByOwner(
@@ -247,14 +271,14 @@ final readonly class SavedPaymentMethodService implements ManagesSavedPaymentMet
         );
 
         if (! is_array($record)) {
-            throw SavedPaymentMethodNotFoundException::forOwner(
+            throw PaymentMethodNotFoundException::forOwner(
                 strtolower($request->provider),
                 $request->ownerReference,
                 $providerPaymentMethodId,
             );
         }
 
-        return SavedPaymentMethodData::fromArray($record);
+        return PaymentMethodData::fromArray($record);
     }
 
     private function requireStoredMethod(
@@ -262,7 +286,7 @@ final readonly class SavedPaymentMethodService implements ManagesSavedPaymentMet
         string $credentialContext,
         string $ownerReference,
         string $providerPaymentMethodId,
-    ): SavedPaymentMethodData {
+    ): PaymentMethodData {
         $record = $this->paymentMethods->findByProviderPaymentMethodId(
             strtolower($provider),
             $credentialContext,
@@ -270,27 +294,27 @@ final readonly class SavedPaymentMethodService implements ManagesSavedPaymentMet
         );
 
         if (! is_array($record) || (string) ($record['owner_reference'] ?? '') !== $ownerReference) {
-            throw SavedPaymentMethodNotFoundException::forOwner(
+            throw PaymentMethodNotFoundException::forOwner(
                 strtolower($provider),
                 $ownerReference,
                 $providerPaymentMethodId,
             );
         }
 
-        return SavedPaymentMethodData::fromArray($record);
+        return PaymentMethodData::fromArray($record);
     }
 
     /**
-     * @return array<int, SavedPaymentMethodData>
+     * @return array<int, PaymentMethodData>
      */
-    private function listActiveByOwner(SavedPaymentMethodData $savedMethod): array
+    private function listActiveByOwner(PaymentMethodData $paymentMethod): array
     {
         return array_map(
-            static fn(array $record): SavedPaymentMethodData => SavedPaymentMethodData::fromArray($record),
+            static fn(array $record): PaymentMethodData => PaymentMethodData::fromArray($record),
             $this->paymentMethods->listActiveByOwner(
-                $savedMethod->provider,
-                $savedMethod->credentialContext,
-                $savedMethod->ownerReference,
+                $paymentMethod->provider,
+                $paymentMethod->credentialContext,
+                $paymentMethod->ownerReference,
             ),
         );
     }
@@ -314,14 +338,21 @@ final readonly class SavedPaymentMethodService implements ManagesSavedPaymentMet
         );
     }
 
-    private function detachProviderPaymentMethod(SavedPaymentMethodData $savedMethod): void
-    {
-        if ($savedMethod->provider !== 'stripe') {
-            return;
-        }
-
-        $this->stripeGateway->detachPaymentMethod(
-            $savedMethod->providerPaymentMethodId,
-        );
+    private function detachProviderPaymentMethod(
+        PaymentMethodData $paymentMethod
+    ): void {
+        match ($paymentMethod->provider) {
+            'stripe' => $this->stripeGateway->detachPaymentMethod(
+                $paymentMethod->providerPaymentMethodId,
+            ),
+            'paypal' => $this->payPalGateway->deletePaymentToken(
+                $paymentMethod->providerPaymentMethodId,
+            ),
+            'mercado_pago' => $this->mercadoPagoGateway->deleteCustomerCard(
+                $paymentMethod->providerCustomerId,
+                $paymentMethod->providerPaymentMethodId,
+            ),
+            default => null,
+        };
     }
 }

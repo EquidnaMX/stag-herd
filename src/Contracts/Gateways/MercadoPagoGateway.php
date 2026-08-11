@@ -82,4 +82,14 @@ interface MercadoPagoGateway
         array $payload,
         ?string $idempotencyKey = null,
     ): array;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getCustomerCards(string $customerId): array;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function deleteCustomerCard(string $customerId, string $cardId): array;
 }

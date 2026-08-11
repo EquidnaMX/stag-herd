@@ -2,22 +2,22 @@
 
 namespace Equidna\StagHerd\Http\Controllers;
 
-use Equidna\StagHerd\Http\Requests\Payments\PayPal\CreateOrderRequest;
-use Equidna\StagHerd\Http\Requests\Payments\PayPal\CaptureOrderRequest;
-use Equidna\StagHerd\Http\Requests\Payments\PayPal\ProcessTokenizedCardRequest;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
-use Equidna\StagHerd\Support\ProviderRegistry;
 use Equidna\StagHerd\Facades\StagHerd;
-use Illuminate\Routing\Controller;
+use Equidna\StagHerd\Http\Requests\Payments\PayPal\CaptureOrderRequest;
+use Equidna\StagHerd\Http\Requests\Payments\PayPal\CreateOrderRequest;
+use Equidna\StagHerd\Http\Requests\Payments\PayPal\ProcessTokenizedCardRequest;
+use Equidna\StagHerd\Http\Requests\Payments\PayPal\RegisterPaymentMethodRequest;
+use Equidna\StagHerd\Infrastructure\Providers\PayPal\Services\PayPalPaymentMethodService;
 use Illuminate\Http\JsonResponse;
-use RuntimeException;
+use Illuminate\Routing\Controller;
 use Throwable;
 
 class PayPalController extends Controller
 {
     public function __construct(
         private readonly PayPalGateway $payPalGateway,
-        private readonly ProviderRegistry $providers,
+        private readonly PayPalPaymentMethodService $payPalPaymentMethods,
     ) {}
 
     public function createOrder(CreateOrderRequest $request): JsonResponse
@@ -98,6 +98,39 @@ class PayPalController extends Controller
                 'errors' => [
                     $exception->getMessage(),
                 ],
+            ], 422);
+        }
+    }
+
+    public function registerPaymentMethod(RegisterPaymentMethodRequest $request): JsonResponse
+    {
+        try {
+            $paymentMethod = $this->payPalPaymentMethods->register(
+                ownerReference: $request->ownerReference(),
+                paymentTokenId: $request->paymentTokenId(),
+                paymentToken: $request->paymentToken(),
+                credentialContext: $request->credentialContext(),
+            );
+
+            if ($paymentMethod === null) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'PayPal payment method could not be registered.',
+                ], 422);
+            }
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'PayPal payment method registered correctly.',
+                'payment_method' => $paymentMethod->toArray(),
+            ]);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
             ], 422);
         }
     }

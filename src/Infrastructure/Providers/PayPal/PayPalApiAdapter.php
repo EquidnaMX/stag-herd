@@ -134,6 +134,22 @@ class PayPalApiAdapter implements PayPalGateway
         );
     }
 
+    public function getPaymentToken(string $paymentTokenId): array
+    {
+        return $this->send(
+            method: 'get',
+            endpoint: "/vault/payment-tokens/{$paymentTokenId}",
+        );
+    }
+
+    public function deletePaymentToken(string $paymentTokenId): array
+    {
+        return $this->send(
+            method: 'delete',
+            endpoint: "/vault/payment-tokens/{$paymentTokenId}",
+        );
+    }
+
     public function verifyWebhookSignature(array $payload): bool
     {
         $response = $this->send(
@@ -161,6 +177,7 @@ class PayPalApiAdapter implements PayPalGateway
             $response = match (strtolower($method)) {
                 'get' => $request->get($endpoint, $payload),
                 'post' => $request->post($endpoint, $payload),
+                'delete' => $request->delete($endpoint, $payload),
                 default => throw ProviderCommunicationException::invalidResponse(
                     self::PROVIDER,
                     [
