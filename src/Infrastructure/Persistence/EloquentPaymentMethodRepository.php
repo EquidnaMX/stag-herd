@@ -227,4 +227,19 @@ final class EloquentPaymentMethodRepository implements PaymentMethodRepository
                 'last_used_at' => now(),
             ]);
     }
+
+    public function updateDisplayName(
+        string $provider,
+        string $credentialContext,
+        string $providerPaymentMethodId,
+        string $displayName,
+    ): void {
+        StagHerdPaymentMethod::query()
+            ->where('provider', $provider)
+            ->where('credential_context', $credentialContext)
+            ->where('provider_payment_method_id', $providerPaymentMethodId)
+            ->update([
+                'display_name' => $displayName,
+            ]);
+    }
 }

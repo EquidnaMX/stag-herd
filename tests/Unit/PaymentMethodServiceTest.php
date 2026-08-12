@@ -34,11 +34,13 @@ final class PaymentMethodServiceTest extends TestCase
             providerCustomerId: 'cus_second',
             providerPaymentMethodId: 'pm_second',
             fingerprint: 'modmChWtgTXsjmPQ',
+            displayName: 'Tarjeta personal',
             last4: '4242',
         ));
 
         $this->assertSame('pm_first', $first->providerPaymentMethodId);
         $this->assertSame('pm_first', $second->providerPaymentMethodId);
+        $this->assertSame('Tarjeta personal', $second->displayName);
         $this->assertSame(1, $repository->count());
         $this->assertSame(1, $repository->touchCount('pm_first'));
     }
@@ -201,6 +203,19 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
     public function touchLastUsed(string $provider, string $credentialContext, string $providerPaymentMethodId): void
     {
         $this->touches[$providerPaymentMethodId] = ($this->touches[$providerPaymentMethodId] ?? 0) + 1;
+    }
+
+    public function updateDisplayName(
+        string $provider,
+        string $credentialContext,
+        string $providerPaymentMethodId,
+        string $displayName,
+    ): void {
+        $key = $this->key($provider, $credentialContext, $providerPaymentMethodId);
+
+        if (isset($this->records[$key])) {
+            $this->records[$key]['display_name'] = $displayName;
+        }
     }
 
     public function count(): int

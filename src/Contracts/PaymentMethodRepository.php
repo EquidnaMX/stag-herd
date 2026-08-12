@@ -77,4 +77,11 @@ interface PaymentMethodRepository
         string $credentialContext,
         string $providerPaymentMethodId,
     ): void;
+
+    public function updateDisplayName(
+        string $provider,
+        string $credentialContext,
+        string $providerPaymentMethodId,
+        string $displayName,
+    ): void;
 }

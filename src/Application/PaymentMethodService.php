@@ -171,6 +171,17 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
             $paymentMethod->providerPaymentMethodId,
         );
 
+        $displayName = trim((string) ($request->displayName ?? ''));
+
+        if ($displayName !== '') {
+            $this->paymentMethods->updateDisplayName(
+                $paymentMethod->provider,
+                $paymentMethod->credentialContext,
+                $paymentMethod->providerPaymentMethodId,
+                $displayName,
+            );
+        }
+
         return $this->requireStoredMethod(
             provider: $paymentMethod->provider,
             credentialContext: $paymentMethod->credentialContext,
