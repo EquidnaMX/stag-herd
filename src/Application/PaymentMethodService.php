@@ -95,6 +95,12 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
     private function upsertWithinContext(
         PaymentMethodRegisterData $request
     ): PaymentMethodData {
+        $existingByFingerprint = $this->findActiveByOwnerFingerprint($request);
+
+        if ($existingByFingerprint instanceof PaymentMethodData) {
+            return $existingByFingerprint;
+        }
+
         $attributes = $request->toArray();
 
         if (($attributes['status'] ?? 'active') === 'active' && ($attributes['attached_at'] ?? null) === null) {
@@ -137,6 +143,40 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
             credentialContext: $request->credentialContext,
             providerPaymentMethodId: $request->providerPaymentMethodId,
         ));
+    }
+
+    private function findActiveByOwnerFingerprint(
+        PaymentMethodRegisterData $request,
+    ): ?PaymentMethodData {
+        if ($request->fingerprint === null || trim($request->fingerprint) === '') {
+            return null;
+        }
+
+        $record = $this->paymentMethods->findActiveByOwnerFingerprint(
+            strtolower($request->provider),
+            $request->credentialContext,
+            $request->ownerReference,
+            $request->fingerprint,
+        );
+
+        if (! is_array($record)) {
+            return null;
+        }
+
+        $paymentMethod = PaymentMethodData::fromArray($record);
+
+        $this->paymentMethods->touchLastUsed(
+            $paymentMethod->provider,
+            $paymentMethod->credentialContext,
+            $paymentMethod->providerPaymentMethodId,
+        );
+
+        return $this->requireStoredMethod(
+            provider: $paymentMethod->provider,
+            credentialContext: $paymentMethod->credentialContext,
+            ownerReference: $paymentMethod->ownerReference,
+            providerPaymentMethodId: $paymentMethod->providerPaymentMethodId,
+        );
     }
 
     private function markDefaultWithinContext(

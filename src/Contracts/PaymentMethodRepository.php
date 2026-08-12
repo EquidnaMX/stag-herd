@@ -22,6 +22,14 @@ interface PaymentMethodRepository
         string $fingerprint,
     ): ?array;
 
+    /** @return array<string, mixed>|null */
+    public function findActiveByOwnerFingerprint(
+        string $provider,
+        string $credentialContext,
+        string $ownerReference,
+        string $fingerprint,
+    ): ?array;
+
     /** @return array<int, array<string, mixed>> */
     public function listByOwner(
         string $provider,

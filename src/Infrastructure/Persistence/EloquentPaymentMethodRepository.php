@@ -87,6 +87,27 @@ final class EloquentPaymentMethodRepository implements PaymentMethodRepository
             ?->toArray();
     }
 
+    /** @return array<string, mixed>|null */
+    public function findActiveByOwnerFingerprint(
+        string $provider,
+        string $credentialContext,
+        string $ownerReference,
+        string $fingerprint,
+    ): ?array {
+        return StagHerdPaymentMethod::query()
+            ->where('provider', $provider)
+            ->where('credential_context', $credentialContext)
+            ->where('owner_reference', $ownerReference)
+            ->where('fingerprint', $fingerprint)
+            ->where('status', 'active')
+            ->orderByDesc('is_default')
+            ->orderByDesc('last_used_at')
+            ->orderByDesc('attached_at')
+            ->orderByDesc('id')
+            ->first()
+            ?->toArray();
+    }
+
     /** @return array<int, array<string, mixed>> */
     public function listByOwner(
         string $provider,
