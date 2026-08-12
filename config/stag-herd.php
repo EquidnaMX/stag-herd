@@ -48,6 +48,22 @@ return [
         'payment_methods' => null,
     ],
 
+    'payments' => [
+        'routes' => [
+            'enabled' => true,
+            'prefix' => 'stag-herd/payments',
+            'middleware' => ['api'],
+        ],
+    ],
+
+    'payment_methods' => [
+        'routes' => [
+            'enabled' => true,
+            'prefix' => 'stag-herd/payments/payment-methods',
+            'middleware' => ['api'],
+        ],
+    ],
+
     'webhooks' => [
         'routes' => [
             'enabled' => true,
