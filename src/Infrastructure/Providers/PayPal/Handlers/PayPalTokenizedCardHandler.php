@@ -2,6 +2,7 @@
 
 namespace Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers;
 
+use Equidna\StagHerd\Contracts\ExtractsPaymentMethodFromPayment;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\ManagesPaymentMethods;
 use Equidna\StagHerd\Contracts\PaymentMethodHandler;
@@ -10,6 +11,7 @@ use Equidna\StagHerd\Data\PaymentConfirmationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentMethodData;
 use Equidna\StagHerd\Data\PaymentMethodLookupData;
+use Equidna\StagHerd\Data\PaymentMethodRegisterData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\RefundRequestData;
@@ -20,7 +22,7 @@ use Equidna\StagHerd\Support\MoneyFormatter;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
-final class PayPalTokenizedCardHandler implements PaymentMethodHandler
+final class PayPalTokenizedCardHandler implements PaymentMethodHandler, ExtractsPaymentMethodFromPayment
 {
     public function __construct(
         private readonly PayPalGateway $gateway,
@@ -124,6 +126,72 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler
             request: $request,
             captureId: $captureId,
             response: $response,
+        );
+    }
+
+    public function paymentMethodFromPayment(
+        PaymentRequestData $request,
+        PaymentResultData $result,
+    ): ?PaymentMethodRegisterData {
+        $paypal = is_array(data_get($request->metadata, 'paypal'))
+            ? data_get($request->metadata, 'paypal')
+            : [];
+
+        $paymentToken = $this->arrayFromFirst([
+            data_get($paypal, 'payment_token'),
+            data_get($request->metadata, 'payment_token'),
+            data_get($result->rawPayload, 'payment_source.card.attributes.vault'),
+            data_get($result->rawPayload, 'payment_source.token'),
+        ]);
+
+        $ownerReference = $this->firstString([
+            $request->payerReference,
+            data_get($request->metadata, 'payer_reference'),
+        ]);
+        $paymentTokenId = $this->firstString([
+            data_get($paypal, 'payment_token_id'),
+            data_get($paypal, 'token_id'),
+            data_get($paymentToken, 'id'),
+        ]);
+        $customerId = $this->firstString([
+            data_get($paymentToken, 'customer.id'),
+            data_get($paymentToken, 'customer_id'),
+            data_get($paymentToken, 'customer'),
+        ]);
+
+        if ($ownerReference === null || $paymentTokenId === null || $customerId === null) {
+            return null;
+        }
+
+        $card = is_array(data_get($paymentToken, 'payment_source.card'))
+            ? data_get($paymentToken, 'payment_source.card')
+            : [];
+
+        return new PaymentMethodRegisterData(
+            provider: 'paypal',
+            ownerReference: $ownerReference,
+            providerCustomerId: $customerId,
+            providerPaymentMethodId: $paymentTokenId,
+            credentialContext: $request->credentialContext,
+            type: 'tokenized_card',
+            brand: $this->firstString([
+                data_get($card, 'brand'),
+                data_get($card, 'type'),
+                data_get($card, 'network'),
+            ]),
+            last4: $this->firstString([
+                data_get($card, 'last_digits'),
+                data_get($card, 'last4'),
+            ]),
+            payload: [
+                'paypal' => [
+                    'token_id' => $paymentTokenId,
+                    'token_type' => data_get($paymentToken, 'type', 'PAYMENT_TOKEN'),
+                    'customer_id' => $customerId,
+                    'payment_token' => $paymentToken,
+                ],
+                'payment_result' => $result->toArray(),
+            ],
         );
     }
 
@@ -376,5 +444,32 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler
         $value = trim($value);
 
         return $value === '' ? null : $value;
+    }
+
+    /** @param array<int, mixed> $values */
+    private function firstString(array $values): ?string
+    {
+        foreach ($values as $value) {
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return trim((string) $value);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, mixed> $values
+     * @return array<string, mixed>
+     */
+    private function arrayFromFirst(array $values): array
+    {
+        foreach ($values as $value) {
+            if (is_array($value) && $value !== []) {
+                return $value;
+            }
+        }
+
+        return [];
     }
 }

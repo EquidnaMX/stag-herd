@@ -10,7 +10,6 @@ use Equidna\StagHerd\Domain\Payment;
 use Equidna\StagHerd\Domain\PaymentStateMachine;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
-use Equidna\StagHerd\Support\PaymentEventDispatcher;
 use Equidna\StagHerd\Support\ProviderRegistry;
 
 final readonly class SyncPayment
@@ -18,6 +17,7 @@ final readonly class SyncPayment
     public function __construct(
         private ProviderRegistry $providers,
         private PaymentRepository $payments,
+        private StorePaymentResult $storePaymentResult,
     ) {
         //
     }
@@ -82,14 +82,10 @@ final readonly class SyncPayment
         }
 
         if (! $localPayment) {
-            $payment = $this->payments->storeFromResult(
+            return $this->storePaymentResult->store(
                 request: $fallbackRequest,
                 result: $externalResult,
-            );
-
-            PaymentEventDispatcher::dispatchForPayment($payment);
-
-            return $payment;
+            )->payment;
         }
 
         $externalResult->assertMatchesPayment(
@@ -102,17 +98,11 @@ final readonly class SyncPayment
             providerResultStatus: $externalResult->status,
         );
 
-        $updatedPayment = $this->payments->updateFromResult(
+        return $this->storePaymentResult->update(
             payment: $localPayment,
             result: $externalResult,
-        );
-
-        PaymentEventDispatcher::dispatchForPayment(
-            payment: $updatedPayment,
-            previousPayment: $localPayment,
-        );
-
-        return $updatedPayment;
+            request: $fallbackRequest,
+        )->payment;
     }
 
     private function resolveLookupReference(PaymentLookupData $lookup): string

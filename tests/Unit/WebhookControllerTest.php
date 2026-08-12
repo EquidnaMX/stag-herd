@@ -43,7 +43,7 @@ class WebhookControllerTest extends TestCase
 
         $response->assertStatus(400);
         $this->assertStringContainsString(
-            'Only [PAYMENT.CAPTURE.COMPLETED] is currently supported.',
+            'PayPal webhook event [PAYMENT.CAPTURE.DENIED] is not supported.',
             (string) $response->json('message'),
         );
     }
@@ -166,6 +166,44 @@ final class ControllerSpyPayPalGateway implements \Equidna\StagHerd\Contracts\Ga
         ?string $currency = null,
         ?string $idempotencyKey = null,
     ): array {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function createCatalogProduct(array $payload, ?string $idempotencyKey = null): array
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function createPlan(array $payload, ?string $idempotencyKey = null): array
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function createSubscription(array $payload, ?string $idempotencyKey = null): array
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function getSubscription(string $subscriptionId): array
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function cancelSubscription(
+        string $subscriptionId,
+        array $payload = [],
+        ?string $idempotencyKey = null,
+    ): array {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function getPaymentToken(string $paymentTokenId): array
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function deletePaymentToken(string $paymentTokenId): array
+    {
         throw new RuntimeException('Not implemented.');
     }
 

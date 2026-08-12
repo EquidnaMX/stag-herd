@@ -3,7 +3,17 @@
 namespace Equidna\StagHerd\Tests\Unit;
 
 use Equidna\StagHerd\Application\Actions\CreatePayment;
+use Equidna\StagHerd\Application\Actions\RegisterPaymentMethod;
+use Equidna\StagHerd\Application\Actions\RegisterPaymentMethodFromResult;
+use Equidna\StagHerd\Application\Actions\StorePaymentResult;
+use Equidna\StagHerd\Contracts\ManagesPaymentMethods;
 use Equidna\StagHerd\Contracts\PaymentRepository;
+use Equidna\StagHerd\Data\PaymentMethodData;
+use Equidna\StagHerd\Data\PaymentMethodDeactivateData;
+use Equidna\StagHerd\Data\PaymentMethodLookupData;
+use Equidna\StagHerd\Data\PaymentMethodRegisterData;
+use Equidna\StagHerd\Data\PaymentMethodSetDefaultData;
+use Equidna\StagHerd\Data\PaymentMethodsListData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\ProviderReferencesData;
@@ -25,7 +35,7 @@ class CreatePaymentTest extends TestCase
 
         $action = new CreatePayment(
             providers: $registry,
-            payments: $repository,
+            storePaymentResult: $this->storePaymentResult($registry, $repository),
         );
 
         $payment = $action->handle(
@@ -70,7 +80,7 @@ class CreatePaymentTest extends TestCase
 
         $action = new CreatePayment(
             providers: $registry,
-            payments: $repository,
+            storePaymentResult: $this->storePaymentResult($registry, $repository),
         );
 
         $payment = $action->handle(
@@ -100,7 +110,7 @@ class CreatePaymentTest extends TestCase
 
         $action = new CreatePayment(
             providers: $registry,
-            payments: $repository,
+            storePaymentResult: $this->storePaymentResult($registry, $repository),
         );
 
         $payment = $action->handle(
@@ -129,7 +139,7 @@ class CreatePaymentTest extends TestCase
 
         $action = new CreatePayment(
             providers: $registry,
-            payments: $repository,
+            storePaymentResult: $this->storePaymentResult($registry, $repository),
         );
 
         $this->expectException(ProviderNotRegisteredException::class);
@@ -143,6 +153,47 @@ class CreatePaymentTest extends TestCase
                 externalReference: 'ORDER-UNIT-FAKE',
             )
         );
+    }
+
+    private function storePaymentResult(
+        ProviderRegistry $registry,
+        PaymentRepository $repository,
+    ): StorePaymentResult {
+        return new StorePaymentResult(
+            payments: $repository,
+            registerPaymentMethodFromResult: new RegisterPaymentMethodFromResult(
+                providers: $registry,
+                registerPaymentMethod: new RegisterPaymentMethod(new NullPaymentMethodManager()),
+            ),
+        );
+    }
+}
+
+final class NullPaymentMethodManager implements ManagesPaymentMethods
+{
+    public function registerPaymentMethod(PaymentMethodRegisterData $request): PaymentMethodData
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function listPaymentMethods(PaymentMethodsListData $request): array
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function setDefaultPaymentMethod(PaymentMethodSetDefaultData $request): PaymentMethodData
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function deactivatePaymentMethod(PaymentMethodDeactivateData $request): PaymentMethodData
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function resolveUsablePaymentMethod(PaymentMethodLookupData $request): PaymentMethodData
+    {
+        throw new RuntimeException('Not implemented.');
     }
 }
 

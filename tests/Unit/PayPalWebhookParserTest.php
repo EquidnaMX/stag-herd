@@ -50,7 +50,7 @@ class PayPalWebhookParserTest extends TestCase
         $payload = $this->payload(eventType: 'PAYMENT.CAPTURE.DENIED');
 
         $this->expectException(UnsupportedOperationException::class);
-        $this->expectExceptionMessage('Only [PAYMENT.CAPTURE.COMPLETED] is currently supported.');
+        $this->expectExceptionMessage('PayPal webhook event [PAYMENT.CAPTURE.DENIED] is not supported.');
 
         $parser->parse($payload);
     }
@@ -125,6 +125,44 @@ final class SpyPayPalGateway implements PayPalGateway
         ?string $currency = null,
         ?string $idempotencyKey = null,
     ): array {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function createCatalogProduct(array $payload, ?string $idempotencyKey = null): array
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function createPlan(array $payload, ?string $idempotencyKey = null): array
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function createSubscription(array $payload, ?string $idempotencyKey = null): array
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function getSubscription(string $subscriptionId): array
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function cancelSubscription(
+        string $subscriptionId,
+        array $payload = [],
+        ?string $idempotencyKey = null,
+    ): array {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function getPaymentToken(string $paymentTokenId): array
+    {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function deletePaymentToken(string $paymentTokenId): array
+    {
         throw new RuntimeException('Not implemented.');
     }
 

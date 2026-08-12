@@ -5,11 +5,11 @@ namespace Equidna\StagHerd\Application\Actions;
 use Equidna\StagHerd\Contracts\ConfirmsPayments;
 use Equidna\StagHerd\Contracts\PaymentRepository;
 use Equidna\StagHerd\Data\PaymentConfirmationData;
+use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Domain\Payment;
 use Equidna\StagHerd\Domain\PaymentStateMachine;
 use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
-use Equidna\StagHerd\Support\PaymentEventDispatcher;
 use Equidna\StagHerd\Support\ProviderRegistry;
 
 final readonly class ConfirmPayment
@@ -17,6 +17,7 @@ final readonly class ConfirmPayment
     public function __construct(
         private ProviderRegistry $providers,
         private PaymentRepository $payments,
+        private StorePaymentResult $storePaymentResult,
     ) {
         //
     }
@@ -62,17 +63,32 @@ final readonly class ConfirmPayment
             providerResultStatus: $result->status,
         );
 
-        $updatedPayment = $this->payments->updateFromResult(
+        return $this->storePaymentResult->update(
             payment: $payment,
             result: $result,
-        );
+            request: $this->requestForPaymentMethodRegistration($payment, $request),
+        )->payment;
+    }
 
-        PaymentEventDispatcher::dispatchForPayment(
-            payment: $updatedPayment,
-            previousPayment: $payment,
+    private function requestForPaymentMethodRegistration(
+        Payment $payment,
+        PaymentConfirmationData $request,
+    ): PaymentRequestData {
+        return new PaymentRequestData(
+            amount: $payment->amount,
+            currency: $payment->currency,
+            method: $payment->method,
+            provider: $payment->provider,
+            providerOrderId: $payment->references?->providerOrderId,
+            externalReference: $payment->externalReference,
+            payerReference: $payment->payerReference,
+            payerEmail: $payment->payerEmail,
+            description: null,
+            returnUrl: null,
+            cancelUrl: null,
+            metadata: array_merge($payment->metadata, $request->metadata),
+            credentialContext: $request->credentialContext,
         );
-
-        return $updatedPayment;
     }
 
     private function resolveLocalPayment(PaymentConfirmationData $request): Payment

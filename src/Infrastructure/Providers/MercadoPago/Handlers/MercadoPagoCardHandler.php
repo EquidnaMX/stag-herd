@@ -2,11 +2,13 @@
 
 namespace Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers;
 
+use Equidna\StagHerd\Contracts\ExtractsPaymentMethodFromPayment;
 use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
 use Equidna\StagHerd\Contracts\PaymentMethodHandler;
 use Equidna\StagHerd\Data\PaymentCancellationData;
 use Equidna\StagHerd\Data\PaymentConfirmationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
+use Equidna\StagHerd\Data\PaymentMethodRegisterData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Data\RefundRequestData;
@@ -17,7 +19,7 @@ use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoResultMappe
 use Equidna\StagHerd\Support\MoneyFormatter;
 use Illuminate\Support\Str;
 
-final class MercadoPagoCardHandler implements PaymentMethodHandler
+final class MercadoPagoCardHandler implements PaymentMethodHandler, ExtractsPaymentMethodFromPayment
 {
     public function __construct(
         private readonly MercadoPagoGateway $gateway,
@@ -102,6 +104,75 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler
         );
 
         return $this->mapper->mapRefundResponseToResult($request, $response);
+    }
+
+    public function paymentMethodFromPayment(
+        PaymentRequestData $request,
+        PaymentResultData $result,
+    ): ?PaymentMethodRegisterData {
+        $mercadoPago = is_array(data_get($request->metadata, 'mercado_pago'))
+            ? data_get($request->metadata, 'mercado_pago')
+            : [];
+
+        $card = $this->arrayFromFirst([
+            data_get($mercadoPago, 'card'),
+            data_get($request->metadata, 'card'),
+            data_get($result->rawPayload, 'card'),
+        ]);
+
+        $ownerReference = $this->firstString([
+            $request->payerReference,
+            data_get($request->metadata, 'payer_reference'),
+            data_get($result->rawPayload, 'metadata.payer_reference'),
+        ]);
+        $customerId = $this->firstString([
+            data_get($mercadoPago, 'customer_id'),
+            data_get($card, 'customer_id'),
+            data_get($result->rawPayload, 'card.customer_id'),
+            data_get($result->rawPayload, 'metadata.customer_id'),
+        ]);
+        $cardId = $this->firstString([
+            data_get($mercadoPago, 'card_id'),
+            data_get($card, 'id'),
+            data_get($result->rawPayload, 'card.id'),
+            data_get($result->rawPayload, 'metadata.card_id'),
+        ]);
+
+        if ($ownerReference === null || $customerId === null || $cardId === null) {
+            return null;
+        }
+
+        return new PaymentMethodRegisterData(
+            provider: 'mercado_pago',
+            ownerReference: $ownerReference,
+            providerCustomerId: $customerId,
+            providerPaymentMethodId: $cardId,
+            credentialContext: $request->credentialContext,
+            type: 'tokenized_card',
+            displayName: $this->firstString([
+                data_get($card, 'cardholder.name'),
+                data_get($card, 'display_name'),
+            ]),
+            brand: $this->firstString([
+                data_get($result->rawPayload, 'payment_method_id'),
+                data_get($card, 'payment_method.id'),
+            ]),
+            last4: $this->firstString([data_get($card, 'last_four_digits')]),
+            expMonth: $this->firstInt([data_get($card, 'expiration_month')]),
+            expYear: $this->firstInt([data_get($card, 'expiration_year')]),
+            payload: [
+                'mercado_pago' => [
+                    'customer_id' => $customerId,
+                    'card_id' => $cardId,
+                    'payment_method_id' => $this->firstString([
+                        data_get($result->rawPayload, 'payment_method_id'),
+                        data_get($mercadoPago, 'payment_method_id'),
+                    ]),
+                    'card' => $card,
+                ],
+                'payment_result' => $result->toArray(),
+            ],
+        );
     }
 
     private function validateCreatePaymentRequest(PaymentRequestData $request): void
@@ -274,5 +345,44 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler
         }
 
         return (string) $deviceId;
+    }
+
+    /** @param array<int, mixed> $values */
+    private function firstString(array $values): ?string
+    {
+        foreach ($values as $value) {
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return trim((string) $value);
+            }
+        }
+
+        return null;
+    }
+
+    /** @param array<int, mixed> $values */
+    private function firstInt(array $values): ?int
+    {
+        foreach ($values as $value) {
+            if (is_numeric($value)) {
+                return (int) $value;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, mixed> $values
+     * @return array<string, mixed>
+     */
+    private function arrayFromFirst(array $values): array
+    {
+        foreach ($values as $value) {
+            if (is_array($value) && $value !== []) {
+                return $value;
+            }
+        }
+
+        return [];
     }
 }
