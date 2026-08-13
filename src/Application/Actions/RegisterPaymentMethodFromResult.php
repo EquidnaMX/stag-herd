@@ -44,6 +44,15 @@ final readonly class RegisterPaymentMethodFromResult
         PaymentRequestData $request,
         PaymentResultData $result,
     ): bool {
+        $registerPaymentMethod = data_get(
+            $request->metadata,
+            'stag_herd.register_payment_method',
+        );
+
+        if ($registerPaymentMethod !== null) {
+            return filter_var($registerPaymentMethod, FILTER_VALIDATE_BOOL);
+        }
+
         return filter_var(
             data_get($request->metadata, 'save_payment_method')
                 ?? data_get($request->metadata, 'stripe.save_payment_method')
