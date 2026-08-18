@@ -2,7 +2,7 @@
 
 namespace Equidna\StagHerd\Http\Controllers;
 
-use Equidna\StagHerd\Facades\StagHerd;
+use Equidna\StagHerd\Application\PaymentService;
 use Equidna\StagHerd\Http\Requests\Payments\MercadoPago\CreateCheckoutProRequest;
 use Equidna\StagHerd\Http\Requests\Payments\MercadoPago\ProcessBrickRequest;
 use Equidna\StagHerd\Http\Requests\Payments\MercadoPago\ProcessTokenizedCardRequest;
@@ -16,12 +16,14 @@ class MercadoPagoController extends Controller
 {
     public function __construct(
         private readonly MercadoPagoPaymentMethodService $mercadoPagoPaymentMethods,
-    ) {}
+        private readonly PaymentService $payments,
+    ) {
+    }
 
     public function processBrick(ProcessBrickRequest $request): JsonResponse
     {
         try {
-            if (! $request->token()) {
+            if (!$request->token()) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'Mercado Pago Brick did not send a token.',
@@ -29,7 +31,7 @@ class MercadoPagoController extends Controller
                 ], 422);
             }
 
-            if (! $request->paymentMethodId()) {
+            if (!$request->paymentMethodId()) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'Mercado Pago Brick did not send payment_method_id.',
@@ -37,7 +39,7 @@ class MercadoPagoController extends Controller
                 ], 422);
             }
 
-            $payment = StagHerd::createPayment(
+            $payment = $this->payments->createPayment(
                 $request->toPaymentRequestData(),
             );
 
@@ -60,7 +62,7 @@ class MercadoPagoController extends Controller
     public function createCheckoutPro(CreateCheckoutProRequest $request): JsonResponse
     {
         try {
-            $payment = StagHerd::createPayment(
+            $payment = $this->payments->createPayment(
                 $request->toPaymentRequestData(),
             );
 
@@ -87,7 +89,7 @@ class MercadoPagoController extends Controller
     public function processTokenizedCard(ProcessTokenizedCardRequest $request): JsonResponse
     {
         try {
-            $payment = StagHerd::createPayment(
+            $payment = $this->payments->createPayment(
                 $request->toPaymentRequestData(),
             );
 

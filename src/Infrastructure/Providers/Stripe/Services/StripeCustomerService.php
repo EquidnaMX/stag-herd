@@ -29,10 +29,10 @@ final class StripeCustomerService
                         'payer_reference' => $payerReference ?: null,
                         'source' => $source,
                     ],
-                    fn($value) => $value !== null && $value !== '',
+                    fn ($value) => $value !== null && $value !== '',
                 ),
             ],
-            fn($value) => $value !== null && $value !== '' && $value !== [],
+            fn ($value) => $value !== null && $value !== '' && $value !== [],
         );
     }
 
@@ -65,7 +65,7 @@ final class StripeCustomerService
 
     private function normalizeCustomerId(?string $customerId): ?string
     {
-        if (! is_string($customerId)) {
+        if (!is_string($customerId)) {
             return null;
         }
 
@@ -79,7 +79,7 @@ final class StripeCustomerService
             return null;
         }
 
-        if (! str_starts_with($customerId, 'cus_')) {
+        if (!str_starts_with($customerId, 'cus_')) {
             return null;
         }
 

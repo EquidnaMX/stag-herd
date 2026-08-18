@@ -6,6 +6,7 @@ use Illuminate\Validation\Validator;
 
 class CreatePaymentIntentRequest extends StripeFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -35,7 +36,7 @@ class CreatePaymentIntentRequest extends StripeFormRequest
     {
         $stripe = $this->input('stripe', []);
 
-        if (! is_array($stripe)) {
+        if (!is_array($stripe)) {
             $stripe = [];
         }
 
@@ -135,7 +136,7 @@ class CreatePaymentIntentRequest extends StripeFormRequest
             'checkout_type' => data_get($metadata, 'checkout_type'),
             'action' => data_get($metadata, 'action'),
             'save_payment_method' => $this->savePaymentMethod() ? 'true' : 'false',
-        ], fn($value) => $value !== null && $value !== '');
+        ], fn ($value) => $value !== null && $value !== '');
 
         return array_replace_recursive($intentMetadata, $stripe);
     }
@@ -158,19 +159,19 @@ class CreatePaymentIntentRequest extends StripeFormRequest
             $payload['customer'] = $customerId;
         }
 
-        if (! empty($stripe['capture_method'])) {
+        if (!empty($stripe['capture_method'])) {
             $payload['capture_method'] = $stripe['capture_method'];
         }
 
-        if (! empty($stripe['statement_descriptor'])) {
+        if (!empty($stripe['statement_descriptor'])) {
             $payload['statement_descriptor'] = $stripe['statement_descriptor'];
         }
 
-        if (! empty($stripe['statement_descriptor_suffix'])) {
+        if (!empty($stripe['statement_descriptor_suffix'])) {
             $payload['statement_descriptor_suffix'] = $stripe['statement_descriptor_suffix'];
         }
 
-        if (! empty($stripe['setup_future_usage'])) {
+        if (!empty($stripe['setup_future_usage'])) {
             $payload['setup_future_usage'] = $stripe['setup_future_usage'];
         } elseif ($this->savePaymentMethod()) {
             $payload['setup_future_usage'] = 'off_session';
@@ -178,7 +179,7 @@ class CreatePaymentIntentRequest extends StripeFormRequest
 
         return array_filter(
             $payload,
-            fn($value) => $value !== null && $value !== '',
+            fn ($value) => $value !== null && $value !== '',
         );
     }
 }

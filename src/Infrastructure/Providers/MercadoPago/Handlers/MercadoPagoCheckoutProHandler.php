@@ -87,7 +87,7 @@ final class MercadoPagoCheckoutProHandler implements PaymentMethodHandler
             throw InvalidPaymentPayloadException::invalidCurrency($request->currency);
         }
 
-        if (! $request->returnUrl) {
+        if (!$request->returnUrl) {
             throw InvalidPaymentPayloadException::missingField('return_url');
         }
     }
@@ -163,7 +163,7 @@ final class MercadoPagoCheckoutProHandler implements PaymentMethodHandler
 
         return array_filter(
             $payload,
-            fn($value) => $value !== null && $value !== [] && $value !== ''
+            fn ($value) => $value !== null && $value !== [] && $value !== ''
         );
     }
 
@@ -188,7 +188,7 @@ final class MercadoPagoCheckoutProHandler implements PaymentMethodHandler
 
         $results = $response['results'] ?? [];
 
-        if (! is_array($results) || $results === []) {
+        if (!is_array($results) || $results === []) {
             throw UnsupportedOperationException::forOperation(
                 'lookup',
                 'Mercado Pago Checkout Pro lookup by providerOrderId did not return payments.'

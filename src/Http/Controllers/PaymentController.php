@@ -2,19 +2,21 @@
 
 namespace Equidna\StagHerd\Http\Controllers;
 
-use Equidna\StagHerd\Http\Requests\Payments\StorePaymentRequest;
 use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
 use Equidna\StagHerd\Facades\StagHerd;
+use Equidna\StagHerd\Http\Requests\Payments\StorePaymentRequest;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
 use Illuminate\View\View;
 use RuntimeException;
 use Throwable;
 
 class PaymentController extends Controller
 {
-    public function __construct(private readonly PaymentDisplayRepository $payments) {}
+    public function __construct(private readonly PaymentDisplayRepository $payments)
+    {
+    }
 
     public function index(Request $request): View
     {
@@ -60,7 +62,7 @@ class PaymentController extends Controller
     {
         $model = $this->payments->findForDisplay($payment);
 
-        if (! $model) {
+        if (!$model) {
             return $this->redirectWithError(
                 $request,
                 new RuntimeException("No se encontró el pago {$payment}.")
@@ -146,12 +148,12 @@ class PaymentController extends Controller
     {
         $links = data_get($payload, 'links', []);
 
-        if (! is_array($links)) {
+        if (!is_array($links)) {
             return null;
         }
 
         foreach ($links as $link) {
-            if (($link['rel'] ?? null) === $rel && ! empty($link['href'])) {
+            if (($link['rel'] ?? null) === $rel && !empty($link['href'])) {
                 return (string) $link['href'];
             }
         }

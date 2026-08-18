@@ -6,6 +6,7 @@ use Equidna\StagHerd\Support\MoneyFormatter;
 
 class CreateOrderRequest extends PayPalFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -37,7 +38,7 @@ class CreateOrderRequest extends PayPalFormRequest
     {
         $paypal = $this->input('paypal', []);
 
-        if (! is_array($paypal)) {
+        if (!is_array($paypal)) {
             $paypal = [];
         }
 
@@ -123,7 +124,7 @@ class CreateOrderRequest extends PayPalFormRequest
                 'currency_code' => $this->currency(),
                 'value' => MoneyFormatter::toDecimal($this->amountInMinorUnits()),
             ],
-        ], fn($value) => $value !== null && $value !== '');
+        ], fn ($value) => $value !== null && $value !== '');
     }
 
     public function payload(): array
@@ -142,7 +143,7 @@ class CreateOrderRequest extends PayPalFormRequest
                 'landing_page' => $paypal['landing_page'] ?? 'LOGIN',
                 'user_action' => $paypal['user_action'] ?? 'PAY_NOW',
                 'shipping_preference' => $paypal['shipping_preference'] ?? 'NO_SHIPPING',
-            ], fn($value) => $value !== null && $value !== ''),
+            ], fn ($value) => $value !== null && $value !== ''),
         ];
     }
 

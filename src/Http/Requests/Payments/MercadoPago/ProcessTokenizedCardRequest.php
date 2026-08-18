@@ -7,6 +7,7 @@ use Illuminate\Validation\Validator;
 
 class ProcessTokenizedCardRequest extends MercadoPagoFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -50,7 +51,7 @@ class ProcessTokenizedCardRequest extends MercadoPagoFormRequest
     {
         $mercadoPago = $this->input('mercado_pago', []);
 
-        if (! is_array($mercadoPago)) {
+        if (!is_array($mercadoPago)) {
             $mercadoPago = [];
         }
 
@@ -81,7 +82,7 @@ class ProcessTokenizedCardRequest extends MercadoPagoFormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
-            if (! $this->token()) {
+            if (!$this->token()) {
                 $validator->errors()->add(
                     'mercado_pago.token',
                     'mercado_pago.token is required for Mercado Pago saved-card charges.'
@@ -92,14 +93,14 @@ class ProcessTokenizedCardRequest extends MercadoPagoFormRequest
             $paymentMethodId = $this->paymentMethodId();
             $payerReference = $this->payerReference();
 
-            if (! $customerId && ! $payerReference) {
+            if (!$customerId && !$payerReference) {
                 $validator->errors()->add(
                     'payer_reference',
                     'payer_reference is required when mercado_pago.customer_id is not provided.'
                 );
             }
 
-            if ($customerId && ! $paymentMethodId) {
+            if ($customerId && !$paymentMethodId) {
                 $validator->errors()->add(
                     'mercado_pago.payment_method_id',
                     'mercado_pago.payment_method_id is required when mercado_pago.customer_id is provided.'
@@ -159,6 +160,7 @@ class ProcessTokenizedCardRequest extends MercadoPagoFormRequest
         );
     }
 
+    /** @return array<string, mixed> */
     public function payerFromMercadoPago(): array
     {
         $payer = data_get($this->validated('mercado_pago') ?? [], 'payer', []);
@@ -166,6 +168,7 @@ class ProcessTokenizedCardRequest extends MercadoPagoFormRequest
         return is_array($payer) ? $payer : [];
     }
 
+    /** @return array<string, mixed> */
     public function payerFromRoot(): array
     {
         $payer = $this->validated('payer') ?? [];
@@ -214,6 +217,7 @@ class ProcessTokenizedCardRequest extends MercadoPagoFormRequest
         return (string) ($this->validated('credential_context') ?? 'default');
     }
 
+    /** @return array<string, mixed> */
     public function metadata(): array
     {
         $metadata = $this->cleanMetadata($this->validated('metadata') ?? []);
@@ -235,7 +239,7 @@ class ProcessTokenizedCardRequest extends MercadoPagoFormRequest
                 ),
                 'idempotency_key' => $this->idempotencyKey(),
                 'device_id' => $this->deviceId(),
-            ], fn($value) => $value !== null && $value !== ''),
+            ], fn ($value) => $value !== null && $value !== ''),
             'raw_form_data' => $this->validated('raw_form_data') ?? null,
         ]);
 

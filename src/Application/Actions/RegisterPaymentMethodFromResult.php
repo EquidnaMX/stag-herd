@@ -21,13 +21,13 @@ final readonly class RegisterPaymentMethodFromResult
         PaymentRequestData $request,
         PaymentResultData $result,
     ): ?PaymentMethodData {
-        if (! $this->shouldRegister($request, $result)) {
+        if (!$this->shouldRegister($request, $result)) {
             return null;
         }
 
         $provider = $this->providers->get($result->provider);
 
-        if (! $provider instanceof ExtractsPaymentMethodFromPayment) {
+        if (!$provider instanceof ExtractsPaymentMethodFromPayment) {
             return null;
         }
 

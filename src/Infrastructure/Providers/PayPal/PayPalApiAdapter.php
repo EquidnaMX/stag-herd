@@ -250,14 +250,14 @@ class PayPalApiAdapter implements PayPalGateway
                 $clientId = config('stag-herd.providers.paypal.credentials.client_id');
                 $secret = config('stag-herd.providers.paypal.credentials.secret');
 
-                if (! $clientId) {
+                if (!$clientId) {
                     throw ProviderNotConfiguredException::missingCredential(
                         self::PROVIDER,
                         'client_id',
                     );
                 }
 
-                if (! $secret) {
+                if (!$secret) {
                     throw ProviderNotConfiguredException::missingCredential(
                         self::PROVIDER,
                         'secret',
@@ -290,7 +290,7 @@ class PayPalApiAdapter implements PayPalGateway
 
                 $token = $response->json('access_token');
 
-                if (! $token) {
+                if (!$token) {
                     throw ProviderCommunicationException::invalidResponse(
                         self::PROVIDER,
                         $response->json() ?? [],

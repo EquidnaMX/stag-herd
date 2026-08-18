@@ -12,6 +12,7 @@ class DeactivatePaymentMethodRequest extends FormRequest
         return true;
     }
 
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -44,7 +45,7 @@ class DeactivatePaymentMethodRequest extends FormRequest
 
     private function normalizeNullableString(mixed $value): ?string
     {
-        if (! is_scalar($value)) {
+        if (!is_scalar($value)) {
             return null;
         }
 

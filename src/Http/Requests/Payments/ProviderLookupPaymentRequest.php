@@ -4,6 +4,7 @@ namespace Equidna\StagHerd\Http\Requests\Payments;
 
 class ProviderLookupPaymentRequest extends PaymentFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [

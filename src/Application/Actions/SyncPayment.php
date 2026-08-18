@@ -47,7 +47,7 @@ final readonly class SyncPayment
 
         $externalResult = $provider->lookupPayment($lookup);
 
-        if (! $externalResult instanceof PaymentResultData) {
+        if (!$externalResult instanceof PaymentResultData) {
             throw PaymentNotFoundException::withProviderReference(
                 $lookup->provider,
                 $this->resolveLookupReference($lookup),
@@ -74,14 +74,14 @@ final readonly class SyncPayment
             );
         }
 
-        if (! $localPayment && $providerOrderId) {
+        if (!$localPayment && $providerOrderId) {
             $localPayment = $this->payments->findByProviderOrderId(
                 provider: $lookup->provider,
                 providerOrderId: $providerOrderId,
             );
         }
 
-        if (! $localPayment) {
+        if (!$localPayment) {
             return $this->storePaymentResult->store(
                 request: $fallbackRequest,
                 result: $externalResult,

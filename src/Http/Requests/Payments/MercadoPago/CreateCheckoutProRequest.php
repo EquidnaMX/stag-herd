@@ -6,6 +6,7 @@ use Equidna\StagHerd\Data\PaymentRequestData;
 
 class CreateCheckoutProRequest extends MercadoPagoFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -45,7 +46,7 @@ class CreateCheckoutProRequest extends MercadoPagoFormRequest
     {
         $mercadoPago = $this->input('mercado_pago', []);
 
-        if (! is_array($mercadoPago)) {
+        if (!is_array($mercadoPago)) {
             $mercadoPago = [];
         }
 
@@ -109,7 +110,7 @@ class CreateCheckoutProRequest extends MercadoPagoFormRequest
                 'payer' => data_get($mercadoPago, 'payer'),
                 'metadata' => data_get($mercadoPago, 'metadata'),
                 'payload' => data_get($mercadoPago, 'payload'),
-            ], fn($value) => $value !== null && $value !== ''),
+            ], fn ($value) => $value !== null && $value !== ''),
         ]);
 
         return $this->cleanMetadata($metadata);

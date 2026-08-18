@@ -14,7 +14,7 @@ abstract class PaymentFormRequest extends FormRequest
 
     protected function normalizeNullableString(mixed $value): mixed
     {
-        if (! is_string($value)) {
+        if (!is_string($value)) {
             return $value;
         }
 
@@ -25,7 +25,7 @@ abstract class PaymentFormRequest extends FormRequest
 
     protected function normalizeLower(mixed $value): mixed
     {
-        if (! is_string($value)) {
+        if (!is_string($value)) {
             return $value;
         }
 
@@ -36,7 +36,7 @@ abstract class PaymentFormRequest extends FormRequest
 
     protected function normalizeUpper(mixed $value): mixed
     {
-        if (! is_string($value)) {
+        if (!is_string($value)) {
             return $value;
         }
 

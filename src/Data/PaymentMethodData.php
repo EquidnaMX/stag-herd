@@ -88,7 +88,7 @@ final readonly class PaymentMethodData
 
     private static function nullableString(mixed $value): ?string
     {
-        if (! is_scalar($value)) {
+        if (!is_scalar($value)) {
             return null;
         }
 

@@ -217,7 +217,10 @@ final readonly class PayPalPaymentMethodService
         ]);
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
     private function cleanPayload(array $payload): array
     {
         $clean = [];
@@ -249,7 +252,7 @@ final readonly class PayPalPaymentMethodService
     private function firstString(array $values): ?string
     {
         foreach ($values as $value) {
-            if (! is_scalar($value)) {
+            if (!is_scalar($value)) {
                 continue;
             }
 

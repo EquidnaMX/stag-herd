@@ -2,8 +2,8 @@
 
 namespace Equidna\StagHerd\Http\Controllers;
 
+use Equidna\StagHerd\Application\PaymentService;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
-use Equidna\StagHerd\Facades\StagHerd;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\CaptureOrderRequest;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\CreateOrderRequest;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\ProcessTokenizedCardRequest;
@@ -18,7 +18,9 @@ class PayPalController extends Controller
     public function __construct(
         private readonly PayPalGateway $payPalGateway,
         private readonly PayPalPaymentMethodService $payPalPaymentMethods,
-    ) {}
+        private readonly PaymentService $payments,
+    ) {
+    }
 
     public function createOrder(CreateOrderRequest $request): JsonResponse
     {
@@ -30,7 +32,7 @@ class PayPalController extends Controller
 
             $providerOrderId = data_get($response, 'id');
 
-            if (! $providerOrderId) {
+            if (!$providerOrderId) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'PayPal no regresó order id.',
@@ -59,7 +61,7 @@ class PayPalController extends Controller
     public function captureOrder(CaptureOrderRequest $request): JsonResponse
     {
         try {
-            $payment = StagHerd::createPayment(
+            $payment = $this->payments->createPayment(
                 $request->toPaymentRequestData('paypal'),
             );
 
@@ -82,7 +84,7 @@ class PayPalController extends Controller
     public function processTokenizedCard(ProcessTokenizedCardRequest $request): JsonResponse
     {
         try {
-            $payment = StagHerd::createPayment(
+            $payment = $this->payments->createPayment(
                 $request->toPaymentRequestData(),
             );
 

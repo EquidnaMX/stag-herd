@@ -40,14 +40,14 @@ final readonly class LookupPayment
     {
         $payment = $this->payments->find($lookup->paymentId);
 
-        if (! $payment) {
+        if (!$payment) {
             throw PaymentNotFoundException::withId($lookup->paymentId);
         }
 
         $providerPaymentId = $payment->references?->providerPaymentId;
         $providerOrderId = $payment->references?->providerOrderId;
 
-        if (! $providerPaymentId && ! $providerOrderId) {
+        if (!$providerPaymentId && !$providerOrderId) {
             return $payment;
         }
 
@@ -96,7 +96,7 @@ final readonly class LookupPayment
             ?? $lookup->providerPaymentId;
         $providerOrderId = $result->references?->providerOrderId;
 
-        if (! $providerPaymentId) {
+        if (!$providerPaymentId) {
             throw PaymentNotFoundException::withProviderReference(
                 $lookup->provider,
                 $lookup->lookupValue(),
@@ -109,7 +109,7 @@ final readonly class LookupPayment
             providerOrderId: $providerOrderId,
         );
 
-        if (! $payment) {
+        if (!$payment) {
             throw PaymentNotFoundException::withProviderReference(
                 $lookup->provider,
                 $providerPaymentId ?? $providerOrderId,
@@ -150,7 +150,7 @@ final readonly class LookupPayment
             providerOrderId: $providerOrderId,
         );
 
-        if (! $payment) {
+        if (!$payment) {
             throw PaymentNotFoundException::withProviderReference(
                 $lookup->provider,
                 $providerPaymentId ?? $providerOrderId ?? $lookup->lookupValue(),
@@ -219,7 +219,7 @@ final readonly class LookupPayment
         }
 
         $declaredMethods = array_values(array_unique(array_map(
-            static fn(string $method): string => strtolower($method),
+            static fn (string $method): string => strtolower($method),
             $this->providers->get($lookup->provider)->getMethods(),
         )));
 

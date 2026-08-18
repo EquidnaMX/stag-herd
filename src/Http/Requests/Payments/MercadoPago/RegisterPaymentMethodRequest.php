@@ -6,6 +6,7 @@ use Illuminate\Validation\Validator;
 
 class RegisterPaymentMethodRequest extends MercadoPagoFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -32,17 +33,17 @@ class RegisterPaymentMethodRequest extends MercadoPagoFormRequest
         $mercadoPago = $this->input('mercado_pago', []);
         $card = $this->input('card', []);
 
-        if (! is_array($mercadoPago)) {
+        if (!is_array($mercadoPago)) {
             $mercadoPago = [];
         }
 
-        if (! is_array($card)) {
+        if (!is_array($card)) {
             $card = [];
         }
 
         $nestedCard = data_get($mercadoPago, 'card', []);
 
-        if (! is_array($nestedCard)) {
+        if (!is_array($nestedCard)) {
             $nestedCard = [];
         }
 

@@ -34,7 +34,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn(): PaymentMethodData => $this->upsertWithinContext($request),
+            fn (): PaymentMethodData => $this->upsertWithinContext($request),
         );
     }
 
@@ -47,8 +47,8 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn(): array => array_map(
-                static fn(array $record): PaymentMethodData => PaymentMethodData::fromArray($record),
+            fn (): array => array_map(
+                static fn (array $record): PaymentMethodData => PaymentMethodData::fromArray($record),
                 $this->paymentMethods->listActiveByOwner(
                     strtolower($request->provider),
                     $request->credentialContext,
@@ -64,7 +64,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn(): PaymentMethodData => $this->markDefaultWithinContext(
+            fn (): PaymentMethodData => $this->markDefaultWithinContext(
                 $request->toLookupData()
             ),
         );
@@ -76,7 +76,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn(): PaymentMethodData => $this->deactivateWithinContext(
+            fn (): PaymentMethodData => $this->deactivateWithinContext(
                 $request->toLookupData()
             ),
         );
@@ -88,7 +88,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn(): PaymentMethodData => $this->resolveUsableWithinContext($request),
+            fn (): PaymentMethodData => $this->resolveUsableWithinContext($request),
         );
     }
 
@@ -133,7 +133,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
                 $request->ownerReference,
             ) === null;
 
-        if (! $shouldBecomeDefault) {
+        if (!$shouldBecomeDefault) {
             return $paymentMethod;
         }
 
@@ -159,7 +159,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
             $request->fingerprint,
         );
 
-        if (! is_array($record)) {
+        if (!is_array($record)) {
             return null;
         }
 
@@ -285,7 +285,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
                 $request->ownerReference,
             )[0] ?? null);
 
-        if (! is_array($record)) {
+        if (!is_array($record)) {
             throw PaymentMethodNotFoundException::forOwner(
                 strtolower($request->provider),
                 $request->ownerReference,
@@ -321,7 +321,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
             $providerPaymentMethodId,
         );
 
-        if (! is_array($record)) {
+        if (!is_array($record)) {
             throw PaymentMethodNotFoundException::forOwner(
                 strtolower($request->provider),
                 $request->ownerReference,
@@ -344,7 +344,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
             $providerPaymentMethodId,
         );
 
-        if (! is_array($record) || (string) ($record['owner_reference'] ?? '') !== $ownerReference) {
+        if (!is_array($record) || (string) ($record['owner_reference'] ?? '') !== $ownerReference) {
             throw PaymentMethodNotFoundException::forOwner(
                 strtolower($provider),
                 $ownerReference,
@@ -361,7 +361,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
     private function listActiveByOwner(PaymentMethodData $paymentMethod): array
     {
         return array_map(
-            static fn(array $record): PaymentMethodData => PaymentMethodData::fromArray($record),
+            static fn (array $record): PaymentMethodData => PaymentMethodData::fromArray($record),
             $this->paymentMethods->listActiveByOwner(
                 $paymentMethod->provider,
                 $paymentMethod->credentialContext,

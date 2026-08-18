@@ -6,6 +6,7 @@ use Equidna\StagHerd\Data\PaymentRequestData;
 
 class ProcessWalletPaymentRequest extends StripeFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -71,7 +72,7 @@ class ProcessWalletPaymentRequest extends StripeFormRequest
                         'wallet_type' => $method,
                         'source' => $source,
                     ],
-                ], fn($value) => $value !== null && $value !== ''),
+                ], fn ($value) => $value !== null && $value !== ''),
             ],
         );
 

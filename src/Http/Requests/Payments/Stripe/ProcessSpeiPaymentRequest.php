@@ -6,6 +6,7 @@ use Equidna\StagHerd\Data\PaymentRequestData;
 
 class ProcessSpeiPaymentRequest extends StripeFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -118,7 +119,7 @@ class ProcessSpeiPaymentRequest extends StripeFormRequest
                         ],
                         $stripeMetadata,
                     ),
-                ], fn($value) => $value !== null && $value !== '' && $value !== []),
+                ], fn ($value) => $value !== null && $value !== '' && $value !== []),
             ],
         );
 

@@ -80,7 +80,7 @@ final class PaymentStateMachine
         PaymentStatusEnum $from,
         PaymentStatusEnum $to,
     ): void {
-        if (! self::canTransition($from, $to)) {
+        if (!self::canTransition($from, $to)) {
             throw InvalidStateTransitionException::fromTo(
                 from: $from->value,
                 to: $to->value,
@@ -111,7 +111,7 @@ final class PaymentStateMachine
 
     public static function assertCanBeCanceled(Payment $payment): void
     {
-        if (! self::canBeCanceled($payment->status)) {
+        if (!self::canBeCanceled($payment->status)) {
             throw InvalidStateTransitionException::fromTo(
                 from: $payment->status->value,
                 to: PaymentStatusEnum::CANCELED->value,
@@ -126,7 +126,7 @@ final class PaymentStateMachine
 
     public static function assertCanBeRefunded(Payment $payment): void
     {
-        if (! self::canBeRefunded($payment->status)) {
+        if (!self::canBeRefunded($payment->status)) {
             throw InvalidStateTransitionException::fromTo(
                 from: $payment->status->value,
                 to: PaymentStatusEnum::REFUNDED->value,
@@ -144,7 +144,7 @@ final class PaymentStateMachine
 
     public static function assertCanBeReconciled(Payment $payment): void
     {
-        if (! self::canBeReconciled($payment->status)) {
+        if (!self::canBeReconciled($payment->status)) {
             throw new InvalidArgumentException(
                 "Payment with status [{$payment->status->value}] cannot be reconciled."
             );
@@ -165,7 +165,7 @@ final class PaymentStateMachine
         Payment $payment,
         PaymentStatusEnum $incomingStatus,
     ): void {
-        if (! self::canReceiveWebhookUpdate($payment->status, $incomingStatus)) {
+        if (!self::canReceiveWebhookUpdate($payment->status, $incomingStatus)) {
             throw InvalidStateTransitionException::fromTo(
                 from: $payment->status->value,
                 to: $incomingStatus->value,

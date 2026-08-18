@@ -6,6 +6,7 @@ use Equidna\StagHerd\Support\MoneyFormatter;
 
 class RefundPaymentRequest extends PaymentFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [

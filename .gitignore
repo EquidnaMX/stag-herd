@@ -32,3 +32,4 @@ Homestead.json
 .phpactor.json
 auth.json
 /build
+.atl/

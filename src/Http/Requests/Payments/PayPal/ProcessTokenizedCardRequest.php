@@ -7,6 +7,7 @@ use Illuminate\Validation\Validator;
 
 class ProcessTokenizedCardRequest extends PayPalFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -49,7 +50,7 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             $tokenId = $this->input('token_id');
             $payerReference = $this->input('payer_reference');
 
-            if (! $tokenId && ! $payerReference) {
+            if (!$tokenId && !$payerReference) {
                 $validator->errors()->add(
                     'payer_reference',
                     'payer_reference is required when token_id is not provided.'

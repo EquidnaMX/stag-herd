@@ -248,7 +248,7 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler, ExtractsPaym
 
         return array_filter(
             $payload,
-            fn($value) => $value !== null && $value !== [],
+            fn ($value) => $value !== null && $value !== [],
         );
     }
 
@@ -270,7 +270,7 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler, ExtractsPaym
 
         $payment = $this->resolveFirstPaymentFromSearchResponse($response);
 
-        if (! $payment) {
+        if (!$payment) {
             throw PaymentNotFoundException::withProviderReference(
                 'mercado_pago',
                 (string) $request->providerOrderId,
@@ -291,7 +291,7 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler, ExtractsPaym
     {
         $results = $response['results'] ?? [];
 
-        if (! is_array($results) || $results === []) {
+        if (!is_array($results) || $results === []) {
             return null;
         }
 
@@ -310,7 +310,7 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler, ExtractsPaym
         $resolved = $providerPaymentId
             ?? data_get($metadata, 'provider_payment_id');
 
-        if (! $resolved) {
+        if (!$resolved) {
             throw InvalidPaymentPayloadException::missingField('provider_payment_id');
         }
 

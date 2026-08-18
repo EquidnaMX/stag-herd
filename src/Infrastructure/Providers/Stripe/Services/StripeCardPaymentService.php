@@ -81,7 +81,7 @@ final class StripeCardPaymentService
                     ?? $request->metadata['return_url']
                     ?? null,
             ],
-            fn($value) => $value !== null && $value !== ''
+            fn ($value) => $value !== null && $value !== ''
         );
 
         if ($paymentMethodId) {
@@ -166,7 +166,7 @@ final class StripeCardPaymentService
                 'amount' => $request->amount,
                 'reason' => $this->normalizeRefundReason($request->reason),
             ],
-            fn($value) => $value !== null && $value !== ''
+            fn ($value) => $value !== null && $value !== ''
         );
 
         $response = $this->gateway->createRefund(
@@ -211,7 +211,7 @@ final class StripeCardPaymentService
                     'source' => $request->metadata['source']
                         ?? ($options['default_source'] ?? null),
                 ],
-                fn($value) => $value !== null && $value !== ''
+                fn ($value) => $value !== null && $value !== ''
             ),
         ];
 
@@ -265,7 +265,7 @@ final class StripeCardPaymentService
         }
 
         if (
-            ! array_key_exists('return_url', $payload)
+            !array_key_exists('return_url', $payload)
             && is_string($request->returnUrl)
             && trim($request->returnUrl) !== ''
         ) {
@@ -284,7 +284,7 @@ final class StripeCardPaymentService
 
         return array_filter(
             $payload,
-            fn($value) => $value !== null
+            fn ($value) => $value !== null
                 && $value !== []
                 && $value !== '',
         );
@@ -315,7 +315,7 @@ final class StripeCardPaymentService
             ?? data_get($metadata, 'stripe_payment_intent_id')
             ?? data_get($metadata, 'provider_payment_id');
 
-        if (! $resolved) {
+        if (!$resolved) {
             throw InvalidPaymentPayloadException::missingField(
                 'provider_payment_id'
             );

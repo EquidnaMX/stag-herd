@@ -158,7 +158,7 @@ final readonly class MercadoPagoPaymentMethodService
         $nestedCard = data_get($card, 'card');
 
         if (
-            (! array_key_exists('id', $card) || ! is_scalar($card['id']))
+            (!array_key_exists('id', $card) || !is_scalar($card['id']))
             && is_array($nestedCard)
             && $nestedCard !== []
         ) {
@@ -176,7 +176,7 @@ final readonly class MercadoPagoPaymentMethodService
         $cards = $this->gateway->getCustomerCards($customerId);
 
         foreach ($cards as $card) {
-            if (! is_array($card)) {
+            if (!is_array($card)) {
                 continue;
             }
 
@@ -216,7 +216,10 @@ final readonly class MercadoPagoPaymentMethodService
         ]);
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
     private function cleanPayload(array $payload): array
     {
         $clean = [];
@@ -248,7 +251,7 @@ final readonly class MercadoPagoPaymentMethodService
     private function firstString(array $values): ?string
     {
         foreach ($values as $value) {
-            if (! is_scalar($value)) {
+            if (!is_scalar($value)) {
                 continue;
             }
 

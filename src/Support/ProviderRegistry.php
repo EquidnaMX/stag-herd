@@ -22,7 +22,7 @@ class ProviderRegistry
     {
         $name = strtolower($name);
 
-        if (! isset($this->providers[$name])) {
+        if (!isset($this->providers[$name])) {
             throw ProviderNotRegisteredException::forProvider($name);
         }
 
@@ -41,7 +41,7 @@ class ProviderRegistry
     {
         $provider = strtolower($provider);
 
-        if (! $this->has($provider)) {
+        if (!$this->has($provider)) {
             return [];
         }
 
@@ -56,7 +56,7 @@ class ProviderRegistry
 
         $providerConfig = config("stag-herd.providers.{$provider}");
 
-        if (! is_array($providerConfig) || ! ($providerConfig['enabled'] ?? false)) {
+        if (!is_array($providerConfig) || !($providerConfig['enabled'] ?? false)) {
             return [];
         }
 
@@ -65,7 +65,7 @@ class ProviderRegistry
         foreach ($declaredMethods as $declaredMethod) {
             $methodConfig = $providerConfig['methods'][$declaredMethod] ?? null;
 
-            if (! is_array($methodConfig) || ! ($methodConfig['enabled'] ?? false)) {
+            if (!is_array($methodConfig) || !($methodConfig['enabled'] ?? false)) {
                 continue;
             }
 

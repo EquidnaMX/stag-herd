@@ -24,7 +24,7 @@ class PaymentMethodController extends Controller
             return response()->json([
                 'ok' => true,
                 'payment_methods' => array_map(
-                    static fn($paymentMethod) => $paymentMethod->toArray(),
+                    static fn ($paymentMethod) => $paymentMethod->toArray(),
                     $paymentMethods,
                 ),
             ]);

@@ -65,7 +65,7 @@ final readonly class MercadoPagoBillingProvider implements
             'payer_email' => $request->customerEmail,
             'back_url' => $request->successUrl,
             'status' => 'pending',
-        ], fn(mixed $value): bool => $value !== null && $value !== '');
+        ], fn (mixed $value): bool => $value !== null && $value !== '');
 
         $response = $this->gateway->createPreapproval($payload, $request->idempotencyKey);
 

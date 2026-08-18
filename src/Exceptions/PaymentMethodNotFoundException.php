@@ -28,7 +28,7 @@ class PaymentMethodNotFoundException extends NotFoundException
                 'provider' => $provider,
                 'owner_reference' => $ownerReference,
                 'provider_payment_method_id' => $providerPaymentMethodId,
-            ], fn($value) => $value !== null),
+            ], fn ($value) => $value !== null),
         );
     }
 }

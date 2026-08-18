@@ -51,25 +51,20 @@ final class StripeResultMapper
         return new PaymentResultData(
             provider: 'stripe',
             method: $method,
-
             status: $this->statusMapper->mapPaymentIntent(
                 $response
             ),
-
             providerStatus: $providerStatus,
-
             references: new ProviderReferencesData(
                 providerPaymentId: $this->nullableString(
                     Arr::get($response, 'id')
                 ),
-
                 providerOrderId: $this->nullableString(
                     Arr::get(
                         $response,
                         'metadata.external_reference'
                     )
                 ),
-
                 providerTransactionId: $this->nullableString(
                     Arr::get(
                         $response,
@@ -77,11 +72,9 @@ final class StripeResultMapper
                     )
                 ),
             ),
-
             amount: Arr::has($response, 'amount')
                 ? (int) Arr::get($response, 'amount')
                 : $fallbackAmount,
-
             currency: strtoupper(
                 (string) (
                     Arr::get($response, 'currency')
@@ -89,11 +82,9 @@ final class StripeResultMapper
                     ?? ''
                 )
             ),
-
             nextAction: $this->resolveNextAction(
                 $response
             ),
-
             reason: $this->nullableString(
                 Arr::get(
                     $response,
@@ -103,7 +94,6 @@ final class StripeResultMapper
                     'cancellation_reason'
                 )
             ),
-
             metadata: array_filter(
                 [
                     'external_reference' =>
@@ -173,11 +163,10 @@ final class StripeResultMapper
                         'payment_method'
                     ),
                 ],
-                fn($value) =>
+                fn ($value) =>
                 $value !== null
                     && $value !== ''
             ),
-
             rawPayload: $response,
         );
     }
@@ -209,7 +198,7 @@ final class StripeResultMapper
                 'stripe_refund_id' => Arr::get($response, 'id'),
                 'stripe_refund_status' => Arr::get($response, 'status'),
                 'stripe_charge_id' => Arr::get($response, 'charge'),
-            ], fn($value) => $value !== null && $value !== ''),
+            ], fn ($value) => $value !== null && $value !== ''),
             rawPayload: $response,
         );
     }
@@ -246,7 +235,7 @@ final class StripeResultMapper
                 'stripe_bank_transfer_reference' => Arr::get($bankTransferInstructions, 'reference'),
                 'stripe_bank_transfer_type' => Arr::get($bankTransferInstructions, 'type'),
                 'stripe_bank_transfer_financial_addresses' => Arr::get($bankTransferInstructions, 'financial_addresses'),
-            ], fn($value) => $value !== null && $value !== ''));
+            ], fn ($value) => $value !== null && $value !== ''));
         }
 
         return NextActionData::none();

@@ -6,6 +6,7 @@ use Equidna\StagHerd\Data\PaymentRequestData;
 
 class ProcessBrickRequest extends MercadoPagoFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -46,7 +47,7 @@ class ProcessBrickRequest extends MercadoPagoFormRequest
     {
         $mercadoPago = $this->input('mercado_pago', []);
 
-        if (! is_array($mercadoPago)) {
+        if (!is_array($mercadoPago)) {
             $mercadoPago = [];
         }
 
@@ -179,7 +180,7 @@ class ProcessBrickRequest extends MercadoPagoFormRequest
                 ),
                 'idempotency_key' => $this->idempotencyKey(),
                 'device_id' => $this->deviceId(),
-            ], fn($value) => $value !== null && $value !== ''),
+            ], fn ($value) => $value !== null && $value !== ''),
             'raw_form_data' => $this->validated('raw_form_data') ?? null,
         ]);
 

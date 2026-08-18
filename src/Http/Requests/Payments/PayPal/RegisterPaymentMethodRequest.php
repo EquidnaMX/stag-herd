@@ -6,6 +6,7 @@ use Illuminate\Validation\Validator;
 
 class RegisterPaymentMethodRequest extends PayPalFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -22,7 +23,7 @@ class RegisterPaymentMethodRequest extends PayPalFormRequest
     {
         $paymentToken = $this->input('payment_token', []);
 
-        if (! is_array($paymentToken)) {
+        if (!is_array($paymentToken)) {
             $paymentToken = [];
         }
 
@@ -40,7 +41,7 @@ class RegisterPaymentMethodRequest extends PayPalFormRequest
             $paymentTokenId = $this->input('payment_token_id')
                 ?? data_get($this->input('payment_token'), 'id');
 
-            if (! is_string($paymentTokenId) || trim($paymentTokenId) === '') {
+            if (!is_string($paymentTokenId) || trim($paymentTokenId) === '') {
                 $validator->errors()->add(
                     'payment_token_id',
                     'payment_token_id is required when payment_token.id is not provided.'

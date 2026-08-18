@@ -39,13 +39,13 @@ final class StripeSpeiPaymentService
             ),
         );
 
-        if (! is_string($customerId) || trim($customerId) === '') {
+        if (!is_string($customerId) || trim($customerId) === '') {
             throw InvalidPaymentPayloadException::missingField(
                 'metadata.stripe.customer'
             );
         }
 
-        if (! str_starts_with($customerId, 'cus_')) {
+        if (!str_starts_with($customerId, 'cus_')) {
             throw InvalidPaymentPayloadException::invalidField(
                 'metadata.stripe.customer',
                 'Stripe customer must contain a valid cus_... identifier.'
@@ -107,7 +107,7 @@ final class StripeSpeiPaymentService
                     'payment_method_family' => 'spei',
                     'bank_transfer_type' => 'mx_bank_transfer',
                 ],
-                fn($value) => $value !== null && $value !== ''
+                fn ($value) => $value !== null && $value !== ''
             ),
         ];
 
@@ -123,7 +123,7 @@ final class StripeSpeiPaymentService
 
         return array_filter(
             $payload,
-            fn($value) => $value !== null
+            fn ($value) => $value !== null
                 && $value !== ''
                 && $value !== [],
         );

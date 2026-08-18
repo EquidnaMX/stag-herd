@@ -6,6 +6,7 @@ use Equidna\StagHerd\Data\PaymentRequestData;
 
 class StorePaymentRequest extends PaymentFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [

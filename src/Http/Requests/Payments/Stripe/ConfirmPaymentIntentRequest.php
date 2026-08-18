@@ -4,6 +4,7 @@ namespace Equidna\StagHerd\Http\Requests\Payments\Stripe;
 
 class ConfirmPaymentIntentRequest extends StripeFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -39,6 +40,7 @@ class ConfirmPaymentIntentRequest extends StripeFormRequest
         return $this->validated('stripe_status');
     }
 
+    /** @return array<string, mixed> */
     public function inputMetadata(): array
     {
         $metadata = $this->validated('metadata') ?? [];

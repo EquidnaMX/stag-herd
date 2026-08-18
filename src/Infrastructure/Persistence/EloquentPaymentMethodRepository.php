@@ -26,9 +26,11 @@ final class EloquentPaymentMethodRepository implements PaymentMethodRepository
 
             $providerEventCreatedAt = $attributes['provider_event_created_at'] ?? null;
 
-            if ($existing instanceof StagHerdPaymentMethod
+            if (
+                $existing instanceof StagHerdPaymentMethod
                 && $providerEventCreatedAt !== null
-                && (int) $existing->provider_event_created_at > (int) $providerEventCreatedAt) {
+                && (int) $existing->provider_event_created_at > (int) $providerEventCreatedAt
+            ) {
                 return false;
             }
 
@@ -94,7 +96,8 @@ final class EloquentPaymentMethodRepository implements PaymentMethodRepository
         string $ownerReference,
         string $fingerprint,
     ): ?array {
-        return StagHerdPaymentMethod::query()
+        /** @var StagHerdPaymentMethod|null $paymentMethod */
+        $paymentMethod = StagHerdPaymentMethod::query()
             ->where('provider', $provider)
             ->where('credential_context', $credentialContext)
             ->where('owner_reference', $ownerReference)
@@ -104,8 +107,9 @@ final class EloquentPaymentMethodRepository implements PaymentMethodRepository
             ->orderByDesc('last_used_at')
             ->orderByDesc('attached_at')
             ->orderByDesc('id')
-            ->first()
-            ?->toArray();
+            ->first();
+
+        return $paymentMethod?->toArray();
     }
 
     /** @return array<int, array<string, mixed>> */

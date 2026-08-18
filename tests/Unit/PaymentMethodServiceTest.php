@@ -143,7 +143,7 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
     {
         return array_values(array_filter(
             $this->filterByOwner($provider, $credentialContext, $ownerReference),
-            static fn(array $record): bool => ($record['status'] ?? 'active') === 'active',
+            static fn (array $record): bool => ($record['status'] ?? 'active') === 'active',
         ));
     }
 
@@ -155,7 +155,7 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
     ): ?array {
         $record = $this->findByProviderPaymentMethodId($provider, $credentialContext, $providerPaymentMethodId);
 
-        if (! is_array($record)
+        if (!is_array($record)
             || ($record['owner_reference'] ?? null) !== $ownerReference
             || ($record['status'] ?? 'active') !== 'active') {
             return null;
@@ -233,7 +233,7 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
     {
         return array_values(array_filter(
             $this->records,
-            static fn(array $record): bool => ($record['provider'] ?? null) === $provider
+            static fn (array $record): bool => ($record['provider'] ?? null) === $provider
                 && ($record['credential_context'] ?? null) === $credentialContext
                 && ($record['owner_reference'] ?? null) === $ownerReference,
         ));
@@ -247,59 +247,244 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
 
 final class NullStripeGateway implements StripeGateway
 {
-    public function createCheckoutSession(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function getCheckoutSession(string $checkoutSessionId): array { return []; }
-    public function createProduct(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function createPrice(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function getSubscription(string $subscriptionId): array { return []; }
-    public function updateSubscription(string $subscriptionId, array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function cancelSubscription(string $subscriptionId, ?string $idempotencyKey = null): array { return []; }
-    public function createBillingPortalSession(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function createPaymentIntent(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function getPaymentIntent(string $paymentIntentId): array { return []; }
-    public function confirmPaymentIntent(string $paymentIntentId, array $payload = [], ?string $idempotencyKey = null): array { return []; }
-    public function cancelPaymentIntent(string $paymentIntentId): array { return []; }
-    public function createRefund(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function createCustomer(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function getCustomer(string $customerId): array { return []; }
-    public function createSetupIntent(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function getSetupIntent(string $setupIntentId): array { return []; }
-    public function getPaymentMethod(string $paymentMethodId): array { return []; }
-    public function detachPaymentMethod(string $paymentMethodId): array { return []; }
-    public function updateCustomer(string $customerId, array $payload): array { return []; }
-    public function listCustomerPaymentMethods(string $customerId, string $type = 'card'): array { return []; }
+    public function createCheckoutSession(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function getCheckoutSession(string $checkoutSessionId): array
+    {
+        return [];
+    }
+
+    public function createProduct(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function createPrice(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function getSubscription(string $subscriptionId): array
+    {
+        return [];
+    }
+
+    public function updateSubscription(string $subscriptionId, array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function cancelSubscription(string $subscriptionId, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function createBillingPortalSession(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function createPaymentIntent(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function getPaymentIntent(string $paymentIntentId): array
+    {
+        return [];
+    }
+
+    public function confirmPaymentIntent(string $paymentIntentId, array $payload = [], ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function cancelPaymentIntent(string $paymentIntentId): array
+    {
+        return [];
+    }
+
+    public function createRefund(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function createCustomer(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function getCustomer(string $customerId): array
+    {
+        return [];
+    }
+
+    public function createSetupIntent(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function getSetupIntent(string $setupIntentId): array
+    {
+        return [];
+    }
+
+    public function getPaymentMethod(string $paymentMethodId): array
+    {
+        return [];
+    }
+
+    public function detachPaymentMethod(string $paymentMethodId): array
+    {
+        return [];
+    }
+
+    public function updateCustomer(string $customerId, array $payload): array
+    {
+        return [];
+    }
+
+    public function listCustomerPaymentMethods(string $customerId, string $type = 'card'): array
+    {
+        return [];
+    }
 }
 
 final class NullPayPalGateway implements PayPalGateway
 {
-    public function createOrder(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function getOrder(string $orderId): array { return []; }
-    public function captureOrder(string $orderId, ?string $idempotencyKey = null): array { return []; }
-    public function getCapture(string $captureId): array { return []; }
-    public function refundCapture(string $captureId, ?int $amount = null, ?string $currency = null, ?string $idempotencyKey = null): array { return []; }
-    public function createCatalogProduct(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function createPlan(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function createSubscription(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function getSubscription(string $subscriptionId): array { return []; }
-    public function cancelSubscription(string $subscriptionId, array $payload = [], ?string $idempotencyKey = null): array { return []; }
-    public function getPaymentToken(string $paymentTokenId): array { return []; }
-    public function deletePaymentToken(string $paymentTokenId): array { return []; }
-    public function verifyWebhookSignature(array $payload): bool { return false; }
+    public function createOrder(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function getOrder(string $orderId): array
+    {
+        return [];
+    }
+
+    public function captureOrder(string $orderId, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function getCapture(string $captureId): array
+    {
+        return [];
+    }
+
+    public function refundCapture(string $captureId, ?int $amount = null, ?string $currency = null, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function createCatalogProduct(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function createPlan(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function createSubscription(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function getSubscription(string $subscriptionId): array
+    {
+        return [];
+    }
+
+    public function cancelSubscription(string $subscriptionId, array $payload = [], ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function getPaymentToken(string $paymentTokenId): array
+    {
+        return [];
+    }
+
+    public function deletePaymentToken(string $paymentTokenId): array
+    {
+        return [];
+    }
+
+    public function verifyWebhookSignature(array $payload): bool
+    {
+        return false;
+    }
 }
 
 final class NullMercadoPagoGateway implements MercadoPagoGateway
 {
-    public function createPayment(array $payload, ?string $idempotencyKey = null, ?string $deviceId = null): array { return []; }
-    public function getPayment(string $providerPaymentId): array { return []; }
-    public function searchPayments(array $filters = []): array { return []; }
-    public function cancelPayment(string $providerPaymentId): array { return []; }
-    public function refundPayment(string $providerPaymentId, ?int $amount = null, ?string $idempotencyKey = null): array { return []; }
-    public function createPreference(array $payload): array { return []; }
-    public function createPreapprovalPlan(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function getPreapprovalPlan(string $planId): array { return []; }
-    public function createPreapproval(array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function getPreapproval(string $subscriptionId): array { return []; }
-    public function updatePreapproval(string $subscriptionId, array $payload, ?string $idempotencyKey = null): array { return []; }
-    public function getCustomerCards(string $customerId): array { return []; }
-    public function deleteCustomerCard(string $customerId, string $cardId): array { return []; }
+    public function createPayment(array $payload, ?string $idempotencyKey = null, ?string $deviceId = null): array
+    {
+        return [];
+    }
+
+    public function getPayment(string $providerPaymentId): array
+    {
+        return [];
+    }
+
+    public function searchPayments(array $filters = []): array
+    {
+        return [];
+    }
+
+    public function cancelPayment(string $providerPaymentId): array
+    {
+        return [];
+    }
+
+    public function refundPayment(string $providerPaymentId, ?int $amount = null, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function createPreference(array $payload): array
+    {
+        return [];
+    }
+
+    public function createPreapprovalPlan(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function getPreapprovalPlan(string $planId): array
+    {
+        return [];
+    }
+
+    public function createPreapproval(array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function getPreapproval(string $subscriptionId): array
+    {
+        return [];
+    }
+
+    public function updatePreapproval(string $subscriptionId, array $payload, ?string $idempotencyKey = null): array
+    {
+        return [];
+    }
+
+    public function getCustomerCards(string $customerId): array
+    {
+        return [];
+    }
+
+    public function deleteCustomerCard(string $customerId, string $cardId): array
+    {
+        return [];
+    }
 }

@@ -71,7 +71,7 @@ abstract class AbstractPaymentProvider implements PaymentProvider, ConfirmsPayme
     ): ?PaymentMethodRegisterData {
         $handler = $this->handlers->get($this->resolveMethod($result->method));
 
-        if (! $handler instanceof ExtractsPaymentMethodFromPayment) {
+        if (!$handler instanceof ExtractsPaymentMethodFromPayment) {
             return null;
         }
 

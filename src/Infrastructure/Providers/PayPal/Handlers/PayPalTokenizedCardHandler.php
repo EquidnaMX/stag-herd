@@ -356,7 +356,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
                     'currency_code' => strtoupper($request->currency),
                     'value' => MoneyFormatter::toDecimal($request->amount),
                 ],
-            ], fn($value) => $value !== null && $value !== ''),
+            ], fn ($value) => $value !== null && $value !== ''),
         ];
 
         $applicationContext = array_filter([
@@ -366,7 +366,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             'landing_page' => $paypal['landing_page'] ?? 'LOGIN',
             'user_action' => $paypal['user_action'] ?? 'PAY_NOW',
             'shipping_preference' => $paypal['shipping_preference'] ?? 'NO_SHIPPING',
-        ], fn($value) => $value !== null && $value !== '');
+        ], fn ($value) => $value !== null && $value !== '');
 
         $payload = [
             'intent' => strtoupper((string) ($paypal['intent'] ?? 'CAPTURE')),
@@ -381,6 +381,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
         return $payload;
     }
 
+    /** @param array<string,mixed> $metadata */
     private function resolveOrderId(
         ?string $providerOrderId,
         ?string $providerPaymentId = null,
@@ -392,11 +393,11 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             ?? $metadata['order_id']
             ?? null;
 
-        if (! $resolved && $providerPaymentId) {
+        if (!$resolved && $providerPaymentId) {
             $resolved = $providerPaymentId;
         }
 
-        if (! $resolved) {
+        if (!$resolved) {
             throw InvalidPaymentPayloadException::missingField(
                 'provider_order_id / paypal_order_id'
             );
@@ -405,6 +406,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
         return (string) $resolved;
     }
 
+    /** @param array<string, mixed> $metadata */
     private function resolveCaptureId(
         ?string $providerPaymentId,
         array $metadata = [],
@@ -414,7 +416,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             ?? $metadata['paypal_capture_id']
             ?? null;
 
-        if (! $resolved) {
+        if (!$resolved) {
             throw InvalidPaymentPayloadException::missingField(
                 'provider_payment_id / paypal_capture_id'
             );
@@ -423,6 +425,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
         return (string) $resolved;
     }
 
+    /** @param array<string,mixed> $metadata */
     private function resolveIdempotencyKey(
         string $prefix,
         ?string $reference = null,
@@ -437,7 +440,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
 
     private function nullableString(mixed $value): ?string
     {
-        if (! is_string($value)) {
+        if (!is_string($value)) {
             return null;
         }
 

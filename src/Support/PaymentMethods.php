@@ -13,20 +13,20 @@ final class PaymentMethods
         $methods = [];
 
         foreach ($providers as $providerConfig) {
-            if (! is_array($providerConfig)) {
+            if (!is_array($providerConfig)) {
                 continue;
             }
 
-            if ($enabledOnly && ! ($providerConfig['enabled'] ?? false)) {
+            if ($enabledOnly && !($providerConfig['enabled'] ?? false)) {
                 continue;
             }
 
             foreach (($providerConfig['methods'] ?? []) as $method => $methodConfig) {
-                if (! is_array($methodConfig)) {
+                if (!is_array($methodConfig)) {
                     continue;
                 }
 
-                if ($enabledOnly && ! ($methodConfig['enabled'] ?? false)) {
+                if ($enabledOnly && !($methodConfig['enabled'] ?? false)) {
                     continue;
                 }
 

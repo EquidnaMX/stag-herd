@@ -86,7 +86,7 @@ final class MercadoPagoResultMapper
                 'mercado_pago_date_approved' => Arr::get($response, 'date_approved'),
                 'mercado_pago_lookup_amount' => $providerAmount,
                 'mercado_pago_lookup_currency' => $providerCurrency,
-            ], fn(mixed $value): bool => $value !== null && $value !== ''),
+            ], fn (mixed $value): bool => $value !== null && $value !== ''),
             rawPayload: $response,
             payerEmail: $this->resolvePayerEmail($response),
         );
@@ -162,7 +162,7 @@ final class MercadoPagoResultMapper
             ?? Arr::get($response, 'init_point')
             ?? Arr::get($response, 'sandbox_init_point');
 
-        if (! $redirectUrl) {
+        if (!$redirectUrl) {
             return NextActionData::none();
         }
 

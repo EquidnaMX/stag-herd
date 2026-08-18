@@ -21,7 +21,7 @@ final class PaymentMethodHandlerRegistry
     {
         $method = strtolower($method);
 
-        if (! isset($this->handlers[$method])) {
+        if (!isset($this->handlers[$method])) {
             throw InvalidPaymentMethodException::forMethod($method);
         }
 

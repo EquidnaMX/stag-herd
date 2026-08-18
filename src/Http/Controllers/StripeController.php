@@ -15,8 +15,8 @@ use Equidna\StagHerd\Http\Requests\Payments\Stripe\ProcessTokenizedCardRequest;
 use Equidna\StagHerd\Http\Requests\Payments\Stripe\ProcessWalletPaymentRequest;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardReuse;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCustomerService;
-use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeResultMapper;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripePaymentMethodService;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeResultMapper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Throwable;
@@ -30,7 +30,8 @@ class StripeController extends Controller
         private readonly StripeCustomerService $stripeCustomerService,
         private readonly StripePaymentMethodService $stripePaymentMethods,
         private readonly StorePaymentResult $storePaymentResult,
-    ) {}
+    ) {
+    }
 
     public function createSetupIntent(CreateSetupIntentRequest $request): JsonResponse
     {
@@ -47,14 +48,14 @@ class StripeController extends Controller
                 customerPayload: $customerPayload,
             );
 
-            if (! $customerId) {
+            if (!$customerId) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'Stripe no regresó customer_id.',
                 ], 422);
             }
 
-            if (! str_starts_with($customerId, 'cus_')) {
+            if (!str_starts_with($customerId, 'cus_')) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'El customer_id de Stripe no es válido.',
@@ -76,7 +77,7 @@ class StripeController extends Controller
                             ],
                         ),
                     ],
-                    fn($value) => $value !== null && $value !== '' && $value !== [],
+                    fn ($value) => $value !== null && $value !== '' && $value !== [],
                 ),
                 idempotencyKey: $request->idempotencyKey(),
             );
@@ -84,7 +85,7 @@ class StripeController extends Controller
             $setupIntentId = data_get($setupIntent, 'id');
             $clientSecret = data_get($setupIntent, 'client_secret');
 
-            if (! $setupIntentId) {
+            if (!$setupIntentId) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'Stripe no regresó setup_intent_id.',
@@ -92,7 +93,7 @@ class StripeController extends Controller
                 ], 422);
             }
 
-            if (! $clientSecret) {
+            if (!$clientSecret) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'Stripe no regresó client_secret.',
@@ -142,7 +143,7 @@ class StripeController extends Controller
                 ], 422);
             }
 
-            if (! $paymentMethodId) {
+            if (!$paymentMethodId) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'Stripe no regresó payment_method_id.',
@@ -156,9 +157,7 @@ class StripeController extends Controller
             );
 
             $paymentMethodId = $resolvedPaymentMethod['payment_method_id'];
-            $rawStripePaymentMethod = is_array($resolvedPaymentMethod['payment_method'] ?? null)
-                ? $resolvedPaymentMethod['payment_method']
-                : [];
+            $rawStripePaymentMethod = $resolvedPaymentMethod['payment_method'];
 
             $credentialContext = $request->credentialContext(
                 data_get($setupIntent, 'metadata.credential_context')
@@ -304,7 +303,7 @@ class StripeController extends Controller
                     customerPayload: $customerPayload,
                 );
 
-                if (! $customerId) {
+                if (!$customerId) {
                     return response()->json([
                         'ok' => false,
                         'message' => 'Stripe no regresó customer_id.',
@@ -312,7 +311,7 @@ class StripeController extends Controller
                 }
             }
 
-            if ($customerId && ! str_starts_with($customerId, 'cus_')) {
+            if ($customerId && !str_starts_with($customerId, 'cus_')) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'El customer_id de Stripe no es válido.',
@@ -327,7 +326,7 @@ class StripeController extends Controller
             $clientSecret = data_get($intent, 'client_secret');
             $paymentIntentId = data_get($intent, 'id');
 
-            if (! $clientSecret) {
+            if (!$clientSecret) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'Stripe no regresó client_secret.',
@@ -335,7 +334,7 @@ class StripeController extends Controller
                 ], 422);
             }
 
-            if (! $paymentIntentId) {
+            if (!$paymentIntentId) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'Stripe no regresó payment_intent_id.',
@@ -383,7 +382,7 @@ class StripeController extends Controller
 
             $providerStatus = strtolower((string) ($result->providerStatus ?? ''));
 
-            if (! in_array($providerStatus, ['succeeded', 'processing', 'requires_capture'], true)) {
+            if (!in_array($providerStatus, ['succeeded', 'processing', 'requires_capture'], true)) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'Stripe todavía no confirmó el pago.',
@@ -395,7 +394,7 @@ class StripeController extends Controller
             $requestMetadata = $request->inputMetadata();
             $stripeIntentMetadata = data_get($stripeResponse, 'metadata');
 
-            if (! is_array($stripeIntentMetadata)) {
+            if (!is_array($stripeIntentMetadata)) {
                 $stripeIntentMetadata = [];
             }
 
@@ -443,7 +442,7 @@ class StripeController extends Controller
                     'exp_month' => data_get($paymentMethod, 'card.exp_month'),
                     'exp_year' => data_get($paymentMethod, 'card.exp_year'),
                     'fingerprint' => $resolvedPaymentMethod['fingerprint'] ?? data_get($paymentMethod, 'card.fingerprint'),
-                ], fn($value) => $value !== null && $value !== ''),
+                ], fn ($value) => $value !== null && $value !== ''),
             ]);
 
             $metadata = $this->cleanMetadata($metadata);
@@ -523,7 +522,7 @@ class StripeController extends Controller
             $paymentArray = $payment->toArray();
             $clientSecret = data_get($paymentArray, 'metadata.stripe_client_secret');
 
-            if (! $clientSecret) {
+            if (!$clientSecret) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'Stripe no regresó client_secret para el wallet payment.',
@@ -552,7 +551,6 @@ class StripeController extends Controller
             return $this->errorResponse($exception);
         }
     }
-
 
     private function errorResponse(Throwable $exception): JsonResponse
     {
@@ -615,5 +613,4 @@ class StripeController extends Controller
             customerPayload: $customerPayload,
         );
     }
-
 }

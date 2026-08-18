@@ -4,6 +4,7 @@ namespace Equidna\StagHerd\Http\Requests\Payments\Stripe;
 
 class CompleteSetupIntentRequest extends StripeFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [

@@ -148,8 +148,8 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
         );
 
         return array_values(array_filter(
-            is_array($response) ? $response : [],
-            static fn(mixed $card): bool => is_array($card),
+            $response,
+            static fn (mixed $card): bool => is_array($card),
         ));
     }
 
@@ -228,7 +228,7 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
     ): PendingRequest {
         $accessToken = config('stag-herd.providers.mercado_pago.credentials.access_token');
 
-        if (! $accessToken) {
+        if (!$accessToken) {
             throw ProviderNotConfiguredException::missingCredential(
                 self::PROVIDER,
                 'access_token',

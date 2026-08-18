@@ -261,7 +261,7 @@ final class PayPalCheckoutHandler implements PaymentMethodHandler, ExtractsPayme
                     'currency_code' => strtoupper($request->currency),
                     'value' => MoneyFormatter::toDecimal($request->amount),
                 ],
-            ], fn($value) => $value !== null && $value !== ''),
+            ], fn ($value) => $value !== null && $value !== ''),
         ];
 
         $applicationContext = array_filter([
@@ -271,7 +271,7 @@ final class PayPalCheckoutHandler implements PaymentMethodHandler, ExtractsPayme
             'landing_page' => $paypal['landing_page'] ?? 'LOGIN',
             'user_action' => $paypal['user_action'] ?? 'PAY_NOW',
             'shipping_preference' => $paypal['shipping_preference'] ?? 'NO_SHIPPING',
-        ], fn($value) => $value !== null && $value !== '');
+        ], fn ($value) => $value !== null && $value !== '');
 
         $payload = [
             'intent' => strtoupper((string) ($paypal['intent'] ?? 'CAPTURE')),
@@ -304,11 +304,11 @@ final class PayPalCheckoutHandler implements PaymentMethodHandler, ExtractsPayme
          * En algunos flujos el action de confirm solo trae providerPaymentId.
          * Si el Payment local todavía no tiene capture id, ese valor puede ser el order id.
          */
-        if (! $resolved && $providerPaymentId) {
+        if (!$resolved && $providerPaymentId) {
             $resolved = $providerPaymentId;
         }
 
-        if (! $resolved) {
+        if (!$resolved) {
             throw InvalidPaymentPayloadException::missingField(
                 'provider_order_id / paypal_order_id'
             );
@@ -326,7 +326,7 @@ final class PayPalCheckoutHandler implements PaymentMethodHandler, ExtractsPayme
             ?? $metadata['paypal_capture_id']
             ?? null;
 
-        if (! $resolved) {
+        if (!$resolved) {
             throw InvalidPaymentPayloadException::missingField(
                 'provider_payment_id / paypal_capture_id'
             );

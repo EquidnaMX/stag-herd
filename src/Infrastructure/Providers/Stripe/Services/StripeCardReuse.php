@@ -8,7 +8,8 @@ final class StripeCardReuse
 {
     public function __construct(
         private readonly StripeGateway $stripeGateway,
-    ) {}
+    ) {
+    }
 
     /**
      * @return array{
@@ -32,7 +33,7 @@ final class StripeCardReuse
             'card.fingerprint',
         );
 
-        if (! is_string($fingerprint) || $fingerprint === '') {
+        if (!is_string($fingerprint) || $fingerprint === '') {
             return [
                 'payment_method_id' => $paymentMethodId,
                 'original_payment_method_id' => $paymentMethodId,

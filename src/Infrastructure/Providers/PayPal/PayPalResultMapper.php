@@ -223,7 +223,7 @@ final class PayPalResultMapper
     {
         $approveUrl = $this->resolveLink($response, 'approve');
 
-        if (! $approveUrl) {
+        if (!$approveUrl) {
             return NextActionData::none();
         }
 
@@ -236,12 +236,12 @@ final class PayPalResultMapper
     {
         $links = Arr::get($response, 'links', []);
 
-        if (! is_array($links)) {
+        if (!is_array($links)) {
             return null;
         }
 
         foreach ($links as $link) {
-            if (($link['rel'] ?? null) === $rel && ! empty($link['href'])) {
+            if (($link['rel'] ?? null) === $rel && !empty($link['href'])) {
                 return (string) $link['href'];
             }
         }

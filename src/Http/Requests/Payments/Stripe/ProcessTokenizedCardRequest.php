@@ -7,6 +7,7 @@ use Illuminate\Validation\Validator;
 
 class ProcessTokenizedCardRequest extends StripeFormRequest
 {
+    /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
@@ -49,14 +50,14 @@ class ProcessTokenizedCardRequest extends StripeFormRequest
             $paymentMethodId = $this->input('payment_method_id');
             $payerReference = $this->input('payer_reference');
 
-            if ($customerId && ! $paymentMethodId) {
+            if ($customerId && !$paymentMethodId) {
                 $validator->errors()->add(
                     'payment_method_id',
                     'payment_method_id is required when customer_id is provided.'
                 );
             }
 
-            if (! $customerId && ! $payerReference) {
+            if (!$customerId && !$payerReference) {
                 $validator->errors()->add(
                     'payer_reference',
                     'payer_reference is required when customer_id is not provided.'

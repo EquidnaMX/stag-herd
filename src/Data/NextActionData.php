@@ -5,6 +5,7 @@ namespace Equidna\StagHerd\Data;
 final readonly class NextActionData
 {
     public const TYPE_NONE = 'none';
+
     public const TYPE_REDIRECT = 'redirect';
 
     public function __construct(

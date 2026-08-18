@@ -127,14 +127,14 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
                 );
             }
 
-            if (! str_starts_with($customerId, 'cus_')) {
+            if (!str_starts_with($customerId, 'cus_')) {
                 throw InvalidPaymentPayloadException::invalidField(
                     'metadata.stripe.customer',
                     'Stripe customer must contain a valid cus_... identifier.'
                 );
             }
 
-            if (! str_starts_with($paymentMethodId, 'pm_')) {
+            if (!str_starts_with($paymentMethodId, 'pm_')) {
                 throw InvalidPaymentPayloadException::invalidField(
                     'metadata.stripe.payment_method',
                     'Stripe payment method must contain a valid pm_... identifier.'
@@ -154,7 +154,7 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
 
         if (
             $paymentMethodId !== null
-            && ! str_starts_with($paymentMethodId, 'pm_')
+            && !str_starts_with($paymentMethodId, 'pm_')
         ) {
             throw InvalidPaymentPayloadException::invalidField(
                 'metadata.stripe.payment_method',
@@ -171,14 +171,14 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
             )
         );
 
-        if (! str_starts_with($paymentMethod->providerCustomerId, 'cus_')) {
+        if (!str_starts_with($paymentMethod->providerCustomerId, 'cus_')) {
             throw InvalidPaymentPayloadException::invalidField(
                 'payment_method.provider_payment_method_id',
                 'Stripe payment method resolved an invalid pm_... payment method identifier.'
             );
         }
 
-        if (! str_starts_with($paymentMethod->providerPaymentMethodId, 'pm_')) {
+        if (!str_starts_with($paymentMethod->providerPaymentMethodId, 'pm_')) {
             throw InvalidPaymentPayloadException::invalidField(
                 'payment_method.provider_payment_method_id',
                 'Payment method resolved an invalid pm_... payment method identifier.'
@@ -194,7 +194,7 @@ final class StripeTokenizedCardHandler implements PaymentMethodHandler
 
     private function nullableString(mixed $value): ?string
     {
-        if (! is_string($value)) {
+        if (!is_string($value)) {
             return null;
         }
 

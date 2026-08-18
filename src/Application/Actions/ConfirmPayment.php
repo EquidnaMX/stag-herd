@@ -28,7 +28,7 @@ final readonly class ConfirmPayment
 
         $provider = $this->providers->get($payment->provider);
 
-        if (! $provider instanceof ConfirmsPayments) {
+        if (!$provider instanceof ConfirmsPayments) {
             throw UnsupportedOperationException::forProvider(
                 provider: $payment->provider,
                 operation: 'confirm',

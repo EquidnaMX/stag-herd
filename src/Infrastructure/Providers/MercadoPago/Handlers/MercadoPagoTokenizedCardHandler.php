@@ -108,7 +108,7 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
     }
 
     /**
-     * @return array{token:string,customer_id:string,payment_method_id:string,card_id:?string,issuer_id:mixed,installments:int,payer:array}
+     * @return array{token:string,customer_id:string,payment_method_id:string,card_id:string|null,issuer_id:mixed,installments:int,payer:array<string,mixed>}
      */
     private function resolveChargeData(PaymentRequestData $request): array
     {
@@ -212,7 +212,7 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
     }
 
     /**
-     * @param array{token:string,customer_id:string,payment_method_id:string,card_id:?string,issuer_id:mixed,installments:int,payer:array} $resolved
+     * @param array{token:string,customer_id:string,payment_method_id:string,card_id:string|null,issuer_id:mixed,installments:int,payer:array<string,mixed>} $resolved
      * @return array<string,mixed>
      */
     private function buildCreatePaymentPayload(PaymentRequestData $request, array $resolved): array
@@ -263,7 +263,7 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
         }
 
         foreach ($optionalFields as $field) {
-            if (array_key_exists($field, $mercadoPago) && ! array_key_exists($field, $payload)) {
+            if (array_key_exists($field, $mercadoPago) && !array_key_exists($field, $payload)) {
                 $payload[$field] = $mercadoPago[$field];
             }
         }
@@ -277,7 +277,7 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
 
         return array_filter(
             $payload,
-            fn($value) => $value !== null && $value !== [],
+            fn ($value) => $value !== null && $value !== [],
         );
     }
 
@@ -299,7 +299,7 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
 
         $payment = $this->resolveFirstPaymentFromSearchResponse($response);
 
-        if (! $payment) {
+        if (!$payment) {
             throw PaymentNotFoundException::withProviderReference(
                 'mercado_pago',
                 (string) $request->providerOrderId,
@@ -320,7 +320,7 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
     {
         $results = $response['results'] ?? [];
 
-        if (! is_array($results) || $results === []) {
+        if (!is_array($results) || $results === []) {
             return null;
         }
 
@@ -332,6 +332,7 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
         return $results[0] ?? null;
     }
 
+    /** @param array<string,mixed> $metadata */
     private function resolveProviderPaymentId(
         ?string $providerPaymentId,
         array $metadata = [],
@@ -339,7 +340,7 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
         $resolved = $providerPaymentId
             ?? data_get($metadata, 'provider_payment_id');
 
-        if (! $resolved) {
+        if (!$resolved) {
             throw InvalidPaymentPayloadException::missingField('provider_payment_id');
         }
 
@@ -373,7 +374,7 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
 
     private function nullableString(mixed $value): ?string
     {
-        if (! is_scalar($value)) {
+        if (!is_scalar($value)) {
             return null;
         }
 

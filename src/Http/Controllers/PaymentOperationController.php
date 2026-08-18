@@ -2,34 +2,36 @@
 
 namespace Equidna\StagHerd\Http\Controllers;
 
-use Equidna\StagHerd\Http\Requests\Payments\ProviderLookupPaymentRequest;
-use Equidna\StagHerd\Http\Requests\Payments\ProviderSyncPaymentRequest;
-use Equidna\StagHerd\Http\Requests\Payments\CancelPaymentRequest;
-use Equidna\StagHerd\Http\Requests\Payments\RefundPaymentRequest;
 use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
-use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
+use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
 use Equidna\StagHerd\Data\PaymentCancellationData;
-use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentLookupData;
+use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\RefundRequestData;
 use Equidna\StagHerd\Facades\StagHerd;
+use Equidna\StagHerd\Http\Requests\Payments\CancelPaymentRequest;
+use Equidna\StagHerd\Http\Requests\Payments\ProviderLookupPaymentRequest;
+use Equidna\StagHerd\Http\Requests\Payments\ProviderSyncPaymentRequest;
+use Equidna\StagHerd\Http\Requests\Payments\RefundPaymentRequest;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
 use RuntimeException;
 use Throwable;
 
 class PaymentOperationController extends Controller
 {
-    public function __construct(private readonly PaymentDisplayRepository $payments) {}
+    public function __construct(private readonly PaymentDisplayRepository $payments)
+    {
+    }
 
     public function lookup(Request $request, int|string $payment): RedirectResponse
     {
         try {
             $model = $this->payments->findForDisplay($payment);
 
-            if (! $model) {
+            if (!$model) {
                 throw new RuntimeException("No se encontró el pago {$payment}.");
             }
 
@@ -49,7 +51,7 @@ class PaymentOperationController extends Controller
         try {
             $model = $this->payments->findForDisplay($payment);
 
-            if (! $model) {
+            if (!$model) {
                 throw new RuntimeException("No se encontró el pago {$payment}.");
             }
 
@@ -70,7 +72,7 @@ class PaymentOperationController extends Controller
         try {
             $model = $this->payments->findForDisplay($payment);
 
-            if (! $model) {
+            if (!$model) {
                 throw new RuntimeException("No se encontró el pago {$payment}.");
             }
 
@@ -92,7 +94,7 @@ class PaymentOperationController extends Controller
         try {
             $model = $this->payments->findForDisplay($payment);
 
-            if (! $model) {
+            if (!$model) {
                 throw new RuntimeException("No se encontró el pago {$payment}.");
             }
 

@@ -118,7 +118,10 @@ final readonly class StripePaymentMethodService
         }
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
     private function cleanPayload(array $payload): array
     {
         $clean = [];
