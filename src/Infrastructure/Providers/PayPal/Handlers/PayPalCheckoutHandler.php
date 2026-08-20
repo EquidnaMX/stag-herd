@@ -256,6 +256,11 @@ final class PayPalCheckoutHandler implements PaymentMethodHandler, ExtractsPayme
                     purchaseUnits: $payload['purchase_units'],
                     sellerMerchantId: $request->sellerMerchantId,
                 );
+
+                $payload['purchase_units'] = $this->applyPlatformFeeAmount(
+                    purchaseUnits: $payload['purchase_units'],
+                    request: $request,
+                );
             }
 
             return $payload;
@@ -278,6 +283,11 @@ final class PayPalCheckoutHandler implements PaymentMethodHandler, ExtractsPayme
         $purchaseUnits = $this->applyPayeeMerchantId(
             purchaseUnits: $purchaseUnits,
             sellerMerchantId: $request->sellerMerchantId,
+        );
+
+        $purchaseUnits = $this->applyPlatformFeeAmount(
+            purchaseUnits: $purchaseUnits,
+            request: $request,
         );
 
         $applicationContext = array_filter([
@@ -427,5 +437,38 @@ final class PayPalCheckoutHandler implements PaymentMethodHandler, ExtractsPayme
             },
             $purchaseUnits,
         );
+    }
+
+    /**
+     * @param array<int, mixed> $purchaseUnits
+     * @return array<int, mixed>
+     */
+    private function applyPlatformFeeAmount(array $purchaseUnits, PaymentRequestData $request): array
+    {
+        if ($request->platformFeeAmount === null || $request->platformFeeAmount <= 0) {
+            return $purchaseUnits;
+        }
+
+        if (!isset($purchaseUnits[0]) || !is_array($purchaseUnits[0])) {
+            return $purchaseUnits;
+        }
+
+        $purchaseUnits[0]['payment_instruction'] = array_replace(
+            is_array($purchaseUnits[0]['payment_instruction'] ?? null)
+                ? $purchaseUnits[0]['payment_instruction']
+                : [],
+            [
+                'platform_fees' => [
+                    [
+                        'amount' => [
+                            'currency_code' => strtoupper($request->currency),
+                            'value' => MoneyFormatter::toDecimalString($request->platformFeeAmount),
+                        ],
+                    ],
+                ],
+            ],
+        );
+
+        return $purchaseUnits;
     }
 }

@@ -104,6 +104,23 @@ interface PayPalGateway
     ): array;
 
     /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function createPartnerReferral(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array;
+
+    /** @return array<string, mixed> */
+    public function getMerchantIntegration(
+        string $partnerMerchantId,
+        string $sellerMerchantId,
+        ?PayPalRequestContextData $context = null,
+    ): array;
+
+    /**
      * Verifies a PayPal webhook signature against PayPal's API.
      *
      * @param array<string, mixed> $payload

@@ -455,6 +455,22 @@ final class NullPayPalGateway implements PayPalGateway
         return [];
     }
 
+    public function createPartnerReferral(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
+        return [];
+    }
+
+    public function getMerchantIntegration(
+        string $partnerMerchantId,
+        string $sellerMerchantId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
+        return [];
+    }
+
     public function verifyWebhookSignature(
         array $payload,
         ?PayPalRequestContextData $context = null,

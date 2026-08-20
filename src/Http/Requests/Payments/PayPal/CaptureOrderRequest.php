@@ -12,7 +12,6 @@ class CaptureOrderRequest extends PayPalFormRequest
     {
         return [
             'provider_order_id' => ['required', 'string', 'max:255'],
-
             'amount' => ['required', 'numeric', 'min:0.01'],
             'currency' => ['required', 'string', 'size:3'],
             'external_reference' => ['nullable', 'string', 'max:255'],
@@ -20,12 +19,12 @@ class CaptureOrderRequest extends PayPalFormRequest
             'description' => ['nullable', 'string', 'max:255'],
             'idempotency_key' => ['nullable', 'string', 'max:64'],
             'metadata' => ['nullable', 'array'],
-
             'credential_context' => ['nullable', 'string', 'max:100'],
             'seller_merchant_id' => ['nullable', 'string', 'max:255'],
             'platform_attribution_id' => ['nullable', 'string', 'max:255'],
             'environment' => ['nullable', 'string', 'in:sandbox,live'],
             'external_metadata' => ['nullable', 'array'],
+            'platform_fee_amount' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 
@@ -42,6 +41,7 @@ class CaptureOrderRequest extends PayPalFormRequest
             'seller_merchant_id' => $this->normalizeNullableString($this->input('seller_merchant_id')),
             'platform_attribution_id' => $this->normalizeNullableString($this->input('platform_attribution_id')),
             'environment' => $this->normalizeNullableString(strtolower((string) $this->input('environment'))),
+            'platform_fee_amount' => $this->normalizeNullableString($this->input('platform_fee_amount')),
         ]);
     }
 
@@ -93,6 +93,7 @@ class CaptureOrderRequest extends PayPalFormRequest
             environment: $this->validated('environment'),
             externalMetadata: $this->validated('external_metadata') ?? [],
             metadata: $this->metadata(),
+            platformFeeAmount: $this->validated('platform_fee_amount'),
         );
     }
 

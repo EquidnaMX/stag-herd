@@ -9,6 +9,7 @@ use Equidna\StagHerd\Http\Requests\Payments\PayPal\CreateOrderRequest;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\ProcessTokenizedCardRequest;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\RegisterPaymentMethodRequest;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Services\PayPalPaymentMethodService;
+use Equidna\StagHerd\Http\Requests\Payments\PayPal\CreatePartnerReferralRequest;
 use Equidna\StagHerd\Support\CredentialContextManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
@@ -133,6 +134,63 @@ class PayPalController extends Controller
                 'ok' => true,
                 'message' => 'PayPal payment method registered correctly.',
                 'payment_method' => $paymentMethod->toArray(),
+            ]);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
+            ], 422);
+        }
+    }
+
+    public function createPartnerReferral(CreatePartnerReferralRequest $request): JsonResponse
+    {
+        try {
+            $context = $request->paypalContext();
+
+            $response = $this->credentials->run(
+                'paypal',
+                $context->credentialContext,
+                fn() => $this->payPalGateway->createPartnerReferral(
+                    payload: $request->payload(),
+                    idempotencyKey: $request->idempotencyKey(),
+                    context: $context,
+                ),
+            );
+
+            $actionUrl = null;
+            $links = $response['links'] ?? [];
+
+            if (is_array($links)) {
+                foreach ($links as $link) {
+                    if (
+                        is_array($link)
+                        && ($link['rel'] ?? null) === 'action_url'
+                        && isset($link['href'])
+                        && is_string($link['href'])
+                    ) {
+                        $actionUrl = $link['href'];
+                        break;
+                    }
+                }
+            }
+
+            if (!$actionUrl) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'PayPal did not return an onboarding action URL.',
+                    'paypal_response' => $response,
+                ], 422);
+            }
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'PayPal seller onboarding link created correctly.',
+                'action_url' => $actionUrl,
+                'paypal_response' => $response,
             ]);
         } catch (Throwable $exception) {
             return response()->json([

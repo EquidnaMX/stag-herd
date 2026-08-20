@@ -28,6 +28,7 @@ final readonly class PaymentRequestData
         public ?string $platformAttributionId = null,
         public ?string $environment = null,
         public array $externalMetadata = [],
+        public ?int $platformFeeAmount = null,
     ) {
         //
     }
@@ -54,6 +55,7 @@ final readonly class PaymentRequestData
         ?string $platformAttributionId = null,
         ?string $environment = null,
         array $externalMetadata = [],
+        int|float|string|null $platformFeeAmount = null,
     ): self {
         return new self(
             amount: MoneyFormatter::fromDecimal($amount),
@@ -73,6 +75,9 @@ final readonly class PaymentRequestData
             platformAttributionId: $platformAttributionId,
             environment: $environment !== null ? strtolower($environment) : null,
             externalMetadata: $externalMetadata,
+            platformFeeAmount: $platformFeeAmount !== null && $platformFeeAmount !== ''
+                ? MoneyFormatter::fromDecimal($platformFeeAmount)
+                : null,
         );
     }
 
@@ -117,6 +122,9 @@ final readonly class PaymentRequestData
             externalMetadata: isset($data['external_metadata']) && is_array($data['external_metadata'])
                 ? $data['external_metadata']
                 : (isset($data['externalMetadata']) && is_array($data['externalMetadata']) ? $data['externalMetadata'] : []),
+            platformFeeAmount: isset($data['platform_fee_amount'])
+                ? (int) $data['platform_fee_amount']
+                : (isset($data['platformFeeAmount']) ? (int) $data['platformFeeAmount'] : null),
         );
     }
 
@@ -145,6 +153,7 @@ final readonly class PaymentRequestData
             platformAttributionId: $this->platformAttributionId,
             environment: $this->environment,
             externalMetadata: $this->externalMetadata,
+            platformFeeAmount: $this->platformFeeAmount,
         );
     }
 
@@ -169,6 +178,7 @@ final readonly class PaymentRequestData
             'platform_attribution_id' => $this->platformAttributionId,
             'environment' => $this->environment,
             'external_metadata' => $this->externalMetadata,
+            'platform_fee_amount' => $this->platformFeeAmount
         ];
     }
 }

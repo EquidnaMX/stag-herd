@@ -3,6 +3,7 @@
 namespace Equidna\StagHerd\Http\Requests\Payments\PayPal;
 
 use Equidna\StagHerd\Data\PaymentRequestData;
+use Equidna\StagHerd\Support\MoneyFormatter;
 use Illuminate\Validation\Validator;
 
 class ProcessTokenizedCardRequest extends PayPalFormRequest
@@ -28,6 +29,7 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             'environment' => ['nullable', 'string', 'in:sandbox,live'],
             'external_metadata' => ['nullable', 'array'],
             'metadata' => ['nullable', 'array'],
+            'platform_fee_amount' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 
@@ -48,6 +50,7 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             'seller_merchant_id' => $this->normalizeNullableString($this->input('seller_merchant_id')),
             'platform_attribution_id' => $this->normalizeNullableString($this->input('platform_attribution_id')),
             'environment' => $this->normalizeNullableString(strtolower((string) $this->input('environment'))),
+            'platform_fee_amount' => $this->normalizeNullableString($this->input('platform_fee_amount')),
         ]);
     }
 
@@ -110,6 +113,7 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             platformAttributionId: $data['platform_attribution_id'] ?? null,
             environment: $data['environment'] ?? null,
             externalMetadata: $data['external_metadata'] ?? [],
+            platformFeeAmount: $data['platform_fee_amount'] ?? null,
         );
     }
 }

@@ -27,6 +27,8 @@ use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalApiAdapter;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeApiAdapter;
 use Equidna\StagHerd\Infrastructure\Webhooks\EloquentWebhookIdempotencyStore;
 use Equidna\StagHerd\Infrastructure\Webhooks\RedisWebhookIdempotencyStore;
+use Equidna\StagHerd\Contracts\PayPalSellerRepository;
+use Equidna\StagHerd\Infrastructure\Persistence\EloquentPayPalSellerRepository;
 use Equidna\StagHerd\Support\BillingProviderRegistry;
 use Equidna\StagHerd\Support\CredentialContextManager;
 use Equidna\StagHerd\Support\PaymentMethodHandlerRegistry;
@@ -105,6 +107,16 @@ class StagHerdServiceProvider extends ServiceProvider
             }
 
             return $app->make(EloquentPaymentMethodRepository::class);
+        });
+
+        $this->app->bind(PayPalSellerRepository::class, function ($app) {
+            $repository = config('stag-herd.repositories.paypal_sellers');
+
+            if ($repository) {
+                return $app->make($repository);
+            }
+
+            return $app->make(EloquentPayPalSellerRepository::class);
         });
     }
 

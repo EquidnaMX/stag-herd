@@ -46,6 +46,7 @@ return [
         'payment_display' => null,
         'webhooks' => null,
         'payment_methods' => null,
+        'paypal_sellers' => null,
     ],
 
     'payments' => [

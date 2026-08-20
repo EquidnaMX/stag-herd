@@ -235,6 +235,22 @@ final class ControllerSpyPayPalGateway implements \Equidna\StagHerd\Contracts\Ga
         throw new RuntimeException('Not implemented.');
     }
 
+    public function createPartnerReferral(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function getMerchantIntegration(
+        string $partnerMerchantId,
+        string $sellerMerchantId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
+        throw new RuntimeException('Not implemented.');
+    }
+
     public function verifyWebhookSignature(
         array $payload,
         ?PayPalRequestContextData $context = null,

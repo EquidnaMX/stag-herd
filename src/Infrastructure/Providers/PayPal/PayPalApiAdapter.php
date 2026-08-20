@@ -186,6 +186,32 @@ class PayPalApiAdapter implements PayPalGateway
         );
     }
 
+    public function createPartnerReferral(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
+        return $this->send(
+            method: 'post',
+            endpoint: '/v2/customer/partner-referrals',
+            payload: $payload,
+            idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+            context: $context,
+        );
+    }
+
+    public function getMerchantIntegration(
+        string $partnerMerchantId,
+        string $sellerMerchantId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
+        return $this->send(
+            method: 'get',
+            endpoint: "/v1/customer/partners/{$partnerMerchantId}/merchant-integrations/{$sellerMerchantId}",
+            context: $context,
+        );
+    }
+
     public function verifyWebhookSignature(
         array $payload,
         ?PayPalRequestContextData $context = null,

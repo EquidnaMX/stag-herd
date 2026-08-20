@@ -36,6 +36,8 @@ class CreateOrderRequest extends PayPalFormRequest
             'platform_attribution_id' => ['nullable', 'string', 'max:255'],
             'environment' => ['nullable', 'string', 'in:sandbox,live'],
             'external_metadata' => ['nullable', 'array'],
+            'platform_fee_amount' => ['nullable', 'numeric', 'min:0'],
+            'paypal.platform_fee_amount' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 
@@ -55,6 +57,7 @@ class CreateOrderRequest extends PayPalFormRequest
         $paypal['invoice_id'] = $this->normalizeNullableString($paypal['invoice_id'] ?? null);
         $paypal['return_url'] = $this->normalizeNullableString($paypal['return_url'] ?? null);
         $paypal['cancel_url'] = $this->normalizeNullableString($paypal['cancel_url'] ?? null);
+        $paypal['platform_fee_amount'] = $this->normalizeNullableString($paypal['platform_fee_amount'] ?? null);
 
         $this->merge([
             'currency' => $this->normalizeUpper($this->input('currency')),
@@ -68,6 +71,7 @@ class CreateOrderRequest extends PayPalFormRequest
             'seller_merchant_id' => $this->normalizeNullableString($this->input('seller_merchant_id')),
             'platform_attribution_id' => $this->normalizeNullableString($this->input('platform_attribution_id')),
             'environment' => $this->normalizeNullableString(strtolower((string) $this->input('environment'))),
+            'platform_fee_amount' => $this->normalizeNullableString($this->input('platform_fee_amount')),
             'paypal' => $paypal,
         ]);
     }
@@ -86,6 +90,20 @@ class CreateOrderRequest extends PayPalFormRequest
     public function amountInMinorUnits(): int
     {
         return MoneyFormatter::fromDecimal($this->validated('amount'));
+    }
+
+    public function platformFeeAmountInMinorUnits(): ?int
+    {
+        $amount = $this->validated('platform_fee_amount')
+            ?? data_get($this->validated('paypal') ?? [], 'platform_fee_amount');
+
+        if ($amount === null || $amount === '') {
+            return null;
+        }
+
+        $minorUnits = MoneyFormatter::fromDecimal($amount);
+
+        return $minorUnits > 0 ? $minorUnits : null;
     }
 
     public function idempotencyKey(): string
@@ -143,6 +161,21 @@ class CreateOrderRequest extends PayPalFormRequest
             ];
         }
 
+        $platformFeeAmount = $this->platformFeeAmountInMinorUnits();
+
+        if ($platformFeeAmount !== null) {
+            $purchaseUnit['payment_instruction'] = [
+                'platform_fees' => [
+                    [
+                        'amount' => [
+                            'currency_code' => $this->currency(),
+                            'value' => MoneyFormatter::toDecimalString($platformFeeAmount),
+                        ],
+                    ],
+                ],
+            ];
+        }
+
         return $purchaseUnit;
     }
 
@@ -182,6 +215,8 @@ class CreateOrderRequest extends PayPalFormRequest
             'metadata' => array_replace_recursive($this->metadata(), [
                 'paypal_create_idempotency_key' => $this->idempotencyKey(),
             ]),
+            'platform_fee_amount' => $this->validated('platform_fee_amount')
+                ?? data_get($this->validated('paypal') ?? [], 'platform_fee_amount'),
         ];
     }
 

@@ -40,6 +40,7 @@ if (config('stag-herd.payments.routes.enabled', true)) {
                     Route::post('/capture', 'captureOrder')->name('capture');
                     Route::post('/payment-methods', 'registerPaymentMethod')->name('payment-methods.store');
                     Route::post('/tokenized-card', 'processTokenizedCard')->name('tokenized-card');
+                    Route::post('/onboarding/referral', 'createPartnerReferral')->name('onboarding.referral');
                 });
             }
 
