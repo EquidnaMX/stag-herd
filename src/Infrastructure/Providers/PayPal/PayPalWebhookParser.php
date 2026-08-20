@@ -10,6 +10,7 @@ use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\InvalidWebhookSignatureException;
 use Equidna\StagHerd\Exceptions\ProviderNotConfiguredException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
+use Equidna\StagHerd\Data\PayPalRequestContextData;
 
 final readonly class PayPalWebhookParser implements WebhookParser
 {
@@ -62,7 +63,11 @@ final readonly class PayPalWebhookParser implements WebhookParser
             'webhook_event' => $webhook->payload,
         ];
 
-        if (!$this->gateway->verifyWebhookSignature($verificationPayload)) {
+        $context = new PayPalRequestContextData(
+            credentialContext: $webhook->credentialContext,
+        );
+
+        if (!$this->gateway->verifyWebhookSignature($verificationPayload, $context)) {
             throw InvalidWebhookSignatureException::forProvider('paypal');
         }
     }

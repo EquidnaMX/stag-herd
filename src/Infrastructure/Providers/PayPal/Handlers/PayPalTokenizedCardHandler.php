@@ -52,6 +52,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
                 reference: $request->externalReference,
                 metadata: $request->metadata,
             ),
+            context: $request->paypalContext(),
         );
 
         return $this->mapper->mapCreatedOrderToResult(
@@ -201,6 +202,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             orderId: $request->providerOrderId,
             idempotencyKey: $request->metadata['idempotency_key']
                 ?? 'stag-herd-paypal-capture-' . $request->providerOrderId,
+            context: $request->paypalContext(),
         );
 
         return $this->mapper->mapCapturedOrderToResult(
@@ -209,7 +211,6 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             fallbackOrderId: $request->providerOrderId,
         );
     }
-
     private function lookupByOrderId(PaymentLookupData $request): PaymentResultData
     {
         $response = $this->gateway->getOrder((string) $request->providerOrderId);
@@ -343,6 +344,13 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             $payload = $paypal['payload'];
             $payload['payment_source'] = $paymentSource;
 
+            if (isset($payload['purchase_units']) && is_array($payload['purchase_units'])) {
+                $payload['purchase_units'] = $this->applyPayeeMerchantId(
+                    purchaseUnits: $payload['purchase_units'],
+                    sellerMerchantId: $request->sellerMerchantId,
+                );
+            }
+
             return $payload;
         }
 
@@ -356,8 +364,13 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
                     'currency_code' => strtoupper($request->currency),
                     'value' => MoneyFormatter::toDecimal($request->amount),
                 ],
-            ], fn ($value) => $value !== null && $value !== ''),
+            ], fn($value) => $value !== null && $value !== ''),
         ];
+
+        $purchaseUnits = $this->applyPayeeMerchantId(
+            purchaseUnits: $purchaseUnits,
+            sellerMerchantId: $request->sellerMerchantId,
+        );
 
         $applicationContext = array_filter([
             'return_url' => $paypal['return_url'] ?? $request->returnUrl,
@@ -366,7 +379,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             'landing_page' => $paypal['landing_page'] ?? 'LOGIN',
             'user_action' => $paypal['user_action'] ?? 'PAY_NOW',
             'shipping_preference' => $paypal['shipping_preference'] ?? 'NO_SHIPPING',
-        ], fn ($value) => $value !== null && $value !== '');
+        ], fn($value) => $value !== null && $value !== '');
 
         $payload = [
             'intent' => strtoupper((string) ($paypal['intent'] ?? 'CAPTURE')),
@@ -474,5 +487,34 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
         }
 
         return [];
+    }
+
+    /**
+     * @param array<int, mixed> $purchaseUnits
+     * @return array<int, mixed>
+     */
+    private function applyPayeeMerchantId(array $purchaseUnits, ?string $sellerMerchantId): array
+    {
+        if ($sellerMerchantId === null || trim($sellerMerchantId) === '') {
+            return $purchaseUnits;
+        }
+
+        return array_map(
+            function (mixed $purchaseUnit) use ($sellerMerchantId): mixed {
+                if (!is_array($purchaseUnit)) {
+                    return $purchaseUnit;
+                }
+
+                $purchaseUnit['payee'] = array_replace(
+                    is_array($purchaseUnit['payee'] ?? null) ? $purchaseUnit['payee'] : [],
+                    [
+                        'merchant_id' => trim($sellerMerchantId),
+                    ],
+                );
+
+                return $purchaseUnit;
+            },
+            $purchaseUnits,
+        );
     }
 }

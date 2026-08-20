@@ -6,7 +6,10 @@ use Equidna\StagHerd\Support\MoneyFormatter;
 
 final readonly class PaymentRequestData
 {
-    /** @param array<string, mixed> $metadata */
+    /**
+     * @param array<string, mixed> $metadata
+     * @param array<string, mixed> $externalMetadata
+     */
     public function __construct(
         public int $amount,
         public string $currency,
@@ -21,11 +24,18 @@ final readonly class PaymentRequestData
         public ?string $cancelUrl = null,
         public array $metadata = [],
         public string $credentialContext = 'default',
+        public ?string $sellerMerchantId = null,
+        public ?string $platformAttributionId = null,
+        public ?string $environment = null,
+        public array $externalMetadata = [],
     ) {
         //
     }
 
-    /** @param array<string, mixed> $metadata */
+    /**
+     * @param array<string, mixed> $metadata
+     * @param array<string, mixed> $externalMetadata
+     */
     public static function fromDecimalAmount(
         int|float|string $amount,
         string $currency,
@@ -40,6 +50,10 @@ final readonly class PaymentRequestData
         ?string $cancelUrl = null,
         array $metadata = [],
         string $credentialContext = 'default',
+        ?string $sellerMerchantId = null,
+        ?string $platformAttributionId = null,
+        ?string $environment = null,
+        array $externalMetadata = [],
     ): self {
         return new self(
             amount: MoneyFormatter::fromDecimal($amount),
@@ -55,6 +69,10 @@ final readonly class PaymentRequestData
             cancelUrl: $cancelUrl,
             metadata: $metadata,
             credentialContext: $credentialContext,
+            sellerMerchantId: $sellerMerchantId,
+            platformAttributionId: $platformAttributionId,
+            environment: $environment !== null ? strtolower($environment) : null,
+            externalMetadata: $externalMetadata,
         );
     }
 
@@ -89,7 +107,22 @@ final readonly class PaymentRequestData
                 ? $data['metadata']
                 : [],
             credentialContext: (string) ($data['credential_context'] ?? $data['credentialContext'] ?? 'default'),
+            sellerMerchantId: isset($data['seller_merchant_id'])
+                ? (string) $data['seller_merchant_id']
+                : (isset($data['sellerMerchantId']) ? (string) $data['sellerMerchantId'] : null),
+            platformAttributionId: isset($data['platform_attribution_id'])
+                ? (string) $data['platform_attribution_id']
+                : (isset($data['platformAttributionId']) ? (string) $data['platformAttributionId'] : null),
+            environment: isset($data['environment']) ? strtolower((string) $data['environment']) : null,
+            externalMetadata: isset($data['external_metadata']) && is_array($data['external_metadata'])
+                ? $data['external_metadata']
+                : (isset($data['externalMetadata']) && is_array($data['externalMetadata']) ? $data['externalMetadata'] : []),
         );
+    }
+
+    public function paypalContext(): PayPalRequestContextData
+    {
+        return PayPalRequestContextData::fromPaymentRequest($this);
     }
 
     public function withProvider(string $provider): self
@@ -108,6 +141,10 @@ final readonly class PaymentRequestData
             cancelUrl: $this->cancelUrl,
             metadata: $this->metadata,
             credentialContext: $this->credentialContext,
+            sellerMerchantId: $this->sellerMerchantId,
+            platformAttributionId: $this->platformAttributionId,
+            environment: $this->environment,
+            externalMetadata: $this->externalMetadata,
         );
     }
 
@@ -128,6 +165,10 @@ final readonly class PaymentRequestData
             'cancel_url' => $this->cancelUrl,
             'metadata' => $this->metadata,
             'credential_context' => $this->credentialContext,
+            'seller_merchant_id' => $this->sellerMerchantId,
+            'platform_attribution_id' => $this->platformAttributionId,
+            'environment' => $this->environment,
+            'external_metadata' => $this->externalMetadata,
         ];
     }
 }

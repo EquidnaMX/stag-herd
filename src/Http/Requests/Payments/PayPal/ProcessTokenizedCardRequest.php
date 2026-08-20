@@ -23,6 +23,10 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             'cancel_url' => ['nullable', 'url', 'max:500'],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
             'credential_context' => ['nullable', 'string', 'max:255'],
+            'seller_merchant_id' => ['nullable', 'string', 'max:255'],
+            'platform_attribution_id' => ['nullable', 'string', 'max:255'],
+            'environment' => ['nullable', 'string', 'in:sandbox,live'],
+            'external_metadata' => ['nullable', 'array'],
             'metadata' => ['nullable', 'array'],
         ];
     }
@@ -41,6 +45,9 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             'cancel_url' => $this->normalizeNullableString($this->input('cancel_url')),
             'idempotency_key' => $this->normalizeNullableString($this->input('idempotency_key')),
             'credential_context' => $this->normalizeNullableString($this->input('credential_context')),
+            'seller_merchant_id' => $this->normalizeNullableString($this->input('seller_merchant_id')),
+            'platform_attribution_id' => $this->normalizeNullableString($this->input('platform_attribution_id')),
+            'environment' => $this->normalizeNullableString(strtolower((string) $this->input('environment'))),
         ]);
     }
 
@@ -99,6 +106,10 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             cancelUrl: $data['cancel_url'] ?? null,
             metadata: $this->cleanMetadata($metadata),
             credentialContext: (string) ($data['credential_context'] ?? 'default'),
+            sellerMerchantId: $data['seller_merchant_id'] ?? null,
+            platformAttributionId: $data['platform_attribution_id'] ?? null,
+            environment: $data['environment'] ?? null,
+            externalMetadata: $data['external_metadata'] ?? [],
         );
     }
 }

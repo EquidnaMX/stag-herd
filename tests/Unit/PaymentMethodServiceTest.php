@@ -10,6 +10,7 @@ use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
 use Equidna\StagHerd\Contracts\PaymentMethodRepository;
 use Equidna\StagHerd\Data\PaymentMethodRegisterData;
 use Equidna\StagHerd\Support\CredentialContextManager;
+use Equidna\StagHerd\Data\PayPalRequestContextData;
 use Equidna\StagHerd\Tests\TestCase;
 
 final class PaymentMethodServiceTest extends TestCase
@@ -107,7 +108,8 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
                 && ($record['credential_context'] ?? null) === $credentialContext
                 && ($record['provider_customer_id'] ?? null) === $providerCustomerId
                 && ($record['fingerprint'] ?? null) === $fingerprint
-                && ($record['status'] ?? 'active') === 'active') {
+                && ($record['status'] ?? 'active') === 'active'
+            ) {
                 return $record;
             }
         }
@@ -126,7 +128,8 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
                 && ($record['credential_context'] ?? null) === $credentialContext
                 && ($record['owner_reference'] ?? null) === $ownerReference
                 && ($record['fingerprint'] ?? null) === $fingerprint
-                && ($record['status'] ?? 'active') === 'active') {
+                && ($record['status'] ?? 'active') === 'active'
+            ) {
                 return $record;
             }
         }
@@ -143,7 +146,7 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
     {
         return array_values(array_filter(
             $this->filterByOwner($provider, $credentialContext, $ownerReference),
-            static fn (array $record): bool => ($record['status'] ?? 'active') === 'active',
+            static fn(array $record): bool => ($record['status'] ?? 'active') === 'active',
         ));
     }
 
@@ -155,9 +158,11 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
     ): ?array {
         $record = $this->findByProviderPaymentMethodId($provider, $credentialContext, $providerPaymentMethodId);
 
-        if (!is_array($record)
+        if (
+            !is_array($record)
             || ($record['owner_reference'] ?? null) !== $ownerReference
-            || ($record['status'] ?? 'active') !== 'active') {
+            || ($record['status'] ?? 'active') !== 'active'
+        ) {
             return null;
         }
 
@@ -184,7 +189,8 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
         foreach ($this->records as &$record) {
             if (($record['provider'] ?? null) === $provider
                 && ($record['credential_context'] ?? null) === $credentialContext
-                && ($record['owner_reference'] ?? null) === $ownerReference) {
+                && ($record['owner_reference'] ?? null) === $ownerReference
+            ) {
                 $record['is_default'] = ($record['provider_payment_method_id'] ?? null) === $providerPaymentMethodId;
             }
         }
@@ -233,7 +239,7 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
     {
         return array_values(array_filter(
             $this->records,
-            static fn (array $record): bool => ($record['provider'] ?? null) === $provider
+            static fn(array $record): bool => ($record['provider'] ?? null) === $provider
                 && ($record['credential_context'] ?? null) === $credentialContext
                 && ($record['owner_reference'] ?? null) === $ownerReference,
         ));
@@ -241,7 +247,7 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
 
     private function key(string $provider, string $credentialContext, string $providerPaymentMethodId): string
     {
-        return $provider.'|'.$credentialContext.'|'.$providerPaymentMethodId;
+        return $provider . '|' . $credentialContext . '|' . $providerPaymentMethodId;
     }
 }
 
@@ -355,68 +361,104 @@ final class NullStripeGateway implements StripeGateway
 
 final class NullPayPalGateway implements PayPalGateway
 {
-    public function createOrder(array $payload, ?string $idempotencyKey = null): array
-    {
+    public function createOrder(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return [];
     }
 
-    public function getOrder(string $orderId): array
-    {
+    public function getOrder(
+        string $orderId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return [];
     }
 
-    public function captureOrder(string $orderId, ?string $idempotencyKey = null): array
-    {
+    public function captureOrder(
+        string $orderId,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return [];
     }
 
-    public function getCapture(string $captureId): array
-    {
+    public function getCapture(
+        string $captureId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return [];
     }
 
-    public function refundCapture(string $captureId, ?int $amount = null, ?string $currency = null, ?string $idempotencyKey = null): array
-    {
+    public function refundCapture(
+        string $captureId,
+        ?int $amount = null,
+        ?string $currency = null,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return [];
     }
 
-    public function createCatalogProduct(array $payload, ?string $idempotencyKey = null): array
-    {
+    public function createCatalogProduct(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return [];
     }
 
-    public function createPlan(array $payload, ?string $idempotencyKey = null): array
-    {
+    public function createPlan(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return [];
     }
 
-    public function createSubscription(array $payload, ?string $idempotencyKey = null): array
-    {
+    public function createSubscription(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return [];
     }
 
-    public function getSubscription(string $subscriptionId): array
-    {
+    public function getSubscription(
+        string $subscriptionId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return [];
     }
 
-    public function cancelSubscription(string $subscriptionId, array $payload = [], ?string $idempotencyKey = null): array
-    {
+    public function cancelSubscription(
+        string $subscriptionId,
+        array $payload = [],
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return [];
     }
 
-    public function getPaymentToken(string $paymentTokenId): array
-    {
+    public function getPaymentToken(
+        string $paymentTokenId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return [];
     }
 
-    public function deletePaymentToken(string $paymentTokenId): array
-    {
+    public function deletePaymentToken(
+        string $paymentTokenId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return [];
     }
 
-    public function verifyWebhookSignature(array $payload): bool
-    {
+    public function verifyWebhookSignature(
+        array $payload,
+        ?PayPalRequestContextData $context = null,
+    ): bool {
         return false;
     }
 }

@@ -163,6 +163,9 @@ return [
                 'client_id' => env('VITE_PAYPAL_CLIENT_ID'),
                 'secret' => env('PAYPAL_CLIENT_SECRET', env('PAYPAL_SECRET')),
                 'webhook_id' => env('PAYPAL_WEBHOOK_ID'),
+
+                'environment' => env('PAYPAL_ENVIRONMENT', 'sandbox'),
+                'platform_attribution_id' => env('PAYPAL_PARTNER_ATTRIBUTION_ID'),
             ],
 
             'http' => [

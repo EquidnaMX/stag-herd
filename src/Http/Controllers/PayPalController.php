@@ -9,6 +9,7 @@ use Equidna\StagHerd\Http\Requests\Payments\PayPal\CreateOrderRequest;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\ProcessTokenizedCardRequest;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\RegisterPaymentMethodRequest;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Services\PayPalPaymentMethodService;
+use Equidna\StagHerd\Support\CredentialContextManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Throwable;
@@ -19,15 +20,22 @@ class PayPalController extends Controller
         private readonly PayPalGateway $payPalGateway,
         private readonly PayPalPaymentMethodService $payPalPaymentMethods,
         private readonly PaymentService $payments,
-    ) {
-    }
+        private readonly CredentialContextManager $credentials,
+    ) {}
 
     public function createOrder(CreateOrderRequest $request): JsonResponse
     {
         try {
-            $response = $this->payPalGateway->createOrder(
-                payload: $request->payload(),
-                idempotencyKey: $request->idempotencyKey(),
+            $context = $request->paypalContext();
+
+            $response = $this->credentials->run(
+                'paypal',
+                $context->credentialContext,
+                fn() => $this->payPalGateway->createOrder(
+                    payload: $request->payload(),
+                    idempotencyKey: $request->idempotencyKey(),
+                    context: $context,
+                ),
             );
 
             $providerOrderId = data_get($response, 'id');

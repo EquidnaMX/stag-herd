@@ -2,6 +2,7 @@
 
 namespace Equidna\StagHerd\Http\Requests\Payments\PayPal;
 
+use Equidna\StagHerd\Data\PayPalRequestContextData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 
 class CaptureOrderRequest extends PayPalFormRequest
@@ -17,10 +18,14 @@ class CaptureOrderRequest extends PayPalFormRequest
             'external_reference' => ['nullable', 'string', 'max:255'],
             'payer_email' => ['nullable', 'email', 'max:255'],
             'description' => ['nullable', 'string', 'max:255'],
-
             'idempotency_key' => ['nullable', 'string', 'max:64'],
-
             'metadata' => ['nullable', 'array'],
+
+            'credential_context' => ['nullable', 'string', 'max:100'],
+            'seller_merchant_id' => ['nullable', 'string', 'max:255'],
+            'platform_attribution_id' => ['nullable', 'string', 'max:255'],
+            'environment' => ['nullable', 'string', 'in:sandbox,live'],
+            'external_metadata' => ['nullable', 'array'],
         ];
     }
 
@@ -33,6 +38,10 @@ class CaptureOrderRequest extends PayPalFormRequest
             'payer_email' => $this->normalizeNullableString($this->input('payer_email')),
             'description' => $this->normalizeNullableString($this->input('description')),
             'idempotency_key' => $this->normalizeNullableString($this->input('idempotency_key')),
+            'credential_context' => $this->normalizeNullableString($this->input('credential_context')) ?? 'default',
+            'seller_merchant_id' => $this->normalizeNullableString($this->input('seller_merchant_id')),
+            'platform_attribution_id' => $this->normalizeNullableString($this->input('platform_attribution_id')),
+            'environment' => $this->normalizeNullableString(strtolower((string) $this->input('environment'))),
         ]);
     }
 
@@ -78,7 +87,23 @@ class CaptureOrderRequest extends PayPalFormRequest
             payerReference: data_get($this->metadata(), 'id_client'),
             payerEmail: $this->validated('payer_email') ?? 'cliente@test.com',
             description: $this->validated('description') ?? 'Captured PayPal payment',
+            credentialContext: $this->validated('credential_context') ?? 'default',
+            sellerMerchantId: $this->validated('seller_merchant_id'),
+            platformAttributionId: $this->validated('platform_attribution_id'),
+            environment: $this->validated('environment'),
+            externalMetadata: $this->validated('external_metadata') ?? [],
             metadata: $this->metadata(),
         );
+    }
+
+    public function paypalContext(): PayPalRequestContextData
+    {
+        return PayPalRequestContextData::fromArray([
+            'credential_context' => $this->validated('credential_context') ?? 'default',
+            'seller_merchant_id' => $this->validated('seller_merchant_id'),
+            'platform_attribution_id' => $this->validated('platform_attribution_id'),
+            'environment' => $this->validated('environment'),
+            'external_metadata' => $this->validated('external_metadata') ?? [],
+        ]);
     }
 }

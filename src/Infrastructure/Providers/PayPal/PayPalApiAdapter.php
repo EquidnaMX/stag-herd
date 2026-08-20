@@ -3,6 +3,7 @@
 namespace Equidna\StagHerd\Infrastructure\Providers\PayPal;
 
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
+use Equidna\StagHerd\Data\PayPalRequestContextData;
 use Equidna\StagHerd\Exceptions\ProviderAuthenticationException;
 use Equidna\StagHerd\Exceptions\ProviderCommunicationException;
 use Equidna\StagHerd\Exceptions\ProviderNotConfiguredException;
@@ -18,41 +19,56 @@ class PayPalApiAdapter implements PayPalGateway
 {
     private const PROVIDER = 'paypal';
 
-    public function createCatalogProduct(array $payload, ?string $idempotencyKey = null): array
-    {
+    public function createCatalogProduct(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return $this->send(
             method: 'post',
             endpoint: '/v1/catalogs/products',
             payload: $payload,
             idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+            context: $context,
         );
     }
 
-    public function createPlan(array $payload, ?string $idempotencyKey = null): array
-    {
+    public function createPlan(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return $this->send(
             method: 'post',
             endpoint: '/v1/billing/plans',
             payload: $payload,
             idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+            context: $context,
         );
     }
 
-    public function createSubscription(array $payload, ?string $idempotencyKey = null): array
-    {
+    public function createSubscription(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return $this->send(
             method: 'post',
             endpoint: '/v1/billing/subscriptions',
             payload: $payload,
             idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+            context: $context,
         );
     }
 
-    public function getSubscription(string $subscriptionId): array
-    {
+    public function getSubscription(
+        string $subscriptionId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return $this->send(
             method: 'get',
             endpoint: "/v1/billing/subscriptions/{$subscriptionId}",
+            context: $context,
         );
     }
 
@@ -60,52 +76,64 @@ class PayPalApiAdapter implements PayPalGateway
         string $subscriptionId,
         array $payload = [],
         ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
     ): array {
         return $this->send(
             method: 'post',
             endpoint: "/v1/billing/subscriptions/{$subscriptionId}/cancel",
             payload: $payload === [] ? ['reason' => 'Requested by merchant.'] : $payload,
             idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+            context: $context,
         );
     }
 
     public function createOrder(
         array $payload,
         ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
     ): array {
         return $this->send(
             method: 'post',
             endpoint: '/v2/checkout/orders',
             payload: $payload,
             idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+            context: $context,
         );
     }
 
-    public function getOrder(string $orderId): array
-    {
+    public function getOrder(
+        string $orderId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return $this->send(
             method: 'get',
             endpoint: "/v2/checkout/orders/{$orderId}",
+            context: $context,
         );
     }
 
     public function captureOrder(
         string $orderId,
         ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
     ): array {
         return $this->send(
             method: 'post',
             endpoint: "/v2/checkout/orders/{$orderId}/capture",
             payload: new \stdClass(),
             idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+            context: $context,
         );
     }
 
-    public function getCapture(string $captureId): array
-    {
+    public function getCapture(
+        string $captureId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return $this->send(
             method: 'get',
             endpoint: "/v2/payments/captures/{$captureId}",
+            context: $context,
         );
     }
 
@@ -114,6 +142,7 @@ class PayPalApiAdapter implements PayPalGateway
         ?int $amount = null,
         ?string $currency = null,
         ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
     ): array {
         $payload = new \stdClass();
 
@@ -131,38 +160,48 @@ class PayPalApiAdapter implements PayPalGateway
             endpoint: "/v2/payments/captures/{$captureId}/refund",
             payload: $payload,
             idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
+            context: $context,
         );
     }
 
-    public function getPaymentToken(string $paymentTokenId): array
-    {
+    public function getPaymentToken(
+        string $paymentTokenId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return $this->send(
             method: 'get',
             endpoint: "/vault/payment-tokens/{$paymentTokenId}",
+            context: $context,
         );
     }
 
-    public function deletePaymentToken(string $paymentTokenId): array
-    {
+    public function deletePaymentToken(
+        string $paymentTokenId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         return $this->send(
             method: 'delete',
             endpoint: "/vault/payment-tokens/{$paymentTokenId}",
+            context: $context,
         );
     }
 
-    public function verifyWebhookSignature(array $payload): bool
-    {
+    public function verifyWebhookSignature(
+        array $payload,
+        ?PayPalRequestContextData $context = null,
+    ): bool {
         $response = $this->send(
             method: 'post',
             endpoint: '/v1/notifications/verify-webhook-signature',
             payload: $payload,
+            context: $context,
         );
 
         return strtoupper((string) ($response['verification_status'] ?? '')) === 'SUCCESS';
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param array<string, mixed>|object $payload
      * @return array<string, mixed>
      */
     private function send(
@@ -170,14 +209,15 @@ class PayPalApiAdapter implements PayPalGateway
         string $endpoint,
         array|object $payload = [],
         ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
     ): array {
         try {
-            $request = $this->request($idempotencyKey);
+            $request = $this->request($idempotencyKey, $context);
 
             $response = match (strtolower($method)) {
-                'get' => $request->get($endpoint, $payload),
+                'get' => $request->get($endpoint, is_array($payload) ? $payload : []),
                 'post' => $request->post($endpoint, $payload),
-                'delete' => $request->delete($endpoint, $payload),
+                'delete' => $request->delete($endpoint, is_array($payload) ? $payload : []),
                 default => throw ProviderCommunicationException::invalidResponse(
                     self::PROVIDER,
                     [
@@ -187,7 +227,7 @@ class PayPalApiAdapter implements PayPalGateway
             };
 
             if ($response->status() === 401) {
-                Cache::forget($this->cacheKey());
+                Cache::forget($this->cacheKey($context));
 
                 throw ProviderAuthenticationException::unauthorized(
                     self::PROVIDER,
@@ -223,13 +263,24 @@ class PayPalApiAdapter implements PayPalGateway
         }
     }
 
-    private function request(?string $idempotencyKey = null): PendingRequest
-    {
+    private function request(
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): PendingRequest {
         $request = Http::baseUrl($this->baseUri())
             ->timeout((int) config('stag-herd.providers.paypal.http.timeout', 15))
             ->acceptJson()
             ->asJson()
-            ->withToken($this->accessToken());
+            ->withToken($this->accessToken($context));
+
+        $platformAttributionId = $context?->platformAttributionId
+            ?? config('stag-herd.providers.paypal.credentials.platform_attribution_id');
+
+        if (is_string($platformAttributionId) && trim($platformAttributionId) !== '') {
+            $request = $request->withHeaders([
+                'PayPal-Partner-Attribution-Id' => trim($platformAttributionId),
+            ]);
+        }
 
         if ($idempotencyKey !== null) {
             $request = $request->withHeaders([
@@ -241,10 +292,10 @@ class PayPalApiAdapter implements PayPalGateway
         return $request;
     }
 
-    private function accessToken(): string
+    private function accessToken(?PayPalRequestContextData $context = null): string
     {
         return Cache::remember(
-            $this->cacheKey(),
+            $this->cacheKey($context),
             now()->addMinutes(50),
             function () {
                 $clientId = config('stag-herd.providers.paypal.credentials.client_id');
@@ -310,8 +361,29 @@ class PayPalApiAdapter implements PayPalGateway
         );
     }
 
-    private function cacheKey(): string
+    private function cacheKey(?PayPalRequestContextData $context = null): string
     {
-        return 'stag-herd:paypal:access-token:' . md5($this->baseUri());
+        $environment = $context?->environment
+            ?? config('stag-herd.providers.paypal.credentials.environment', 'sandbox');
+
+        $credentialContext = $context?->credentialContext ?? 'default';
+
+        return implode(':', [
+            'stag-herd',
+            'paypal',
+            'access-token',
+            strtolower((string) $environment),
+            $credentialContext,
+            hash('sha256', $this->baseUri()),
+            $this->credentialFingerprint(),
+        ]);
+    }
+
+    private function credentialFingerprint(): string
+    {
+        $clientId = (string) config('stag-herd.providers.paypal.credentials.client_id', '');
+        $secret = (string) config('stag-herd.providers.paypal.credentials.secret', '');
+
+        return hash('sha256', $clientId . '|' . $secret);
     }
 }

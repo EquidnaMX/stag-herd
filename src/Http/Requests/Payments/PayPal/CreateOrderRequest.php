@@ -2,6 +2,7 @@
 
 namespace Equidna\StagHerd\Http\Requests\Payments\PayPal;
 
+use Equidna\StagHerd\Data\PayPalRequestContextData;
 use Equidna\StagHerd\Support\MoneyFormatter;
 
 class CreateOrderRequest extends PayPalFormRequest
@@ -17,9 +18,7 @@ class CreateOrderRequest extends PayPalFormRequest
             'description' => ['nullable', 'string', 'max:255'],
             'return_url' => ['nullable', 'url', 'max:500'],
             'cancel_url' => ['nullable', 'url', 'max:500'],
-
             'idempotency_key' => ['nullable', 'string', 'max:64'],
-
             'metadata' => ['nullable', 'array'],
 
             'paypal' => ['nullable', 'array'],
@@ -31,6 +30,12 @@ class CreateOrderRequest extends PayPalFormRequest
             'paypal.invoice_id' => ['nullable', 'string'],
             'paypal.return_url' => ['nullable', 'url', 'max:500'],
             'paypal.cancel_url' => ['nullable', 'url', 'max:500'],
+
+            'credential_context' => ['nullable', 'string', 'max:100'],
+            'seller_merchant_id' => ['nullable', 'string', 'max:255'],
+            'platform_attribution_id' => ['nullable', 'string', 'max:255'],
+            'environment' => ['nullable', 'string', 'in:sandbox,live'],
+            'external_metadata' => ['nullable', 'array'],
         ];
     }
 
@@ -59,6 +64,10 @@ class CreateOrderRequest extends PayPalFormRequest
             'return_url' => $this->normalizeNullableString($this->input('return_url')),
             'cancel_url' => $this->normalizeNullableString($this->input('cancel_url')),
             'idempotency_key' => $this->normalizeNullableString($this->input('idempotency_key')),
+            'credential_context' => $this->normalizeNullableString($this->input('credential_context')) ?? 'default',
+            'seller_merchant_id' => $this->normalizeNullableString($this->input('seller_merchant_id')),
+            'platform_attribution_id' => $this->normalizeNullableString($this->input('platform_attribution_id')),
+            'environment' => $this->normalizeNullableString(strtolower((string) $this->input('environment'))),
             'paypal' => $paypal,
         ]);
     }
@@ -115,7 +124,7 @@ class CreateOrderRequest extends PayPalFormRequest
         $metadata = $this->metadata();
         $externalReference = $this->externalReference();
 
-        return array_filter([
+        $purchaseUnit = array_filter([
             'reference_id' => $externalReference,
             'description' => $this->validated('description') ?? 'Payment from PayPal Buttons',
             'custom_id' => data_get($metadata, 'id_client'),
@@ -124,7 +133,17 @@ class CreateOrderRequest extends PayPalFormRequest
                 'currency_code' => $this->currency(),
                 'value' => MoneyFormatter::toDecimal($this->amountInMinorUnits()),
             ],
-        ], fn ($value) => $value !== null && $value !== '');
+        ], fn($value) => $value !== null && $value !== '');
+
+        $sellerMerchantId = $this->validated('seller_merchant_id');
+
+        if (is_string($sellerMerchantId) && trim($sellerMerchantId) !== '') {
+            $purchaseUnit['payee'] = [
+                'merchant_id' => trim($sellerMerchantId),
+            ];
+        }
+
+        return $purchaseUnit;
     }
 
     public function payload(): array
@@ -143,7 +162,7 @@ class CreateOrderRequest extends PayPalFormRequest
                 'landing_page' => $paypal['landing_page'] ?? 'LOGIN',
                 'user_action' => $paypal['user_action'] ?? 'PAY_NOW',
                 'shipping_preference' => $paypal['shipping_preference'] ?? 'NO_SHIPPING',
-            ], fn ($value) => $value !== null && $value !== ''),
+            ], fn($value) => $value !== null && $value !== ''),
         ];
     }
 
@@ -155,9 +174,25 @@ class CreateOrderRequest extends PayPalFormRequest
             'external_reference' => $this->externalReference(),
             'payer_email' => $this->validated('payer_email') ?? 'cliente@test.com',
             'description' => $this->validated('description') ?? 'Payment from PayPal Buttons',
+            'credential_context' => $this->validated('credential_context') ?? 'default',
+            'seller_merchant_id' => $this->validated('seller_merchant_id'),
+            'platform_attribution_id' => $this->validated('platform_attribution_id'),
+            'environment' => $this->validated('environment'),
+            'external_metadata' => $this->validated('external_metadata') ?? [],
             'metadata' => array_replace_recursive($this->metadata(), [
                 'paypal_create_idempotency_key' => $this->idempotencyKey(),
             ]),
         ];
+    }
+
+    public function paypalContext(): PayPalRequestContextData
+    {
+        return PayPalRequestContextData::fromArray([
+            'credential_context' => $this->validated('credential_context') ?? 'default',
+            'seller_merchant_id' => $this->validated('seller_merchant_id'),
+            'platform_attribution_id' => $this->validated('platform_attribution_id'),
+            'environment' => $this->validated('environment'),
+            'external_metadata' => $this->validated('external_metadata') ?? [],
+        ]);
     }
 }
