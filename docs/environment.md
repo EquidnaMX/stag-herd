@@ -1,58 +1,290 @@
-# Configuracion de ambientes
+# Configuración de ambientes
 
-Esta guia define que variables debe configurar la aplicacion host antes de probar o liberar StagHerd. No guardes credenciales reales en este repositorio; usa `.env.example` solo como plantilla.
+Esta guía define las variables de entorno que debe configurar la aplicación host para usar StagHerd.
 
-## Comun a todos los ambientes
+No guardes credenciales reales en este repositorio. Usa `.env.example` solo como plantilla y configura los valores reales en el `.env` del sistema host.
 
-| Variable | Uso | Recomendacion |
-| --- | --- | --- |
-| `STAG_HERD_ROUTE_PREFIX` | Prefijo de rutas webhook | Mantener `stag-herd` salvo que el host ya lo use |
-| `STAG_HERD_PAYMENT_MODEL` | Modelo Eloquent de pagos del host | Obligatorio en la app integradora |
-| `STAG_HERD_AUDIT_CHANNEL` | Canal de logs | Usar un canal centralizado en sandbox/produccion |
-| `WEBHOOK_IDEMPOTENCY_TTL` | Ventana de deduplicacion | `604800` segundos como base |
-| `WEBHOOK_RATE_LIMIT` | Limite por IP/minuto | `60` para iniciar; ajustar con trafico real |
-| `STAG_HERD_CLEANUP_ENABLED` | Limpieza programada | `true` en sandbox/produccion |
+## Reglas generales
+
+- Configura solo los proveedores que el host vaya a usar.
+- Usa credenciales sandbox/local durante desarrollo.
+- Usa credenciales live/productivas solo en producción.
+- Después de cambiar configuración, limpia la caché de Laravel.
+- No hardcodees secretos en código, config publicada o documentación.
+
+## Configuración común
+
+Variables de StagHerd:
+
+```env
+STAG_HERD_WEBHOOK_IDEMPOTENCY_DRIVER=database
+STAG_HERD_WEBHOOK_IDEMPOTENCY_TTL=86400
+```
+
+Drivers esperados para idempotencia:
+
+```text
+database
+redis
+```
+
+Recomendación:
+
+| Ambiente | Driver recomendado |
+| --- | --- |
+| Local | `database` |
+| Sandbox / staging | `database` o `redis` |
+| Producción | `redis` o base compartida entre instancias |
+
+Si tu aplicación corre en más de una instancia, la idempotencia debe usar un almacenamiento compartido.
+
+## Rutas
+
+Las rutas se configuran en `config/stag-herd.php`.
+
+Pagos:
+
+```php
+'payments' => [
+    'routes' => [
+        'enabled' => true,
+        'prefix' => 'stag-herd/payments',
+        'middleware' => ['api'],
+    ],
+],
+```
+
+Métodos de pago guardados:
+
+```php
+'payment_methods' => [
+    'routes' => [
+        'enabled' => true,
+        'prefix' => 'stag-herd/payments/payment-methods',
+        'middleware' => ['api'],
+    ],
+],
+```
+
+Webhooks:
+
+```php
+'webhooks' => [
+    'routes' => [
+        'enabled' => true,
+        'prefix' => 'stag-herd/webhooks',
+        'middleware' => ['api'],
+    ],
+],
+```
+
+Endpoints principales de webhooks:
+
+```text
+POST /stag-herd/webhooks/{provider}/{credentialContext}
+GET|POST /stag-herd/webhooks/mercado-pago
+GET|POST /stag-herd/webhooks/paypal
+GET|POST /stag-herd/webhooks/stripe
+```
+
+## Stripe
+
+Variables:
+
+```env
+STRIPE_SECRET_KEY=
+VITE_STRIPE_PUBLIC_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_API_VERSION=2026-02-25.clover
+STRIPE_BASE_URI=https://api.stripe.com
+```
+
+Uso:
+
+| Variable | Uso |
+| --- | --- |
+| `STRIPE_SECRET_KEY` | Llave privada para llamadas server-side. |
+| `VITE_STRIPE_PUBLIC_KEY` | Llave pública para frontend. |
+| `STRIPE_WEBHOOK_SECRET` | Secreto para validar webhooks. |
+| `STRIPE_API_VERSION` | Versión de API usada por el adapter. |
+| `STRIPE_BASE_URI` | Base URL de Stripe. Normalmente no necesitas cambiarla. |
+
+Métodos soportados desde configuración:
+
+```text
+card
+apple_pay
+google_pay
+tokenized_card
+spei
+```
+
+## PayPal
+
+Variables:
+
+```env
+VITE_PAYPAL_CLIENT_ID=
+PAYPAL_CLIENT_SECRET=
+PAYPAL_SECRET=
+PAYPAL_WEBHOOK_ID=
+PAYPAL_ENVIRONMENT=sandbox
+PAYPAL_BASE_URI=https://api-m.sandbox.paypal.com
+```
+
+Uso:
+
+| Variable | Uso |
+| --- | --- |
+| `VITE_PAYPAL_CLIENT_ID` | Client ID usado por frontend y configuración del proveedor. |
+| `PAYPAL_CLIENT_SECRET` | Secreto principal para llamadas server-side. |
+| `PAYPAL_SECRET` | Fallback de compatibilidad si no se define `PAYPAL_CLIENT_SECRET`. |
+| `PAYPAL_WEBHOOK_ID` | ID del webhook registrado en PayPal. |
+| `PAYPAL_ENVIRONMENT` | Ambiente PayPal. Ejemplo: `sandbox` o `live`. |
+| `PAYPAL_BASE_URI` | Base URL de PayPal. |
+
+Para sandbox:
+
+```env
+PAYPAL_ENVIRONMENT=sandbox
+PAYPAL_BASE_URI=https://api-m.sandbox.paypal.com
+```
+
+Para producción:
+
+```env
+PAYPAL_ENVIRONMENT=live
+PAYPAL_BASE_URI=https://api-m.paypal.com
+```
+
+Métodos soportados desde configuración:
+
+```text
+paypal
+tokenized_card
+```
+
+## Mercado Pago
+
+Variables:
+
+```env
+MERCADO_PAGO_ACCESS_TOKEN=
+VITE_MERCADO_PAGO_PUBLIC_KEY=
+MERCADO_PAGO_WEBHOOK_SECRET=
+MERCADO_PAGO_BASE_URI=https://api.mercadopago.com
+```
+
+Uso:
+
+| Variable | Uso |
+| --- | --- |
+| `MERCADO_PAGO_ACCESS_TOKEN` | Token privado para llamadas server-side. |
+| `VITE_MERCADO_PAGO_PUBLIC_KEY` | Llave pública para frontend. |
+| `MERCADO_PAGO_WEBHOOK_SECRET` | Secreto para validar webhooks. |
+| `MERCADO_PAGO_BASE_URI` | Base URL de Mercado Pago. Normalmente no necesitas cambiarla. |
+
+Métodos soportados desde configuración:
+
+```text
+card
+checkout_pro
+tokenized_card
+```
 
 ## Local
 
-| Area | Valor sugerido |
+En local se recomienda:
+
+| Área | Recomendación |
 | --- | --- |
-| Proveedores | Habilitar solo el proveedor bajo prueba |
-| URLs publicas | Usar tunnel HTTPS estable para webhooks y retornos |
-| Cache | Usar cache persistente si se prueba idempotencia |
-| Logs | `STAG_HERD_AUDIT_CHANNEL=stack` o canal local dedicado |
-| Cleanup | Puede quedar `false` durante pruebas manuales cortas |
+| Proveedores | Activar solo el proveedor que estés probando. |
+| Webhooks | Usar un túnel HTTPS si necesitas recibir eventos reales. |
+| Idempotencia | `database` suele ser suficiente. |
+| Logs | Usar el canal normal de Laravel. |
+| Credenciales | Usar sandbox/test keys. |
+
+Después de cambiar `.env`:
+
+```bash
+php artisan config:clear
+php artisan route:clear
+php artisan cache:clear
+```
 
 ## Sandbox / staging
 
-| Proveedor | Variables obligatorias |
+En sandbox o staging se recomienda:
+
+| Área | Recomendación |
 | --- | --- |
-| PayPal | `PAYPAL_SANDBOX=true`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`, `PAYPAL_RETURN_ROUTE`, `PAYPAL_CANCEL_ROUTE` |
-| Clip | `CLIP_API_KEY`, `CLIP_API_BASE_URL=https://api-gw.payclip.com`, `CLIP_WEBHOOK_URL`, `CLIP_SUCCESS_URL`, `CLIP_ERROR_URL`, `CLIP_DEFAULT_URL` |
-| Conekta | `CONEKTA_API_SECRET`, `CONEKTA_WEBHOOK_PUBLIC_KEY` |
-| Stripe / Google Pay | `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET` |
-| Mercado Pago | `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET` |
-| Openpay | `OPENPAY_MERCHANT_ID`, `OPENPAY_PRIVATE_KEY`, `OPENPAY_SANDBOX=true`, `OPENPAY_WEBHOOK_SECRET` |
+| Credenciales | Usar llaves sandbox/test de cada proveedor. |
+| Webhooks | Registrar endpoints HTTPS reales del ambiente. |
+| Idempotencia | Usar `database` o `redis`. |
+| Pruebas | Ejecutar la matriz de `docs/sandbox-test-matrix.md`. |
+| Datos | Usar montos mínimos y cuentas de prueba. |
 
-## Produccion
+Checklist:
 
-| Control | Requisito |
+- [ ] Configurar `.env` del proveedor activo.
+- [ ] Publicar configuración.
+- [ ] Ejecutar migraciones.
+- [ ] Confirmar que las rutas existen con `php artisan route:list`.
+- [ ] Registrar webhook en el dashboard del proveedor.
+- [ ] Probar creación de pago.
+- [ ] Probar webhook.
+- [ ] Probar errores controlados.
+
+## Producción
+
+En producción se recomienda:
+
+| Área | Requisito |
 | --- | --- |
-| Credenciales | Usar llaves live/productivas; nunca reutilizar sandbox |
-| Webhooks | Registrar endpoints HTTPS finales con cada proveedor |
-| Conekta | Reemplazar cualquier `CONEKTA_WEBHOOK_SECRET`; la verificacion usa `CONEKTA_WEBHOOK_PUBLIC_KEY` |
-| PayPal | Usar `PAYPAL_SANDBOX=false` y confirmar que el webhook id pertenece al app live |
-| Clip | Confirmar que `CLIP_WEBHOOK_URL` apunta al dominio publico final |
-| Logs | No guardar payloads completos; usar provider, event/request id, hash y status |
-| Cache | Usar Redis/Memcached/base compartida para idempotencia entre instancias |
-| Alertas | Alertar por picos de 401/500 en `/stag-herd/{provider}` |
+| Credenciales | Usar llaves live/productivas. |
+| Webhooks | Registrar endpoints HTTPS finales. |
+| Idempotencia | Usar almacenamiento compartido entre instancias. |
+| Logs | No guardar secretos ni datos sensibles completos. |
+| Alertas | Monitorear errores de proveedor, 401, 422 y 500. |
+| Caché | Ejecutar `config:cache` después de validar configuración. |
 
-## Secuencia de actualizacion
+Comandos recomendados después de configurar producción:
 
-1. Copiar `.env.example` a la aplicacion host y completar solo los proveedores activos.
-2. Publicar o revisar `config/stag-herd.php` en la app host.
-3. Confirmar que `STAG_HERD_PAYMENT_MODEL` o `config('stag-herd.payment_model')` apunta al modelo real.
-4. Registrar URLs de webhook y retorno en cada dashboard de proveedor.
-5. Ejecutar `php artisan config:clear` y `php artisan route:clear` en el host.
-6. Ejecutar la matriz en `docs/sandbox-test-matrix.md`.
-7. Congelar credenciales productivas y repetir los smoke tests con montos minimos antes de liberar.
+```bash
+php artisan config:clear
+php artisan route:clear
+php artisan cache:clear
+php artisan config:cache
+```
+
+## Secuencia recomendada de configuración
+
+1. Instalar StagHerd en la aplicación host.
+2. Publicar `config/stag-herd.php`.
+3. Publicar y ejecutar migraciones si se usarán las tablas del paquete.
+4. Activar solo los proveedores necesarios.
+5. Configurar variables `.env`.
+6. Limpiar caché de Laravel.
+7. Revisar rutas con `php artisan route:list`.
+8. Registrar webhooks en los dashboards de los proveedores.
+9. Ejecutar pruebas sandbox.
+10. Pasar a credenciales productivas solo cuando el flujo esté validado.
+
+## Validación rápida
+
+```bash
+php artisan config:clear
+php artisan route:clear
+php artisan route:list
+php artisan migrate:status
+```
+
+Antes de liberar una versión del paquete:
+
+```bash
+composer validate --strict
+composer test
+composer phpstan
+vendor/bin/php-cs-fixer fix --dry-run --diff --verbose
+composer audit
+```
