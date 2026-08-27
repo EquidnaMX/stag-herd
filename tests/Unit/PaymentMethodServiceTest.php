@@ -9,8 +9,8 @@ use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
 use Equidna\StagHerd\Contracts\PaymentMethodRepository;
 use Equidna\StagHerd\Data\PaymentMethodRegisterData;
-use Equidna\StagHerd\Support\CredentialContextManager;
 use Equidna\StagHerd\Data\PayPalRequestContextData;
+use Equidna\StagHerd\Support\CredentialContextManager;
 use Equidna\StagHerd\Tests\TestCase;
 
 final class PaymentMethodServiceTest extends TestCase
@@ -146,7 +146,7 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
     {
         return array_values(array_filter(
             $this->filterByOwner($provider, $credentialContext, $ownerReference),
-            static fn(array $record): bool => ($record['status'] ?? 'active') === 'active',
+            static fn (array $record): bool => ($record['status'] ?? 'active') === 'active',
         ));
     }
 
@@ -239,7 +239,7 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
     {
         return array_values(array_filter(
             $this->records,
-            static fn(array $record): bool => ($record['provider'] ?? null) === $provider
+            static fn (array $record): bool => ($record['provider'] ?? null) === $provider
                 && ($record['credential_context'] ?? null) === $credentialContext
                 && ($record['owner_reference'] ?? null) === $ownerReference,
         ));

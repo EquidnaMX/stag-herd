@@ -2,8 +2,8 @@
 
 namespace Equidna\StagHerd\Http\Requests\Payments\PayPal;
 
-use Equidna\StagHerd\Data\PayPalRequestContextData;
 use Equidna\StagHerd\Data\PaymentRequestData;
+use Equidna\StagHerd\Data\PayPalRequestContextData;
 
 class CaptureOrderRequest extends PayPalFormRequest
 {

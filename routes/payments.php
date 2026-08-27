@@ -40,7 +40,10 @@ if (config('stag-herd.payments.routes.enabled', true)) {
                     Route::post('/capture', 'captureOrder')->name('capture');
                     Route::post('/payment-methods', 'registerPaymentMethod')->name('payment-methods.store');
                     Route::post('/tokenized-card', 'processTokenizedCard')->name('tokenized-card');
-                    Route::post('/onboarding/referral', 'createPartnerReferral')->name('onboarding.referral');
+
+                    if (config('stag-herd.providers.paypal.routes.onboarding_referral.enabled', false)) {
+                        Route::post('/onboarding/referral', 'createPartnerReferral')->name('onboarding.referral');
+                    }
                 });
             }
 
@@ -59,7 +62,7 @@ if (config('stag-herd.payments.routes.enabled', true)) {
         });
 }
 
-if (config('stag-herd.payment_methods.routes.enabled', true)) {
+if (config('stag-herd.payment_methods.routes.enabled', false)) {
     Route::middleware(config('stag-herd.payment_methods.routes.middleware', ['api']))
         ->prefix(config('stag-herd.payment_methods.routes.prefix', 'stag-herd/payments/payment-methods'))
         ->name('stag-herd.payment-methods.')

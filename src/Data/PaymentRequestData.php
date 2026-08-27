@@ -178,7 +178,7 @@ final readonly class PaymentRequestData
             'platform_attribution_id' => $this->platformAttributionId,
             'environment' => $this->environment,
             'external_metadata' => $this->externalMetadata,
-            'platform_fee_amount' => $this->platformFeeAmount
+            'platform_fee_amount' => $this->platformFeeAmount,
         ];
     }
 }

@@ -1,8 +1,8 @@
 # Matriz de pruebas sandbox
 
 Esta matriz organiza evidencia sandbox para los flujos que una liberación decida
-anunciar. No declara `v1.0.0`, estabilidad ni paridad entre proveedores. El
-criterio de cierre es `docs/release-closure-checklist.md`.
+anunciar. No promete paridad entre proveedores ni sustituye el criterio de
+cierre de `docs/release-closure-checklist.md`.
 
 El objetivo no es probar cada caso posible, sino comprobar que los flujos prometidos funcionan en una aplicación host real con credenciales sandbox/test.
 
@@ -40,7 +40,7 @@ Por cada prueba manual o sandbox guarda:
 | Publicar configuración | `php artisan vendor:publish --tag=stag-herd-config` | Se crea `config/stag-herd.php`. |
 | Publicar migraciones | `php artisan vendor:publish --tag=stag-herd-migrations` | Se publican las migraciones del paquete. |
 | Ejecutar migraciones | `php artisan migrate` | Se crean las tablas necesarias. |
-| Revisar rutas | `php artisan route:list` | Aparecen rutas de pagos, métodos guardados y webhooks cuando están habilitadas. |
+| Revisar rutas | `php artisan route:list` | Aparecen solo las rutas habilitadas. Las rutas públicas de métodos guardados no aparecen por defecto. |
 | Resolver servicios | Resolver `PaymentService`, `PaymentMethodService` y `BillingService` desde el contenedor | Los servicios se resuelven sin errores. |
 
 ## Stripe
@@ -109,6 +109,10 @@ Por cada prueba manual o sandbox guarda:
 | Desactivar método | Usar `deactivatePaymentMethod()` | El método deja de aparecer como activo. |
 | Aislamiento por dueño | Crear métodos para dos usuarios distintos | Un usuario no ve métodos del otro. |
 | Aislamiento por contexto | Probar dos `credentialContext` distintos | Los métodos no se mezclan entre contextos. |
+
+Si el host expone las rutas públicas de métodos guardados, registra evidencia de
+que el middleware deriva o valida `owner_reference` contra el principal
+autenticado antes de listar, marcar default o desactivar métodos.
 
 ## Billing y suscripciones
 

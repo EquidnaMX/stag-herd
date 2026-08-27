@@ -4,7 +4,6 @@ namespace Equidna\StagHerd\Tests\Unit;
 
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\ManagesPaymentMethods;
-use Equidna\StagHerd\Data\PayPalRequestContextData;
 use Equidna\StagHerd\Data\PaymentMethodData;
 use Equidna\StagHerd\Data\PaymentMethodDeactivateData;
 use Equidna\StagHerd\Data\PaymentMethodLookupData;
@@ -12,6 +11,7 @@ use Equidna\StagHerd\Data\PaymentMethodRegisterData;
 use Equidna\StagHerd\Data\PaymentMethodSetDefaultData;
 use Equidna\StagHerd\Data\PaymentMethodsListData;
 use Equidna\StagHerd\Data\PaymentRequestData;
+use Equidna\StagHerd\Data\PayPalRequestContextData;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalCheckoutHandler;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalTokenizedCardHandler;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalResultMapper;

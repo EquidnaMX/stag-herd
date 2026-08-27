@@ -211,6 +211,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             fallbackOrderId: $request->providerOrderId,
         );
     }
+
     private function lookupByOrderId(PaymentLookupData $request): PaymentResultData
     {
         $response = $this->gateway->getOrder((string) $request->providerOrderId);
@@ -369,7 +370,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
                     'currency_code' => strtoupper($request->currency),
                     'value' => MoneyFormatter::toDecimal($request->amount),
                 ],
-            ], fn($value) => $value !== null && $value !== ''),
+            ], fn ($value) => $value !== null && $value !== ''),
         ];
 
         $purchaseUnits = $this->applyPayeeMerchantId(
@@ -389,7 +390,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             'landing_page' => $paypal['landing_page'] ?? 'LOGIN',
             'user_action' => $paypal['user_action'] ?? 'PAY_NOW',
             'shipping_preference' => $paypal['shipping_preference'] ?? 'NO_SHIPPING',
-        ], fn($value) => $value !== null && $value !== '');
+        ], fn ($value) => $value !== null && $value !== '');
 
         $payload = [
             'intent' => strtoupper((string) ($paypal['intent'] ?? 'CAPTURE')),

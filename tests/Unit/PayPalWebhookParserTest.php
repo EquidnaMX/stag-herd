@@ -3,11 +3,11 @@
 namespace Equidna\StagHerd\Tests\Unit;
 
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
+use Equidna\StagHerd\Data\PayPalRequestContextData;
 use Equidna\StagHerd\Data\WebhookPayloadData;
 use Equidna\StagHerd\Exceptions\InvalidWebhookSignatureException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalWebhookParser;
-use Equidna\StagHerd\Data\PayPalRequestContextData;
 use Equidna\StagHerd\Tests\TestCase;
 use RuntimeException;
 

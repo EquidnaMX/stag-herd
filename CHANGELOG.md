@@ -17,19 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Provider-neutral Billing capabilities for hosted checkout, products/prices, subscriptions, invoices and Customer Portal.
+- Provider-specific billing capabilities for hosted checkout, products/prices, subscriptions, invoices, and customer portal where implemented by the selected provider.
 - Stripe Checkout support for `payment` and `subscription` modes using API version `2026-02-25.clover`.
 - Request-scoped opaque credential contexts for payment, billing and webhook operations.
 - Durable billing-resource and webhook-event persistence, with stale provider events ignored.
 - Normalized `CheckoutCompleted`, `SubscriptionStatusChanged`, `InvoicePaid` and `InvoicePaymentFailed` events.
-- Webhook payload validation framework for all providers
-- Rate limiting middleware for webhook endpoints
-- Audit logging for payment state transitions
-- Database transaction wrapping for payment operations
-- PayPal certificate URL domain whitelisting
-- CI/CD pipeline with GitHub Actions
-- Code coverage reporting with PCOV
-- Database migration stubs for payment tables
+- Webhook payload parsing and signature validation paths for configured providers.
+- PayPal webhook certificate URL domain validation.
+- Database migrations for payment, payment-method, billing-resource, seller, and webhook-event tables.
 
 ### Changed
 
@@ -39,8 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced webhook verification with timestamp validation
 - Improved PHPDoc compliance across all classes
 - Handlers now receive `PaymentData` directly; removed legacy stdClass conversion.
-- Payment fees are now configured per provider (e.g., `stag-herd.paypal.fee`) and mapped into `stag-herd.methods.*.fee`.
 - Added `PaymentMethodDataNormalizer` under `Equidna\StagHerd\Support`.
+- Public saved-payment-method routes are disabled by default and must be enabled by the host with authorization middleware.
+- The PayPal onboarding referral route is disabled by default and remains outside the supported release surface.
 
 ### Removed
 
@@ -51,9 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Provider signatures are mandatory for contextual Stripe, PayPal and Mercado Pago webhooks.
 - Webhook idempotency uses the real provider event ID and is no longer bounded by a Redis TTL.
-- Added cryptographic signature verification for all webhook providers
-- Implemented constant-time comparison for security-critical operations
-- Added SSRF protection for PayPal webhook certificate validation
+- Added cryptographic signature verification for configured webhook parsers.
+- Added PayPal webhook certificate URL host validation.
 
 [Unreleased]: https://github.com/EquidnaMX/stag-herd/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/EquidnaMX/stag-herd/releases/tag/v1.0.0

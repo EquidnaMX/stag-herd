@@ -4,7 +4,6 @@ namespace Equidna\StagHerd\Infrastructure\Providers\Stripe\Services;
 
 use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
 use Equidna\StagHerd\Exceptions\ProviderCommunicationException;
-use Illuminate\Support\Str;
 
 final class StripeCustomerService
 {
@@ -29,10 +28,10 @@ final class StripeCustomerService
                         'payer_reference' => $payerReference ?: null,
                         'source' => $source,
                     ],
-                    fn ($value) => $value !== null && $value !== '',
+                    fn($value) => $value !== null && $value !== '',
                 ),
             ],
-            fn ($value) => $value !== null && $value !== '' && $value !== [],
+            fn($value) => $value !== null && $value !== '' && $value !== [],
         );
     }
 
@@ -88,9 +87,23 @@ final class StripeCustomerService
 
     private function create(array $payload): array
     {
+        $payerReference = trim((string) data_get($payload, 'metadata.payer_reference', ''));
+        $email = strtolower(trim((string) data_get($payload, 'email', '')));
+
+        $dedupeSource = $payerReference !== ''
+            ? 'payer_reference:' . $payerReference
+            : 'email:' . $email;
+
+        if ($dedupeSource === 'email:') {
+            $dedupeSource = 'payload:' . hash(
+                'sha256',
+                json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: ''
+            );
+        }
+
         return $this->stripeGateway->createCustomer(
             payload: $payload,
-            idempotencyKey: 'stag-herd-stripe-customer-' . (string) Str::uuid(),
+            idempotencyKey: 'stag-herd-stripe-customer-' . hash('sha256', $dedupeSource),
         );
     }
 }

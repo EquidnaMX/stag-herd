@@ -28,9 +28,10 @@ publicada; las variables de entorno no los habilitan.
 | Cash | `cash` | Método local habilitado por defecto para flujos manuales o internos. |
 
 `PaymentMethodService` administra el registro, consulta, valor predeterminado y
-desactivación de métodos guardados. La autorización del dueño es responsabilidad
-del host: las rutas publicadas usan el middleware configurado y el valor por
-defecto es `api`, que no asocia por sí mismo `owner_reference` al usuario actual.
+desactivación de métodos guardados. Sus rutas públicas están deshabilitadas por
+defecto. Si el host las habilita, debe agregar autenticación/autorización que
+derive o valide `owner_reference` contra el usuario actual; `api` por sí solo no
+hace esa asociación.
 
 ## Billing y suscripciones
 
@@ -56,7 +57,7 @@ una interfaz portable entre proveedores.
 | Webhooks | Hay parsers configurados para Stripe, PayPal y Mercado Pago. El procesamiento usa almacenamiento de idempotencia. |
 | Idempotencia | `STAG_HERD_WEBHOOK_IDEMPOTENCY_DRIVER=redis` selecciona Redis; cualquier otro valor usa el store Eloquent/database. |
 | Persistencia | Pagos y métodos de pago aceptan repositorios configurables; los recursos de billing usan el repositorio Eloquent registrado por el provider. |
-| Rutas | Las rutas de pagos, métodos guardados y webhooks se habilitan y prefijan desde `config/stag-herd.php`. |
+| Rutas | Las rutas de pagos y webhooks se habilitan y prefijan desde `config/stag-herd.php`; las rutas públicas de métodos guardados están deshabilitadas por defecto. |
 
 ## Fuente y cierre
 

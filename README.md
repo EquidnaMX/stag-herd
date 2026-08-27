@@ -8,13 +8,14 @@ El host decide qué se cobra, a quién se cobra y qué reglas de negocio aplicar
 
 ## Estado y alcance actual
 
-El repositorio contiene una implementación de pagos para Laravel. No declara en
-este README una versión publicada ni una promesa de estabilidad o paridad entre
-proveedores. Cada flujo depende del proveedor, método y configuración habilitados.
+Este README describe la superficie pública preparada para una liberación `1.0.0`.
+No promete paridad entre proveedores: cada flujo depende del proveedor, método y
+configuración habilitados.
 
-Consulta `docs/support-matrix.md` para el inventario de rutas de implementación y
-sus límites, y `docs/release-closure-checklist.md` antes de representar un flujo
-como soportado en una liberación. PayPal Platforms permanece fuera de alcance.
+Consulta `docs/support-matrix.md` para el inventario de implementación y sus
+límites, y `docs/release-closure-checklist.md` antes de etiquetar o publicar.
+Los flujos internos de onboarding/partner referral de PayPal no forman parte de
+la superficie soportada de esta liberación.
 
 El código contiene rutas para:
 
@@ -35,9 +36,14 @@ El provider `cash` existe como método dummy/local para pruebas o flujos manuale
 
 ## Instalación
 
-No uses esta documentación para inferir una versión publicada. Para desarrollo
-desde este repositorio, registra una dependencia `path` en el `composer.json` de
-la aplicación host:
+Instala la versión pública con Composer:
+
+```bash
+composer require equidna/stag-herd:^1.0 -W
+```
+
+Para desarrollo local desde este repositorio, puedes registrar una dependencia
+`path` en el `composer.json` de la aplicación host:
 
 ```json
 {
@@ -48,12 +54,6 @@ la aplicación host:
     }
   ]
 }
-```
-
-Después instala la rama o la versión que tu proceso de liberación haya publicado:
-
-```bash
-composer require equidna/stag-herd:dev-dev -W
 ```
 
 Publicar configuración:
@@ -108,7 +108,7 @@ Las secciones principales son:
 
 'payment_methods' => [
     'routes' => [
-        'enabled' => true,
+        'enabled' => false,
         'prefix' => 'stag-herd/payments/payment-methods',
         'middleware' => ['api'],
     ],
@@ -131,7 +131,12 @@ Las secciones principales son:
 
 Cuando un repositorio está en `null`, StagHerd usa su implementación interna.
 
-## Proveedores soportados
+Las rutas públicas de métodos guardados están deshabilitadas por defecto. Si el
+host las habilita, debe agregar middleware de autenticación/autorización que
+derive o valide `owner_reference` contra el principal autenticado; `api` por sí
+solo no hace esa validación.
+
+## Proveedores configurables
 
 ### Stripe
 
@@ -169,6 +174,11 @@ PAYPAL_BASE_URI=https://api-m.sandbox.paypal.com
 ```
 
 `PAYPAL_SECRET` funciona como fallback de compatibilidad.
+
+La ruta interna `POST /stag-herd/payments/paypal/onboarding/referral` queda
+deshabilitada por defecto mediante
+`stag-herd.providers.paypal.routes.onboarding_referral.enabled`. No forma parte
+de la superficie soportada de esta liberación.
 
 Métodos disponibles:
 

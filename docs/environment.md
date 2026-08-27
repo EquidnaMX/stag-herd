@@ -44,10 +44,11 @@ Si tu aplicación corre en más de una instancia, la idempotencia debe usar un a
 
 Las rutas se configuran en `config/stag-herd.php`.
 
-Las rutas de métodos de pago guardados usan el middleware configurado por el
-host. El middleware `api` por defecto no vincula `owner_reference` con un
-principal autenticado; no las expongas sin autenticación y autorización que
-verifiquen esa relación. Consulta `docs/release-closure-checklist.md`.
+Las rutas públicas de métodos de pago guardados están deshabilitadas por defecto.
+Si el host las habilita, debe usar middleware de autenticación/autorización que
+derive o valide `owner_reference` contra el principal autenticado. El middleware
+`api` por sí solo no hace esa validación. Consulta
+`docs/release-closure-checklist.md`.
 
 Pagos:
 
@@ -66,7 +67,7 @@ Métodos de pago guardados:
 ```php
 'payment_methods' => [
     'routes' => [
-        'enabled' => true,
+        'enabled' => false,
         'prefix' => 'stag-herd/payments/payment-methods',
         'middleware' => ['api'],
     ],

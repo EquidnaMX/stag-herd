@@ -59,7 +59,7 @@ return [
 
     'payment_methods' => [
         'routes' => [
-            'enabled' => true,
+            'enabled' => false,
             'prefix' => 'stag-herd/payments/payment-methods',
             'middleware' => ['api'],
         ],
@@ -176,6 +176,12 @@ return [
 
             'webhooks' => [
                 'parser' => PayPalWebhookParser::class,
+            ],
+
+            'routes' => [
+                'onboarding_referral' => [
+                    'enabled' => false,
+                ],
             ],
         ],
         'stripe' => [

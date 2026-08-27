@@ -151,7 +151,7 @@ class CreateOrderRequest extends PayPalFormRequest
                 'currency_code' => $this->currency(),
                 'value' => MoneyFormatter::toDecimal($this->amountInMinorUnits()),
             ],
-        ], fn($value) => $value !== null && $value !== '');
+        ], fn ($value) => $value !== null && $value !== '');
 
         $sellerMerchantId = $this->validated('seller_merchant_id');
 
@@ -195,7 +195,7 @@ class CreateOrderRequest extends PayPalFormRequest
                 'landing_page' => $paypal['landing_page'] ?? 'LOGIN',
                 'user_action' => $paypal['user_action'] ?? 'PAY_NOW',
                 'shipping_preference' => $paypal['shipping_preference'] ?? 'NO_SHIPPING',
-            ], fn($value) => $value !== null && $value !== ''),
+            ], fn ($value) => $value !== null && $value !== ''),
         ];
     }
 

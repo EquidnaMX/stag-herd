@@ -6,10 +6,10 @@ use Equidna\StagHerd\Application\PaymentService;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\CaptureOrderRequest;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\CreateOrderRequest;
+use Equidna\StagHerd\Http\Requests\Payments\PayPal\CreatePartnerReferralRequest;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\ProcessTokenizedCardRequest;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\RegisterPaymentMethodRequest;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Services\PayPalPaymentMethodService;
-use Equidna\StagHerd\Http\Requests\Payments\PayPal\CreatePartnerReferralRequest;
 use Equidna\StagHerd\Support\CredentialContextManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
@@ -22,7 +22,8 @@ class PayPalController extends Controller
         private readonly PayPalPaymentMethodService $payPalPaymentMethods,
         private readonly PaymentService $payments,
         private readonly CredentialContextManager $credentials,
-    ) {}
+    ) {
+    }
 
     public function createOrder(CreateOrderRequest $request): JsonResponse
     {
@@ -32,7 +33,7 @@ class PayPalController extends Controller
             $response = $this->credentials->run(
                 'paypal',
                 $context->credentialContext,
-                fn() => $this->payPalGateway->createOrder(
+                fn () => $this->payPalGateway->createOrder(
                     payload: $request->payload(),
                     idempotencyKey: $request->idempotencyKey(),
                     context: $context,
@@ -154,7 +155,7 @@ class PayPalController extends Controller
             $response = $this->credentials->run(
                 'paypal',
                 $context->credentialContext,
-                fn() => $this->payPalGateway->createPartnerReferral(
+                fn () => $this->payPalGateway->createPartnerReferral(
                     payload: $request->payload(),
                     idempotencyKey: $request->idempotencyKey(),
                     context: $context,
@@ -173,6 +174,7 @@ class PayPalController extends Controller
                         && is_string($link['href'])
                     ) {
                         $actionUrl = $link['href'];
+
                         break;
                     }
                 }

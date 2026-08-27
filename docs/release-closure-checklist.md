@@ -58,27 +58,24 @@ provider sandbox proof.
 
 ## v1 blockers
 
-### 1. Saved-payment-method route security — release decision required
+### 1. Saved-payment-method route security — release decision applied
 
-The default saved-method routes are enabled under `api` middleware:
+The package default is to not expose the public saved-method routes:
 
 - `GET /stag-herd/payments/payment-methods`
 - `POST /stag-herd/payments/payment-methods/default`
 - `POST /stag-herd/payments/payment-methods/deactivate`
 
-Their request objects authorize every request and accept
-`owner_reference` from the client. The package therefore does not, by default,
-bind that reference to an authenticated principal. This is a release blocker
-for any host that exposes these routes.
+Their request objects accept `owner_reference`; the package does not bind that
+reference to an authenticated principal. For a public package, the safe default
+is therefore `stag-herd.payment_methods.routes.enabled=false`.
 
-- [ ] Record one explicit release decision: **the routes are disabled/not
-  exposed**, or **the host configures authentication and authorization
-  middleware that derives or verifies `owner_reference` against the current
-  principal for all three routes**.
+- [x] Record one explicit release decision: **the routes are disabled/not
+  exposed by default**.
 - [ ] For the chosen deployment model, retain review evidence that one owner
   cannot list, make default, or deactivate another owner’s method, including
-  separate credential contexts.
-- [ ] Confirm the published configuration does not describe default `api`
+  separate credential contexts, if a host enables these routes.
+- [x] Confirm the published configuration does not describe default `api`
   middleware as sufficient authorization for saved-method routes.
 
 Evidence: `routes/payments.php`, `config/stag-herd.php`, and the three request
@@ -92,15 +89,15 @@ authorization test was found.
   `composer test`.
 - [ ] Record the result for the repository’s defined static-analysis command:
   `composer phpstan`.
-- [ ] Record the result for the CI style check:
+- [ ] Record the result for the style check:
   `vendor/bin/php-cs-fixer fix --dry-run --diff --verbose`.
-- [ ] Record the result for the CI dependency check: `composer audit`.
-- [ ] Confirm the CI matrix remains applicable to the declared PHP and
-  Illuminate constraints in `composer.json`.
+- [ ] Record the result for the dependency check: `composer audit`.
+- [ ] Record the result for Composer package validation:
+  `composer validate --strict`.
 
-Existing CI defines PHPUnit coverage, PHPStan, PHP-CS-Fixer, and Composer audit
-in `.github/workflows/ci.yml`. This checklist contains no assertion that any
-of those commands has been run.
+This repository currently has no workflow files under `.github/workflows`; do
+not claim GitHub Actions, PCOV, or hosted CI evidence unless a workflow is added
+and run separately.
 
 ### 3. Evidence missing for current functionality
 
@@ -140,10 +137,9 @@ supported in the release. Do not expand the feature set to fill matrix gaps.
   names.
 - [ ] Ensure release instructions expose no credentials and explain that only
   enabled, configured providers are usable.
-- [ ] Verify package metadata and release instructions are compatible: the
-  README currently uses the development branch `dev-dev`, and the package has
-  `minimum-stability: dev`. A published release must replace that branch with
-  its actual version.
+- [ ] Verify package metadata and release instructions are compatible with the
+  tag being published, including the Composer version constraint used by the
+  clean host installation test.
 
 ## Release criteria
 
@@ -153,6 +149,8 @@ supported in the release. Do not expand the feature set to fill matrix gaps.
 - [ ] The saved-method route decision is applied in the intended host
   deployment and has isolation evidence.
 - [ ] Automated-check results are attached to the release record.
+- [ ] Clean host installation and any advertised provider sandbox results are
+  attached to the release record before tagging/publishing.
 - [ ] Evidence is attached only for the capabilities the release claims; no
   provider-parity claim is introduced.
 - [ ] PayPal Platforms remains excluded from the release promise without

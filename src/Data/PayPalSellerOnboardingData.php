@@ -22,5 +22,6 @@ class PayPalSellerOnboardingData
         public readonly array $permissions = [],
         public readonly array $capabilities = [],
         public readonly array $raw = [],
-    ) {}
+    ) {
+    }
 }

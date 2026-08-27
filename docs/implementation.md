@@ -1,8 +1,8 @@
 # Guía de implementación de StagHerd
 
-Esta guía explica cómo integrar el código actual de `equidna/stag-herd` en una
-aplicación Laravel. No declara una versión publicada, estabilidad ni paridad
-entre proveedores. Antes de anunciar un flujo, revisa sus límites en
+Esta guía explica cómo integrar `equidna/stag-herd` en una aplicación Laravel.
+Describe la superficie preparada para `1.0.0`, sin prometer paridad entre
+proveedores. Antes de anunciar un flujo, revisa sus límites en
 `docs/support-matrix.md` y los criterios de `docs/release-closure-checklist.md`.
 
 ## 1. Qué resuelve StagHerd
@@ -34,8 +34,14 @@ La idea central es simple: el host conserva sus reglas de negocio, y StagHerd se
 
 ## 3. Instalación
 
-Para desarrollo desde este repositorio, registra primero una dependencia `path`
-en el `composer.json` de la aplicación host:
+Instala la versión pública con Composer:
+
+```bash
+composer require equidna/stag-herd:^1.0 -W
+```
+
+Para desarrollo local desde este repositorio, puedes registrar una dependencia
+`path` en el `composer.json` de la aplicación host:
 
 ```json
 {
@@ -46,13 +52,6 @@ en el `composer.json` de la aplicación host:
         }
     ]
 }
-```
-
-Después instala la rama de desarrollo. Una liberación debe usar la versión que
-haya sido publicada por el proceso de release; esta guía no inventa una:
-
-```bash
-composer require equidna/stag-herd:dev-dev -W
 ```
 
 ## 4. Publicación de configuración y migraciones
@@ -106,7 +105,7 @@ Las secciones que normalmente debes revisar son:
 
 'payment_methods' => [
     'routes' => [
-        'enabled' => true,
+        'enabled' => false,
         'prefix' => 'stag-herd/payments/payment-methods',
         'middleware' => ['api'],
     ],
@@ -135,6 +134,10 @@ Las secciones que normalmente debes revisar son:
 > que los providers de billing se registran por defecto. Habilita explícitamente
 > solo los proveedores de pago que uses. La existencia de una entrada, ruta o
 > handler no es una promesa de release.
+
+Las rutas públicas de métodos guardados están deshabilitadas por defecto. Si el
+host las habilita, debe protegerlas con autenticación/autorización que derive o
+valide `owner_reference` contra el principal autenticado.
 
 ## 6. Variables de entorno por proveedor
 

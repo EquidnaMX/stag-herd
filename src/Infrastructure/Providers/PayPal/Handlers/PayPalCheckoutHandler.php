@@ -277,7 +277,7 @@ final class PayPalCheckoutHandler implements PaymentMethodHandler, ExtractsPayme
                     'currency_code' => strtoupper($request->currency),
                     'value' => MoneyFormatter::toDecimal($request->amount),
                 ],
-            ], fn($value) => $value !== null && $value !== ''),
+            ], fn ($value) => $value !== null && $value !== ''),
         ];
 
         $purchaseUnits = $this->applyPayeeMerchantId(
@@ -297,7 +297,7 @@ final class PayPalCheckoutHandler implements PaymentMethodHandler, ExtractsPayme
             'landing_page' => $paypal['landing_page'] ?? 'LOGIN',
             'user_action' => $paypal['user_action'] ?? 'PAY_NOW',
             'shipping_preference' => $paypal['shipping_preference'] ?? 'NO_SHIPPING',
-        ], fn($value) => $value !== null && $value !== '');
+        ], fn ($value) => $value !== null && $value !== '');
 
         $payload = [
             'intent' => strtoupper((string) ($paypal['intent'] ?? 'CAPTURE')),
