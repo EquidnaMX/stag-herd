@@ -1,143 +1,67 @@
-# Matriz de soporte de StagHerd v1.0.0
+# Matriz de implementación actual
 
-Este documento define el alcance estable de StagHerd para la versión `v1.0.0`.
+Esta matriz describe rutas presentes en el código actual; no es una promesa de
+estabilidad, disponibilidad comercial ni paridad entre proveedores. Antes de
+anunciar una capacidad o liberar una versión, consulta
+`docs/release-closure-checklist.md`. PayPal Platforms está fuera de alcance.
 
-El objetivo de esta versión es ofrecer una capa confiable de pagos para Laravel, con soporte para pagos directos, métodos de pago guardados, suscripciones, webhooks y métodos personalizados del sistema host.
+## Cómo leerla
 
-## Niveles de soporte
-
-| Nivel | Significado |
+| Estado | Significado |
 | --- | --- |
-| Estable | Forma parte de `v1.0.0` y debe estar documentado y probado. |
-| Opcional | Disponible para pruebas, demo o flujos internos, pero no forma parte de la promesa principal del paquete. |
-| No soportado | No forma parte del alcance de `v1.0.0`. |
+| Configurado | El proveedor, método o adapter aparece en `config/stag-herd.php`. |
+| Implementado | Existe una ruta de código para la operación, sujeta a configuración y credenciales. |
+| No implementado | La operación lanza `UnsupportedOperationException` o el provider no implementa el contrato. |
 
-## Proveedores de pago
+Los proveedores de pago directo Stripe, PayPal y Mercado Pago están
+deshabilitados por defecto. El host debe habilitarlos en la configuración
+publicada; las variables de entorno no los habilitan.
 
-| Proveedor | Estado | Notas |
+## Pagos directos y métodos guardados
+
+| Proveedor | Métodos configurados | Observaciones |
 | --- | --- | --- |
-| Stripe | Estable | Soporta pagos con tarjeta, wallets, tarjetas guardadas, SPEI, webhooks, checkout y suscripciones. |
-| PayPal | Estable | Soporta checkout normal de PayPal, métodos guardados, webhooks, checkout y suscripciones según lo implementado por el proveedor. |
-| Mercado Pago | Estable | Soporta pagos con tarjeta, Checkout Pro, tarjetas guardadas, webhooks, checkout y suscripciones según lo implementado por el proveedor. |
-| Custom | Estable | Permite que el sistema host registre métodos de pago internos mediante handlers personalizados. |
-| Cash | Opcional | Disponible como método dummy/local para pruebas o flujos manuales internos. No forma parte de la promesa principal del paquete. |
+| Stripe | `card`, `apple_pay`, `google_pay`, `tokenized_card`, `spei` | Implementados mediante handlers configurados. |
+| PayPal | `paypal`, `tokenized_card` | Implementados mediante handlers configurados. |
+| Mercado Pago | `card`, `checkout_pro`, `tokenized_card` | Implementados mediante handlers configurados. Una carga tokenizada requiere un token fresco incluso al resolver un método guardado. |
+| Custom | Ninguno por defecto | El host puede registrar handlers propios. |
+| Cash | `cash` | Método local habilitado por defecto para flujos manuales o internos. |
 
-## Métodos de pago directos
-
-| Método | Proveedor | Estado | Propósito |
-| --- | --- | --- | --- |
-| `card` | Stripe | Estable | Pago con tarjeta mediante Stripe. |
-| `apple_pay` | Stripe | Estable | Pago con Apple Pay mediante Stripe. |
-| `google_pay` | Stripe | Estable | Pago con Google Pay mediante Stripe. |
-| `spei` | Stripe | Estable | Pago SPEI mediante Stripe. |
-| `paypal` | PayPal | Estable | Flujo estándar de checkout con PayPal. |
-| `card` | Mercado Pago | Estable | Pago con tarjeta mediante Mercado Pago. |
-| `checkout_pro` | Mercado Pago | Estable | Flujo hospedado de Mercado Pago Checkout Pro. |
-| Métodos personalizados | Custom | Estable | Métodos definidos por el host, como wallet, crédito de cliente, cortesía o saldo interno. |
-| `cash` | Cash | Opcional | Método dummy/manual para validación local. |
-
-## Métodos de pago guardados
-
-| Proveedor | Método | Estado | Notas |
-| --- | --- | --- | --- |
-| Stripe | `tokenized_card` | Estable | Usa un cliente del proveedor y una referencia de método de pago guardado. |
-| PayPal | `tokenized_card` | Estable | Usa una referencia de método de pago guardado del proveedor. |
-| Mercado Pago | `tokenized_card` | Estable | Usa una tarjeta guardada/tokenizada de Mercado Pago. |
-
-Los métodos guardados se administran mediante:
-
-```php
-Equidna\StagHerd\Application\PaymentMethodService
-```
-
-o mediante el contrato:
-
-```php
-Equidna\StagHerd\Contracts\ManagesPaymentMethods
-```
+`PaymentMethodService` administra el registro, consulta, valor predeterminado y
+desactivación de métodos guardados. La autorización del dueño es responsabilidad
+del host: las rutas publicadas usan el middleware configurado y el valor por
+defecto es `api`, que no asocia por sí mismo `owner_reference` al usuario actual.
 
 ## Billing y suscripciones
 
-| Capacidad | Estado | Punto de entrada |
-| --- | --- | --- |
-| Checkout hospedado | Estable | `BillingService::createCheckout()` |
-| Consulta de checkout | Estable | `BillingService::lookupCheckout()` |
-| Consulta de suscripción | Estable | `BillingService::lookupSubscription()` |
-| Cancelación de suscripción | Estable | `BillingService::cancelSubscription()` |
-| Creación de producto | Estable | `BillingService::createProduct()` |
-| Creación de precio | Estable | `BillingService::createPrice()` |
-| Portal de cliente | Estable cuando el proveedor lo soporte | `BillingService::createBillingPortal()` |
+| Capacidad | Stripe | PayPal | Mercado Pago |
+| --- | --- | --- | --- |
+| Checkout hospedado | Pago y suscripción | Solo suscripción; exactamente una línea | Solo suscripción; exactamente una línea |
+| Consulta de checkout y suscripción | Implementado | Implementado sobre la suscripción | Implementado sobre la preapproval |
+| Cancelación inmediata | Implementado | Implementado | Implementado |
+| Cancelación al fin del período | Implementado | No implementado | No implementado |
+| Crear producto | Implementado | Implementado | No implementado |
+| Crear precio/plan | Implementado | Implementado como plan recurrente | Implementado como plan recurrente |
+| Intervalos de plan | Delegado a Stripe | `day`, `week`, `month`, `year` | `day`, `week`, `month`, `year` |
+| Portal de cliente | Implementado | No implementado | No implementado |
 
-Las operaciones de billing dependen del soporte real de cada proveedor. Si un proveedor no soporta una operación, StagHerd debe fallar de forma controlada mediante `UnsupportedOperationException`.
+Las operaciones de billing no soportadas fallan con
+`UnsupportedOperationException`; el host debe manejar ese resultado y no asumir
+una interfaz portable entre proveedores.
 
-## Webhooks
+## Webhooks y persistencia
 
-| Proveedor | Estado | Notas |
-| --- | --- | --- |
-| Stripe | Estable | El parsing de webhooks y los eventos normalizados forman parte de `v1.0.0`. |
-| PayPal | Estable | El parsing de webhooks y los eventos normalizados forman parte de `v1.0.0`. |
-| Mercado Pago | Estable | El parsing de webhooks y los eventos normalizados forman parte de `v1.0.0`. |
+| Área | Implementación actual |
+| --- | --- |
+| Webhooks | Hay parsers configurados para Stripe, PayPal y Mercado Pago. El procesamiento usa almacenamiento de idempotencia. |
+| Idempotencia | `STAG_HERD_WEBHOOK_IDEMPOTENCY_DRIVER=redis` selecciona Redis; cualquier otro valor usa el store Eloquent/database. |
+| Persistencia | Pagos y métodos de pago aceptan repositorios configurables; los recursos de billing usan el repositorio Eloquent registrado por el provider. |
+| Rutas | Las rutas de pagos, métodos guardados y webhooks se habilitan y prefijan desde `config/stag-herd.php`. |
 
-La idempotencia de webhooks debe configurarse con:
+## Fuente y cierre
 
-```env
-STAG_HERD_WEBHOOK_IDEMPOTENCY_DRIVER=database
-STAG_HERD_WEBHOOK_IDEMPOTENCY_TTL=86400
-```
-
-Drivers esperados:
-
-```text
-database
-redis
-```
-
-## Persistencia
-
-| Área | Persistencia por defecto | Personalizable |
-| --- | --- | --- |
-| Pagos | `stag_herd_payments` | Sí, mediante `PaymentRepository`. |
-| Métodos de pago | `stag_herd_payment_methods` | Sí, mediante `PaymentMethodRepository`. |
-| Recursos de billing | `stag_herd_billing_resources` | Sí, mediante `BillingResourceRepository`. |
-| Eventos de webhook | `stag_herd_webhook_events` | Sí, mediante la configuración de idempotencia de webhooks. |
-
-El sistema host puede usar las tablas de StagHerd, sus propias tablas o APIs externas implementando los contratos correspondientes.
-
-## Servicios públicos
-
-| Servicio | Estado | Responsabilidad |
-| --- | --- | --- |
-| `PaymentService` | Estable | Operaciones de pagos directos. |
-| `PaymentMethodService` | Estable | Métodos de pago guardados/tokenizados. |
-| `BillingService` | Estable | Checkout hospedado, suscripciones, productos, precios y portal de cliente. |
-
-## Facades públicas
-
-| Facade | Estado | Servicio |
-| --- | --- | --- |
-| `StagHerd` | Estable | `PaymentService` |
-| `StagHerdBilling` | Estable | `BillingService` |
-
-## Eventos
-
-| Grupo de eventos | Estado | Propósito |
-| --- | --- | --- |
-| Eventos de pago | Estable | Permiten que el host reaccione a cambios de estado de pagos. |
-| Eventos de webhook | Estable | Permiten que el host observe el procesamiento de webhooks. |
-| Eventos de billing | Estable | Permiten que el host reaccione a checkout, facturas y suscripciones. |
-
-## Demo y UI
-
-El paquete puede incluir vistas demo o assets frontend, pero son opcionales.
-
-Para `v1.0.0`, StagHerd se considera primero un paquete backend de pagos para Laravel. La UI no es obligatoria para la promesa estable del paquete, a menos que se documente explícitamente como una parte soportada del producto.
-
-## Regla de release para v1.0.0
-
-Una funcionalidad se considera parte de `v1.0.0` solo si tiene:
-
-- Documentación.
-- Tests.
-- API pública estable o contrato documentado.
-- Configuración clara.
-- Errores controlados cuando algo no está soportado.
+La fuente funcional de proveedores, métodos, rutas y variables es
+`config/stag-herd.php`. Las rutas y contratos presentes no sustituyen la
+evidencia de un flujo real. Para la decisión de release, evidencia requerida y
+límites de pruebas, usa `docs/release-closure-checklist.md` y
+`docs/sandbox-test-matrix.md`.

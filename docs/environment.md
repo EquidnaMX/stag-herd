@@ -11,6 +11,8 @@ No guardes credenciales reales en este repositorio. Usa `.env.example` solo como
 - Usa credenciales live/productivas solo en producción.
 - Después de cambiar configuración, limpia la caché de Laravel.
 - No hardcodees secretos en código, config publicada o documentación.
+- Las variables no habilitan proveedores: los proveedores de pago se habilitan
+  en `config/stag-herd.php`. Configura solo los que estén habilitados.
 
 ## Configuración común
 
@@ -41,6 +43,11 @@ Si tu aplicación corre en más de una instancia, la idempotencia debe usar un a
 ## Rutas
 
 Las rutas se configuran en `config/stag-herd.php`.
+
+Las rutas de métodos de pago guardados usan el middleware configurado por el
+host. El middleware `api` por defecto no vincula `owner_reference` con un
+principal autenticado; no las expongas sin autenticación y autorización que
+verifiquen esa relación. Consulta `docs/release-closure-checklist.md`.
 
 Pagos:
 
@@ -221,7 +228,7 @@ En sandbox o staging se recomienda:
 | Credenciales | Usar llaves sandbox/test de cada proveedor. |
 | Webhooks | Registrar endpoints HTTPS reales del ambiente. |
 | Idempotencia | Usar `database` o `redis`. |
-| Pruebas | Ejecutar la matriz de `docs/sandbox-test-matrix.md`. |
+| Pruebas | Registrar la evidencia aplicable de `docs/sandbox-test-matrix.md`. |
 | Datos | Usar montos mínimos y cuentas de prueba. |
 
 Checklist:
@@ -267,7 +274,7 @@ php artisan config:cache
 6. Limpiar caché de Laravel.
 7. Revisar rutas con `php artisan route:list`.
 8. Registrar webhooks en los dashboards de los proveedores.
-9. Ejecutar pruebas sandbox.
+9. Registrar evidencia sandbox para los flujos que se vayan a anunciar.
 10. Pasar a credenciales productivas solo cuando el flujo esté validado.
 
 ## Validación rápida
@@ -279,7 +286,8 @@ php artisan route:list
 php artisan migrate:status
 ```
 
-Antes de liberar una versión del paquete:
+Antes de liberar, usa `docs/release-closure-checklist.md` como criterio de
+cierre y registra los resultados de los comandos definidos por el repositorio:
 
 ```bash
 composer validate --strict

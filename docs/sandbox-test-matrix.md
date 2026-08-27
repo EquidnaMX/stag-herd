@@ -1,6 +1,8 @@
 # Matriz de pruebas sandbox
 
-Esta matriz define las pruebas mínimas que deben ejecutarse antes de liberar StagHerd como `v1.0.0`.
+Esta matriz organiza evidencia sandbox para los flujos que una liberación decida
+anunciar. No declara `v1.0.0`, estabilidad ni paridad entre proveedores. El
+criterio de cierre es `docs/release-closure-checklist.md`.
 
 El objetivo no es probar cada caso posible, sino comprobar que los flujos prometidos funcionan en una aplicación host real con credenciales sandbox/test.
 
@@ -34,7 +36,7 @@ Por cada prueba manual o sandbox guarda:
 
 | Caso | Pasos | Resultado esperado |
 | --- | --- | --- |
-| Instalar paquete | `composer require equidna/stag-herd` | El paquete instala sin conflictos. |
+| Instalar paquete | Instalar la rama o versión objetivo mediante Composer | La dependencia objetivo instala sin conflictos. |
 | Publicar configuración | `php artisan vendor:publish --tag=stag-herd-config` | Se crea `config/stag-herd.php`. |
 | Publicar migraciones | `php artisan vendor:publish --tag=stag-herd-migrations` | Se publican las migraciones del paquete. |
 | Ejecutar migraciones | `php artisan migrate` | Se crean las tablas necesarias. |
@@ -65,10 +67,10 @@ Por cada prueba manual o sandbox guarda:
 | Checkout normal | Crear pago con `provider: 'paypal'` y `method: 'paypal'` | Se crea orden o acción siguiente válida. |
 | Captura/confirmación | Completar el flujo sandbox del comprador | El pago se normaliza a estado final correcto. |
 | Tarjeta guardada | Registrar método y cobrar con `method: 'tokenized_card'` | El pago usa el método guardado correcto. |
-| Checkout hospedado | Crear checkout con `BillingService::createCheckout()` si el provider lo soporta | Se obtiene sesión o error controlado si no está soportado. |
-| Suscripción | Probar flujo de suscripción si está soportado por el provider | Se obtiene suscripción normalizada o error controlado. |
+| Checkout hospedado | Crear checkout de suscripción con exactamente una línea | Se obtiene una suscripción/URL de aprobación válida. El modo pago único no está implementado. |
+| Suscripción | Probar el flujo de suscripción | Se obtiene suscripción normalizada. |
 | Consulta de suscripción | Consultar con `lookupSubscription()` | Se devuelve estado normalizado o error controlado. |
-| Cancelación de suscripción | Cancelar con `cancelSubscription()` | Se cancela o falla de forma controlada. |
+| Cancelación de suscripción | Cancelar con `atPeriodEnd: false` | Se cancela. `atPeriodEnd: true` no está implementado. |
 | Webhook firmado | Recibir webhook real de PayPal con `PAYPAL_WEBHOOK_ID` configurado | La firma se valida antes de procesar el evento. |
 | Webhook duplicado | Reenviar el mismo evento | No duplica efectos en el host. |
 
@@ -79,10 +81,10 @@ Por cada prueba manual o sandbox guarda:
 | Pago con tarjeta | Crear pago con `provider: 'mercado_pago'` y `method: 'card'` | El pago se crea y el estado se normaliza correctamente. |
 | Checkout Pro | Crear pago con `method: 'checkout_pro'` | Se obtiene flujo/URL de checkout válida. |
 | Tarjeta guardada | Registrar método y cobrar con `method: 'tokenized_card'` | El pago usa la tarjeta guardada correcta. |
-| Checkout hospedado | Crear checkout con `BillingService::createCheckout()` si el provider lo soporta | Se obtiene sesión o error controlado si no está soportado. |
-| Suscripción | Probar flujo de suscripción si está soportado por el provider | Se obtiene suscripción normalizada o error controlado. |
+| Checkout hospedado | Crear checkout de suscripción con exactamente una línea | Se obtiene una suscripción/URL de aprobación válida. El modo pago único no está implementado. |
+| Suscripción | Probar el flujo de suscripción | Se obtiene suscripción normalizada. |
 | Consulta de suscripción | Consultar con `lookupSubscription()` | Se devuelve estado normalizado o error controlado. |
-| Cancelación de suscripción | Cancelar con `cancelSubscription()` | Se cancela o falla de forma controlada. |
+| Cancelación de suscripción | Cancelar con `atPeriodEnd: false` | Se cancela. `atPeriodEnd: true` no está implementado. |
 | Webhook firmado | Recibir webhook con `MERCADO_PAGO_WEBHOOK_SECRET` configurado | La firma se valida antes de procesar el evento. |
 | Webhook duplicado | Reenviar el mismo evento | No duplica efectos en el host. |
 
@@ -110,16 +112,22 @@ Por cada prueba manual o sandbox guarda:
 
 ## Billing y suscripciones
 
+Ejecuta cada caso solo para proveedores que lo implementen: Stripe admite
+checkout de pago y suscripción, catálogo y portal; PayPal admite productos,
+planes y checkout de suscripción; Mercado Pago no admite crear productos y sus
+precios representan planes recurrentes. PayPal y Mercado Pago no implementan
+portal de cliente ni cancelación al fin del período.
+
 | Caso | Pasos | Resultado esperado |
 | --- | --- | --- |
-| Crear producto | `BillingService::createProduct()` | Se crea producto o falla controladamente si el proveedor no lo soporta. |
-| Crear precio | `BillingService::createPrice()` | Se crea precio o falla controladamente si el proveedor no lo soporta. |
-| Crear checkout de pago | `createCheckout()` con modo pago único | Se obtiene sesión/URL válida. |
+| Crear producto | Usar Stripe o PayPal con `BillingService::createProduct()` | Se crea producto. Mercado Pago no implementa esta operación. |
+| Crear precio | Usar `BillingService::createPrice()` | Stripe crea un precio; PayPal y Mercado Pago crean un plan recurrente. |
+| Crear checkout de pago | Usar Stripe con `createCheckout()` en modo pago único | Se obtiene sesión/URL válida. PayPal y Mercado Pago no implementan este modo. |
 | Crear checkout de suscripción | `createCheckout()` con modo suscripción | Se obtiene sesión/URL válida. |
 | Consultar checkout | `lookupCheckout()` | Se devuelve estado normalizado. |
 | Consultar suscripción | `lookupSubscription()` | Se devuelve estado normalizado. |
-| Cancelar suscripción | `cancelSubscription()` | Se cancela o queda marcada para cancelar. |
-| Portal de cliente | `createBillingPortal()` | Se obtiene URL o error controlado si no se soporta. |
+| Cancelar suscripción | Usar Stripe para `atPeriodEnd: true`; usar `false` para PayPal/Mercado Pago | Stripe puede programar la cancelación; PayPal/Mercado Pago solo cancelan de inmediato. |
+| Portal de cliente | Usar Stripe con `createBillingPortal()` | Se obtiene URL. PayPal y Mercado Pago no implementan el portal. |
 
 ## Webhooks
 
@@ -145,15 +153,14 @@ vendor/bin/php-cs-fixer fix --dry-run --diff --verbose
 composer audit
 ```
 
-## Criterio de salida para v1.0.0
+## Criterio de salida
 
 | Nivel | Requisito |
 | --- | --- |
-| Bloqueante | La instalación limpia funciona. |
-| Bloqueante | Los providers documentados no fallan por configuración básica. |
-| Bloqueante | Los flujos de pago principales están probados. |
-| Bloqueante | Los métodos guardados funcionan por dueño y contexto. |
-| Bloqueante | Billing/suscripciones tienen pruebas o fallan controladamente por proveedor. |
-| Bloqueante | Webhooks validan firma, idempotencia y payload inválido. |
+| Bloqueante | La evidencia de instalación corresponde a la rama o versión objetivo. |
+| Bloqueante | Los flujos anunciados cuentan con evidencia por proveedor y método. |
+| Bloqueante | Los métodos guardados demuestran aislamiento por dueño y contexto. |
+| Bloqueante | Billing respeta los límites documentados de cada proveedor. |
+| Bloqueante | Los webhooks anunciados demuestran firma, idempotencia y payload inválido. |
 | Bloqueante | README, implementación, environment y matriz de soporte están alineados. |
-| Release | Composer, PHPUnit, PHPStan, CS Fixer y audit pasan. |
+| Release | Los resultados de Composer, PHPUnit, PHPStan, CS Fixer y audit se registran en el cierre. |

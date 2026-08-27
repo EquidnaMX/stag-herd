@@ -6,23 +6,17 @@ El paquete permite trabajar con pagos directos, métodos de pago guardados, susc
 
 El host decide qué se cobra, a quién se cobra y qué reglas de negocio aplicar. StagHerd se encarga de ejecutar el proveedor configurado, normalizar el resultado y devolver objetos consistentes.
 
-## Estado del paquete
+## Estado y alcance actual
 
-StagHerd apunta a una versión estable `v1.0.0` como paquete backend de pagos para Laravel.
+El repositorio contiene una implementación de pagos para Laravel. No declara en
+este README una versión publicada ni una promesa de estabilidad o paridad entre
+proveedores. Cada flujo depende del proveedor, método y configuración habilitados.
 
-El alcance estable de la versión está definido en:
+Consulta `docs/support-matrix.md` para el inventario de rutas de implementación y
+sus límites, y `docs/release-closure-checklist.md` antes de representar un flujo
+como soportado en una liberación. PayPal Platforms permanece fuera de alcance.
 
-```text
-docs/support-matrix.md
-```
-
-La guía principal de implementación está en:
-
-```text
-docs/implementation.md
-```
-
-El paquete cubre:
+El código contiene rutas para:
 
 - pagos directos;
 - métodos de pago guardados/tokenizados;
@@ -33,16 +27,33 @@ El paquete cubre:
 - persistencia configurable;
 - métodos personalizados del sistema host.
 
-StagHerd incluye soporte para proveedores como Stripe, PayPal y Mercado Pago, además de métodos personalizados definidos por el host.
+StagHerd registra adaptadores para Stripe, PayPal y Mercado Pago, además de
+métodos personalizados definidos por el host. Esto no implica que todos los
+métodos u operaciones de billing tengan el mismo soporte entre proveedores.
 
 El provider `cash` existe como método dummy/local para pruebas o flujos manuales internos, pero no forma parte de la promesa principal del paquete.
 
 ## Instalación
 
-Instalar el paquete con Composer:
+No uses esta documentación para inferir una versión publicada. Para desarrollo
+desde este repositorio, registra una dependencia `path` en el `composer.json` de
+la aplicación host:
+
+```json
+{
+  "repositories": [
+    {
+      "type": "path",
+      "url": "../stag-herd"
+    }
+  ]
+}
+```
+
+Después instala la rama o la versión que tu proceso de liberación haya publicado:
 
 ```bash
-composer require equidna/stag-herd
+composer require equidna/stag-herd:dev-dev -W
 ```
 
 Publicar configuración:
@@ -717,7 +728,11 @@ $portal = app(BillingService::class)->createBillingPortal(
 return redirect()->away($portal->url);
 ```
 
-Si un proveedor no soporta una operación de billing específica, StagHerd lanza `UnsupportedOperationException`.
+Las operaciones de billing no son portables: Stripe implementa checkout de pago y
+suscripción, catálogo y portal; PayPal y Mercado Pago solo implementan checkout
+de suscripción con una línea; Mercado Pago no crea productos; y PayPal/Mercado
+Pago no admiten cancelar al final del período. Las operaciones no implementadas
+lanzan `UnsupportedOperationException`.
 
 ## Webhooks
 
@@ -1033,7 +1048,9 @@ El handler personalizado debe validar reglas propias del host, como saldo dispon
 
 El paquete puede incluir vistas demo o assets frontend, pero son opcionales.
 
-Para `v1.0.0`, StagHerd se considera primero un paquete backend de pagos para Laravel. La UI no es obligatoria para la promesa estable del paquete, a menos que se documente explícitamente como una parte soportada del producto.
+El paquete incluye assets opcionales, pero esta documentación no los presenta
+como una superficie de release. Valida el alcance de cualquier liberación con
+`docs/release-closure-checklist.md`.
 
 ## Checklist de implementación
 
@@ -1052,9 +1069,11 @@ Para `v1.0.0`, StagHerd se considera primero un paquete backend de pagos para La
 - [ ] Implementar billing/suscripciones si el sistema cobra de forma recurrente.
 - [ ] Probar errores, webhooks duplicados y montos en unidades menores.
 
-## Verificación antes de release
+## Cierre de release
 
-Antes de publicar una versión estable deben pasar:
+Antes de publicar, registra los resultados y la evidencia exigida por
+`docs/release-closure-checklist.md`. Los comandos definidos por el repositorio
+son:
 
 ```bash
 composer validate --strict
@@ -1064,10 +1083,11 @@ vendor/bin/php-cs-fixer fix --dry-run --diff --verbose
 composer audit
 ```
 
-También se recomienda validar instalación en una aplicación Laravel limpia:
+La instalación en una aplicación Laravel limpia debe validarse contra la versión
+que se vaya a liberar; el resultado forma parte de la evidencia de cierre:
 
 ```bash
-composer require equidna/stag-herd
+composer require equidna/stag-herd:<release-version>
 php artisan vendor:publish --tag=stag-herd-config
 php artisan vendor:publish --tag=stag-herd-migrations
 php artisan migrate
@@ -1077,6 +1097,7 @@ php artisan route:list
 ## Más documentación
 
 - `docs/implementation.md`: guía completa de implementación.
-- `docs/support-matrix.md`: alcance estable de soporte para `v1.0.0`.
+- `docs/support-matrix.md`: implementación actual y límites por proveedor.
 - `docs/environment.md`: variables de entorno.
 - `docs/sandbox-test-matrix.md`: matriz de pruebas sandbox.
+- `docs/release-closure-checklist.md`: evidencia necesaria antes de liberar.

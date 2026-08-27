@@ -1,6 +1,9 @@
 # Guía de implementación de StagHerd
 
-Esta guía explica cómo integrar `equidna/stag-herd` en una aplicación Laravel usando la API pública actual del paquete: pagos, proveedores, métodos tokenizados, suscripciones, webhooks, eventos y persistencia configurable.
+Esta guía explica cómo integrar el código actual de `equidna/stag-herd` en una
+aplicación Laravel. No declara una versión publicada, estabilidad ni paridad
+entre proveedores. Antes de anunciar un flujo, revisa sus límites en
+`docs/support-matrix.md` y los criterios de `docs/release-closure-checklist.md`.
 
 ## 1. Qué resuelve StagHerd
 
@@ -10,7 +13,8 @@ En vez de que tu aplicación conozca directamente Stripe, PayPal, Mercado Pago o
 
 - `PaymentService` para pagos directos.
 - `PaymentMethodService` para tarjetas o métodos guardados.
-- `BillingService` para checkout hospedado, suscripciones, portal de cliente y catálogo.
+- `BillingService` para operaciones de checkout, suscripción, catálogo y portal
+  que implemente el proveedor seleccionado.
 - Repositorios configurables para decidir dónde se persisten los datos.
 - Eventos para conectar la lógica del host sin modificar el paquete.
 
@@ -23,20 +27,15 @@ La idea central es simple: el host conserva sus reglas de negocio, y StagHerd se
 | Crear, consultar, confirmar, cancelar o reembolsar pagos | `PaymentService` o facade `StagHerd` |
 | Mostrar métodos disponibles en un checkout | `PaymentMethods::getMethods(true)` |
 | Guardar y reutilizar tarjetas/métodos de pago | `PaymentMethodService` |
-| Crear checkout hospedado de pago único o suscripción | `BillingService::createCheckout()` |
+| Crear checkout hospedado | `BillingService::createCheckout()`; Stripe admite pago y suscripción, PayPal/Mercado Pago solo suscripción. |
 | Consultar o cancelar suscripciones | `BillingService::lookupSubscription()` / `cancelSubscription()` |
 | Reaccionar a pagos aprobados, rechazados o reembolsados | Eventos de StagHerd |
 | Persistir en tablas propias o API externa | Repositorios personalizados |
 
 ## 3. Instalación
 
-Instala el paquete con Composer:
-
-```bash
-composer require equidna/stag-herd:dev-dev -W
-```
-
-Si lo consumes desde un repositorio local o privado, registra primero el repositorio en el `composer.json` del host:
+Para desarrollo desde este repositorio, registra primero una dependencia `path`
+en el `composer.json` de la aplicación host:
 
 ```json
 {
@@ -49,7 +48,8 @@ Si lo consumes desde un repositorio local o privado, registra primero el reposit
 }
 ```
 
-Después instala:
+Después instala la rama de desarrollo. Una liberación debe usar la versión que
+haya sido publicada por el proceso de release; esta guía no inventa una:
 
 ```bash
 composer require equidna/stag-herd:dev-dev -W
@@ -131,7 +131,10 @@ Las secciones que normalmente debes revisar son:
 ],
 ```
 
-> Nota: la configuración del paquete puede contener entradas internas o experimentales que no forman parte de una integración normal. Para esta guía solo necesitas revisar los repositorios y proveedores estables descritos aquí.
+> Nota: los proveedores de pago directo están deshabilitados por defecto, mientras
+> que los providers de billing se registran por defecto. Habilita explícitamente
+> solo los proveedores de pago que uses. La existencia de una entrada, ruta o
+> handler no es una promesa de release.
 
 ## 6. Variables de entorno por proveedor
 
@@ -195,8 +198,8 @@ STAG_HERD_WEBHOOK_IDEMPOTENCY_DRIVER=database
 STAG_HERD_WEBHOOK_IDEMPOTENCY_TTL=86400
 ```
 
-El driver de idempotencia puede usar persistencia local o Redis, según la implementación configurada por el paquete.
-Los valores esperados son `database` o `redis`; cualquier valor no reconocido cae a la implementación Eloquent/database.
+El driver `redis` selecciona la implementación Redis; cualquier otro valor usa
+la implementación Eloquent/database.
 
 ## 7. Persistencia
 
@@ -688,6 +691,18 @@ Los proveedores con método `tokenized_card` configurado son:
 | `mercado_pago` | `tokenized_card` | Cobrar una tarjeta guardada/tokenizada de Mercado Pago |
 
 ## 13. Checkout hospedado, catálogo y suscripciones
+
+Estas operaciones son específicas de proveedor:
+
+| Proveedor | Límites de la implementación actual |
+| --- | --- |
+| Stripe | Checkout de pago y suscripción, productos, precios, suscripciones y portal de cliente. |
+| PayPal | Checkout de suscripción con exactamente una línea; productos y planes recurrentes; no hay portal ni cancelación al fin del período. |
+| Mercado Pago | Checkout de suscripción con exactamente una línea; precios crean planes recurrentes; no crea productos, no hay portal ni cancelación al fin del período. |
+
+PayPal y Mercado Pago aceptan los intervalos `day`, `week`, `month` y `year`
+para sus planes recurrentes. Las operaciones no implementadas lanzan
+`UnsupportedOperationException`.
 
 El servicio de billing es:
 
@@ -1190,11 +1205,12 @@ Estos handlers deben validar reglas propias del host, por ejemplo saldo disponib
 9. Conecta eventos del paquete con órdenes, facturas o servicios del host.
 10. Si necesitas reutilizar tarjetas, implementa el flujo de métodos tokenizados.
 11. Si necesitas recurrencia, usa `BillingService` para checkout de suscripción, consulta y cancelación.
-12. Prueba errores, reintentos, webhooks duplicados y montos en unidades menores.
+12. Conserva evidencia de errores, reintentos, webhooks duplicados y montos en
+    unidades menores para los flujos que la aplicación vaya a anunciar.
 
 ## 23. Resumen práctico
 
-Para una integración estable:
+Para una integración alineada con la implementación actual:
 
 - Usa `PaymentService` para pagos directos.
 - Usa `PaymentMethodService` para tarjetas/métodos guardados.
@@ -1205,3 +1221,5 @@ Para una integración estable:
 - Maneja cambios de estado con eventos.
 - Implementa repositorios propios solo cuando el host necesite controlar su base de datos o una API externa.
 - Mantén reglas de negocio en el host.
+- Trata las capacidades como específicas del proveedor y no como paridad entre
+  Stripe, PayPal y Mercado Pago.
