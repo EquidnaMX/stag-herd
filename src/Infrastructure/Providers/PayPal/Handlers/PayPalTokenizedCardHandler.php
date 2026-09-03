@@ -173,7 +173,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             ownerReference: $ownerReference,
             providerCustomerId: $customerId,
             providerPaymentMethodId: $paymentTokenId,
-            credentialContext: $request->credentialContext,
+            credentialContext: $request->platformContext->credentialContext,
             type: 'tokenized_card',
             brand: $this->firstString([
                 data_get($card, 'brand'),
@@ -287,7 +287,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             new PaymentMethodLookupData(
                 provider: 'paypal',
                 ownerReference: $ownerReference,
-                credentialContext: $request->credentialContext,
+                credentialContext: $request->platformContext->credentialContext,
             )
         );
 
@@ -348,7 +348,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             if (isset($payload['purchase_units']) && is_array($payload['purchase_units'])) {
                 $payload['purchase_units'] = $this->applyPayeeMerchantId(
                     purchaseUnits: $payload['purchase_units'],
-                    sellerMerchantId: $request->sellerMerchantId,
+                    sellerMerchantId: $request->platformContext->paypalSellerMerchantId()
                 );
 
                 $payload['purchase_units'] = $this->applyPlatformFeeAmount(
@@ -370,12 +370,12 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
                     'currency_code' => strtoupper($request->currency),
                     'value' => MoneyFormatter::toDecimal($request->amount),
                 ],
-            ], fn ($value) => $value !== null && $value !== ''),
+            ], fn($value) => $value !== null && $value !== ''),
         ];
 
         $purchaseUnits = $this->applyPayeeMerchantId(
             purchaseUnits: $purchaseUnits,
-            sellerMerchantId: $request->sellerMerchantId,
+            sellerMerchantId: $request->platformContext->paypalSellerMerchantId(),
         );
 
         $purchaseUnits = $this->applyPlatformFeeAmount(
@@ -390,7 +390,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             'landing_page' => $paypal['landing_page'] ?? 'LOGIN',
             'user_action' => $paypal['user_action'] ?? 'PAY_NOW',
             'shipping_preference' => $paypal['shipping_preference'] ?? 'NO_SHIPPING',
-        ], fn ($value) => $value !== null && $value !== '');
+        ], fn($value) => $value !== null && $value !== '');
 
         $payload = [
             'intent' => strtoupper((string) ($paypal['intent'] ?? 'CAPTURE')),
@@ -535,7 +535,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
      */
     private function applyPlatformFeeAmount(array $purchaseUnits, PaymentRequestData $request): array
     {
-        if ($request->platformFeeAmount === null || $request->platformFeeAmount <= 0) {
+        if ($request->platformContext->platformFeeAmount === null || $request->platformContext->platformFeeAmount <= 0) {
             return $purchaseUnits;
         }
 
@@ -552,7 +552,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
                     [
                         'amount' => [
                             'currency_code' => strtoupper($request->currency),
-                            'value' => MoneyFormatter::toDecimalString($request->platformFeeAmount),
+                            'value' => MoneyFormatter::toDecimalString($request->platformContext->platformFeeAmount),
                         ],
                     ],
                 ],

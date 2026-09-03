@@ -4,6 +4,7 @@ namespace Equidna\StagHerd\Http\Requests\Payments\PayPal;
 
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PayPalRequestContextData;
+use Equidna\StagHerd\Data\PlatformPaymentContextData;
 
 class CaptureOrderRequest extends PayPalFormRequest
 {
@@ -87,24 +88,32 @@ class CaptureOrderRequest extends PayPalFormRequest
             payerReference: data_get($this->metadata(), 'id_client'),
             payerEmail: $this->validated('payer_email') ?? 'cliente@test.com',
             description: $this->validated('description') ?? 'Captured PayPal payment',
-            credentialContext: $this->validated('credential_context') ?? 'default',
-            sellerMerchantId: $this->validated('seller_merchant_id'),
-            platformAttributionId: $this->validated('platform_attribution_id'),
-            environment: $this->validated('environment'),
-            externalMetadata: $this->validated('external_metadata') ?? [],
             metadata: $this->metadata(),
-            platformFeeAmount: $this->validated('platform_fee_amount'),
+            platformContext: $this->platformContext(),
+        );
+    }
+
+    public function platformContext(): PlatformPaymentContextData
+    {
+        return new PlatformPaymentContextData(
+            credentialContext: $this->validated('credential_context') ?? 'default',
+            sellerReference: $this->validated('seller_merchant_id'),
+            platformFeeAmount: $this->validated('platform_fee_amount') !== null
+                ? \Equidna\StagHerd\Support\MoneyFormatter::fromDecimal($this->validated('platform_fee_amount'))
+                : null,
+            environment: $this->validated('environment'),
+            providerMetadata: [
+                'paypal' => array_filter([
+                    'seller_merchant_id' => $this->validated('seller_merchant_id'),
+                    'platform_attribution_id' => $this->validated('platform_attribution_id'),
+                    'external_metadata' => $this->validated('external_metadata') ?? [],
+                ], static fn($value) => $value !== null && $value !== []),
+            ],
         );
     }
 
     public function paypalContext(): PayPalRequestContextData
     {
-        return PayPalRequestContextData::fromArray([
-            'credential_context' => $this->validated('credential_context') ?? 'default',
-            'seller_merchant_id' => $this->validated('seller_merchant_id'),
-            'platform_attribution_id' => $this->validated('platform_attribution_id'),
-            'environment' => $this->validated('environment'),
-            'external_metadata' => $this->validated('external_metadata') ?? [],
-        ]);
+        return PayPalRequestContextData::fromPlatformContext($this->platformContext());
     }
 }

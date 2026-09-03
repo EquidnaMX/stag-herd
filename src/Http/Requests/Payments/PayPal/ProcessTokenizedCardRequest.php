@@ -2,6 +2,7 @@
 
 namespace Equidna\StagHerd\Http\Requests\Payments\PayPal;
 
+use Equidna\StagHerd\Data\PlatformPaymentContextData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Support\MoneyFormatter;
 use Illuminate\Validation\Validator;
@@ -73,6 +74,8 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
     {
         $data = $this->validated();
 
+        $platformContext = $this->platformContext();
+
         $externalReference = $data['external_reference']
             ?: 'PAYPAL-TOKENIZED-' . now()->format('YmdHis');
 
@@ -108,12 +111,26 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             returnUrl: $data['return_url'] ?? null,
             cancelUrl: $data['cancel_url'] ?? null,
             metadata: $this->cleanMetadata($metadata),
-            credentialContext: (string) ($data['credential_context'] ?? 'default'),
-            sellerMerchantId: $data['seller_merchant_id'] ?? null,
-            platformAttributionId: $data['platform_attribution_id'] ?? null,
-            environment: $data['environment'] ?? null,
-            externalMetadata: $data['external_metadata'] ?? [],
-            platformFeeAmount: $data['platform_fee_amount'] ?? null,
+            platformContext: $platformContext,
+        );
+    }
+
+    public function platformContext(): PlatformPaymentContextData
+    {
+        return new PlatformPaymentContextData(
+            credentialContext: (string) ($this->validated('credential_context') ?? 'default'),
+            sellerReference: $this->validated('seller_merchant_id'),
+            platformFeeAmount: $this->validated('platform_fee_amount') !== null
+                ? MoneyFormatter::fromDecimal($this->validated('platform_fee_amount'))
+                : null,
+            environment: $this->validated('environment'),
+            providerMetadata: [
+                'paypal' => array_filter([
+                    'seller_merchant_id' => $this->validated('seller_merchant_id'),
+                    'platform_attribution_id' => $this->validated('platform_attribution_id'),
+                    'external_metadata' => $this->validated('external_metadata') ?? [],
+                ], static fn($value) => $value !== null && $value !== []),
+            ],
         );
     }
 }

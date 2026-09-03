@@ -23,6 +23,7 @@ use Equidna\StagHerd\Exceptions\ProviderNotRegisteredException;
 use Equidna\StagHerd\Infrastructure\Providers\Cash\CashProvider;
 use Equidna\StagHerd\Support\ProviderRegistry;
 use Equidna\StagHerd\Tests\TestCase;
+use RuntimeException;
 
 class CreatePaymentTest extends TestCase
 {

@@ -14,6 +14,7 @@ use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PayPalRequestContextData;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalCheckoutHandler;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalTokenizedCardHandler;
+use Equidna\StagHerd\Data\PlatformPaymentContextData;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalResultMapper;
 use Equidna\StagHerd\Tests\TestCase;
 use RuntimeException;
@@ -35,8 +36,10 @@ class PayPalPlatformFeeTest extends TestCase
             method: 'paypal',
             provider: 'paypal',
             externalReference: 'ORDER-123',
-            sellerMerchantId: 'SELLER-123',
-            platformFeeAmount: 1500,
+            platformContext: new PlatformPaymentContextData(
+                sellerReference: 'SELLER-123',
+                platformFeeAmount: 1500,
+            ),
         ));
 
         $this->assertSame('SELLER-123', data_get(
@@ -150,7 +153,9 @@ class PayPalPlatformFeeTest extends TestCase
                     'token_type' => 'BILLING_AGREEMENT',
                 ],
             ],
-            platformFeeAmount: 1500,
+            platformContext: new PlatformPaymentContextData(
+                platformFeeAmount: 1500,
+            ),
         ));
 
         $this->assertSame('15.00', data_get(

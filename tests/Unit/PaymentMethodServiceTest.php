@@ -10,6 +10,7 @@ use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
 use Equidna\StagHerd\Contracts\PaymentMethodRepository;
 use Equidna\StagHerd\Data\PaymentMethodRegisterData;
 use Equidna\StagHerd\Data\PayPalRequestContextData;
+use Equidna\StagHerd\Data\MercadoPagoRequestContextData;
 use Equidna\StagHerd\Support\CredentialContextManager;
 use Equidna\StagHerd\Tests\TestCase;
 
@@ -146,7 +147,7 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
     {
         return array_values(array_filter(
             $this->filterByOwner($provider, $credentialContext, $ownerReference),
-            static fn (array $record): bool => ($record['status'] ?? 'active') === 'active',
+            static fn(array $record): bool => ($record['status'] ?? 'active') === 'active',
         ));
     }
 
@@ -239,7 +240,7 @@ final class InMemoryPaymentMethodRepository implements PaymentMethodRepository
     {
         return array_values(array_filter(
             $this->records,
-            static fn (array $record): bool => ($record['provider'] ?? null) === $provider
+            static fn(array $record): bool => ($record['provider'] ?? null) === $provider
                 && ($record['credential_context'] ?? null) === $credentialContext
                 && ($record['owner_reference'] ?? null) === $ownerReference,
         ));
@@ -481,8 +482,12 @@ final class NullPayPalGateway implements PayPalGateway
 
 final class NullMercadoPagoGateway implements MercadoPagoGateway
 {
-    public function createPayment(array $payload, ?string $idempotencyKey = null, ?string $deviceId = null): array
-    {
+    public function createPayment(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?string $deviceId = null,
+        ?MercadoPagoRequestContextData $context = null,
+    ): array {
         return [];
     }
 
@@ -505,9 +510,10 @@ final class NullMercadoPagoGateway implements MercadoPagoGateway
     {
         return [];
     }
-
-    public function createPreference(array $payload): array
-    {
+    public function createPreference(
+        array $payload,
+        ?MercadoPagoRequestContextData $context = null,
+    ): array {
         return [];
     }
 

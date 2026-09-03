@@ -2,10 +2,11 @@
 
 namespace Equidna\StagHerd\Infrastructure\Providers\MercadoPago;
 
-use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
 use Equidna\StagHerd\Exceptions\ProviderAuthenticationException;
 use Equidna\StagHerd\Exceptions\ProviderCommunicationException;
 use Equidna\StagHerd\Exceptions\ProviderNotConfiguredException;
+use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
+use Equidna\StagHerd\Data\MercadoPagoRequestContextData;
 use Equidna\StagHerd\Support\MoneyFormatter;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
@@ -21,6 +22,7 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
         array $payload,
         ?string $idempotencyKey = null,
         ?string $deviceId = null,
+        ?MercadoPagoRequestContextData $context = null,
     ): array {
         return $this->send(
             method: 'post',
@@ -28,6 +30,7 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
             payload: $payload,
             idempotencyKey: $idempotencyKey ?? (string) Str::uuid(),
             deviceId: $deviceId,
+            context: $context,
         );
     }
 
@@ -78,12 +81,15 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
         );
     }
 
-    public function createPreference(array $payload): array
-    {
+    public function createPreference(
+        array $payload,
+        ?MercadoPagoRequestContextData $context = null,
+    ): array {
         return $this->send(
             method: 'post',
             endpoint: '/checkout/preferences',
             payload: $payload,
+            context: $context,
         );
     }
 
@@ -149,7 +155,7 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
 
         return array_values(array_filter(
             $response,
-            static fn (mixed $card): bool => is_array($card),
+            static fn(mixed $card): bool => is_array($card),
         ));
     }
 
@@ -171,11 +177,13 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
         array $payload = [],
         ?string $idempotencyKey = null,
         ?string $deviceId = null,
+        ?MercadoPagoRequestContextData $context = null,
     ): array {
         try {
             $request = $this->request(
                 idempotencyKey: $idempotencyKey,
                 deviceId: $deviceId,
+                context: $context,
             );
 
             $response = match (strtolower($method)) {
@@ -225,8 +233,10 @@ class MercadoPagoApiAdapter implements MercadoPagoGateway
     private function request(
         ?string $idempotencyKey = null,
         ?string $deviceId = null,
+        ?MercadoPagoRequestContextData $context = null,
     ): PendingRequest {
-        $accessToken = config('stag-herd.providers.mercado_pago.credentials.access_token');
+        $accessToken = $context?->sellerAccessToken
+            ?? config('stag-herd.providers.mercado_pago.credentials.access_token');
 
         if (!$accessToken) {
             throw ProviderNotConfiguredException::missingCredential(

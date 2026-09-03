@@ -18,29 +18,19 @@ final readonly class PayPalRequestContextData
     /** @param array<string, mixed> $data */
     public static function fromArray(array $data): self
     {
-        return new self(
-            credentialContext: (string) ($data['credential_context'] ?? $data['credentialContext'] ?? 'default'),
-            sellerMerchantId: isset($data['seller_merchant_id'])
-                ? (string) $data['seller_merchant_id']
-                : (isset($data['sellerMerchantId']) ? (string) $data['sellerMerchantId'] : null),
-            platformAttributionId: isset($data['platform_attribution_id'])
-                ? (string) $data['platform_attribution_id']
-                : (isset($data['platformAttributionId']) ? (string) $data['platformAttributionId'] : null),
-            environment: isset($data['environment']) ? strtolower((string) $data['environment']) : null,
-            externalMetadata: isset($data['external_metadata']) && is_array($data['external_metadata'])
-                ? $data['external_metadata']
-                : (isset($data['externalMetadata']) && is_array($data['externalMetadata']) ? $data['externalMetadata'] : []),
+        return self::fromPlatformContext(
+            PlatformPaymentContextData::fromArray($data),
         );
     }
 
-    public static function fromPaymentRequest(PaymentRequestData $request): self
+    public static function fromPlatformContext(PlatformPaymentContextData $context): self
     {
         return new self(
-            credentialContext: $request->credentialContext,
-            sellerMerchantId: $request->sellerMerchantId,
-            platformAttributionId: $request->platformAttributionId,
-            environment: $request->environment,
-            externalMetadata: $request->externalMetadata,
+            credentialContext: $context->credentialContext,
+            sellerMerchantId: $context->paypalSellerMerchantId(),
+            platformAttributionId: $context->paypalPlatformAttributionId(),
+            environment: $context->environment,
+            externalMetadata: $context->providerMetadata['paypal']['external_metadata'] ?? [],
         );
     }
 

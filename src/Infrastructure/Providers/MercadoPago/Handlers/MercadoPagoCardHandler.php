@@ -41,6 +41,7 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler, ExtractsPaym
             payload: $this->buildCreatePaymentPayload($request),
             idempotencyKey: $this->resolveIdempotencyKey($request),
             deviceId: $this->resolveDeviceId($request),
+            context: $request->mercadoPagoContext(),
         );
 
         return $this->mapper->mapPaymentResponseToResult($request, $response);
@@ -246,10 +247,43 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler, ExtractsPaym
             );
         }
 
+        $payload = $this->applyMarketplaceContext($payload, $request);
+
         return array_filter(
             $payload,
-            fn ($value) => $value !== null && $value !== [],
+            fn($value) => $value !== null && $value !== [],
         );
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function applyMarketplaceContext(
+        array $payload,
+        PaymentRequestData $request,
+    ): array {
+        $context = $request->mercadoPagoContext();
+
+        if ($request->platformContext->platformFeeAmount !== null && $request->platformContext->platformFeeAmount > 0) {
+            if (!$context->sellerAccessToken) {
+                throw InvalidPaymentPayloadException::invalidField(
+                    'platform_context.provider_metadata.mercado_pago.seller_access_token',
+                    'Mercado Pago API payments require the seller OAuth access token when application_fee is present.'
+                );
+            }
+
+            $payload['application_fee'] = (float) MoneyFormatter::toDecimal($request->platformContext->platformFeeAmount);
+        }
+
+        if ($context->sellerReference !== null && trim($context->sellerReference) !== '') {
+            $payload['metadata'] = array_replace(
+                is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                ['seller_reference' => trim($context->sellerReference)],
+            );
+        }
+
+        return $payload;
     }
 
     private function lookupByProviderPaymentId(PaymentLookupData $request): PaymentResultData
