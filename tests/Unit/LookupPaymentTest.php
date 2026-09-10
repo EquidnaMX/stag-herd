@@ -2,19 +2,19 @@
 
 namespace Equidna\StagHerd\Tests\Unit;
 
-use Equidna\StagHerd\Application\Actions\LookupPayment;
-use Equidna\StagHerd\Contracts\PaymentProvider;
-use Equidna\StagHerd\Contracts\PaymentRepository;
-use Equidna\StagHerd\Data\PaymentCancellationData;
-use Equidna\StagHerd\Data\PaymentLookupData;
-use Equidna\StagHerd\Data\PaymentRequestData;
-use Equidna\StagHerd\Data\PaymentResultData;
-use Equidna\StagHerd\Data\ProviderReferencesData;
-use Equidna\StagHerd\Data\RefundRequestData;
-use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
-use Equidna\StagHerd\Domain\Payment;
+use Equidna\StagHerd\Tests\Fakes\Repositories\NullPaymentRepository;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
+use Equidna\StagHerd\Application\Actions\LookupPayment;
+use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
+use Equidna\StagHerd\Data\PaymentCancellationData;
+use Equidna\StagHerd\Data\ProviderReferencesData;
+use Equidna\StagHerd\Contracts\PaymentProvider;
 use Equidna\StagHerd\Support\ProviderRegistry;
+use Equidna\StagHerd\Data\PaymentRequestData;
+use Equidna\StagHerd\Data\PaymentLookupData;
+use Equidna\StagHerd\Data\PaymentResultData;
+use Equidna\StagHerd\Data\RefundRequestData;
+use Equidna\StagHerd\Domain\Payment;
 use Equidna\StagHerd\Tests\TestCase;
 use RuntimeException;
 
@@ -37,7 +37,7 @@ class LookupPaymentTest extends TestCase
         $registry = new ProviderRegistry();
         $registry->register($provider);
 
-        $action = new LookupPayment($registry, new InMemoryLookupPaymentRepository($payment));
+        $action = new LookupPayment($registry, new InMemoryPaymentRepository($payment));
 
         $action->handle(new PaymentLookupData(
             provider: 'mercado_pago',
@@ -58,7 +58,7 @@ class LookupPaymentTest extends TestCase
         $registry = new ProviderRegistry();
         $registry->register($provider);
 
-        $action = new LookupPayment($registry, new NullLookupPaymentRepository());
+        $action = new LookupPayment($registry, new NullPaymentRepository());
 
         $this->expectException(InvalidPaymentPayloadException::class);
         $this->expectExceptionMessage('multiple methods are enabled: [card, pix]');
@@ -118,107 +118,6 @@ final class SpyLookupPaymentProvider implements PaymentProvider
     }
 
     public function refundPayment(RefundRequestData $request): PaymentResultData
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-}
-
-final class InMemoryLookupPaymentRepository implements PaymentRepository
-{
-    public function __construct(
-        private Payment $payment,
-    ) {
-        //
-    }
-
-    public function storeFromResult(PaymentRequestData $request, PaymentResultData $result): Payment
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function find(int|string $id): ?Payment
-    {
-        return (string) $this->payment->id === (string) $id ? $this->payment : null;
-    }
-
-    public function findByProviderPaymentId(string $provider, string $providerPaymentId): ?Payment
-    {
-        if (
-            $this->payment->provider === $provider
-            && $this->payment->references?->providerPaymentId === $providerPaymentId
-        ) {
-            return $this->payment;
-        }
-
-        return null;
-    }
-
-    public function findByProviderOrderId(string $provider, string $providerOrderId): ?Payment
-    {
-        if (
-            $this->payment->provider === $provider
-            && $this->payment->references?->providerOrderId === $providerOrderId
-        ) {
-            return $this->payment;
-        }
-
-        return null;
-    }
-
-    public function findByExternalReference(string $externalReference): ?Payment
-    {
-        return $this->payment->externalReference === $externalReference ? $this->payment : null;
-    }
-
-    public function updateFromResult(Payment $payment, PaymentResultData $result): Payment
-    {
-        $this->payment = new Payment(
-            id: $payment->id,
-            provider: $payment->provider,
-            method: $payment->method,
-            amount: $result->amount ?? $payment->amount,
-            currency: $result->currency ?? $payment->currency,
-            status: $result->status,
-            providerStatus: $result->providerStatus,
-            externalReference: $payment->externalReference,
-            payerReference: $payment->payerReference,
-            payerEmail: $payment->payerEmail,
-            references: $result->references ?? $payment->references,
-            metadata: array_merge($payment->metadata, $result->metadata),
-        );
-
-        return $this->payment;
-    }
-}
-
-final class NullLookupPaymentRepository implements PaymentRepository
-{
-    public function storeFromResult(PaymentRequestData $request, PaymentResultData $result): Payment
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function find(int|string $id): ?Payment
-    {
-        return null;
-    }
-
-    public function findByProviderPaymentId(string $provider, string $providerPaymentId): ?Payment
-    {
-        return null;
-    }
-
-    public function findByProviderOrderId(string $provider, string $providerOrderId): ?Payment
-    {
-        return null;
-    }
-
-    public function findByExternalReference(string $externalReference): ?Payment
-    {
-        return null;
-    }
-
-    public function updateFromResult(Payment $payment, PaymentResultData $result): Payment
     {
         throw new RuntimeException('Not implemented.');
     }

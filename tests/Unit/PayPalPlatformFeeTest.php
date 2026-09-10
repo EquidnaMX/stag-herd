@@ -2,22 +2,14 @@
 
 namespace Equidna\StagHerd\Tests\Unit;
 
-use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
-use Equidna\StagHerd\Contracts\ManagesPaymentMethods;
-use Equidna\StagHerd\Data\PaymentMethodData;
-use Equidna\StagHerd\Data\PaymentMethodDeactivateData;
-use Equidna\StagHerd\Data\PaymentMethodLookupData;
-use Equidna\StagHerd\Data\PaymentMethodRegisterData;
-use Equidna\StagHerd\Data\PaymentMethodSetDefaultData;
-use Equidna\StagHerd\Data\PaymentMethodsListData;
-use Equidna\StagHerd\Data\PaymentRequestData;
-use Equidna\StagHerd\Data\PayPalRequestContextData;
-use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalCheckoutHandler;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalTokenizedCardHandler;
-use Equidna\StagHerd\Data\PlatformPaymentContextData;
+use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalCheckoutHandler;
+use Equidna\StagHerd\Tests\Fakes\Gateways\RecordingPayPalPlatformFeeGateway;
+use Equidna\StagHerd\Tests\Fakes\PaymentMethods\NullPaymentMethodManager;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalResultMapper;
+use Equidna\StagHerd\Data\PlatformPaymentContextData;
+use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Tests\TestCase;
-use RuntimeException;
 
 class PayPalPlatformFeeTest extends TestCase
 {
@@ -137,7 +129,7 @@ class PayPalPlatformFeeTest extends TestCase
         $handler = new PayPalTokenizedCardHandler(
             gateway: $gateway,
             mapper: new PayPalResultMapper(),
-            paymentMethods: new NullPayPalPlatformFeePaymentMethodManager(),
+            paymentMethods: new NullPaymentMethodManager(),
         );
 
         $handler->createPayment(new PaymentRequestData(
@@ -162,150 +154,5 @@ class PayPalPlatformFeeTest extends TestCase
             $gateway->lastCreateOrderPayload,
             'purchase_units.0.payment_instruction.platform_fees.0.amount.value',
         ));
-    }
-}
-
-final class RecordingPayPalPlatformFeeGateway implements PayPalGateway
-{
-    /** @var array<string, mixed>|null */
-    public ?array $lastCreateOrderPayload = null;
-
-    public function createOrder(
-        array $payload,
-        ?string $idempotencyKey = null,
-        ?PayPalRequestContextData $context = null,
-    ): array {
-        $this->lastCreateOrderPayload = $payload;
-
-        return [
-            'id' => 'PAYPAL-ORDER-123',
-            'status' => 'CREATED',
-            'links' => [],
-        ];
-    }
-
-    public function getOrder(string $orderId, ?PayPalRequestContextData $context = null): array
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function captureOrder(
-        string $orderId,
-        ?string $idempotencyKey = null,
-        ?PayPalRequestContextData $context = null,
-    ): array {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function getCapture(string $captureId, ?PayPalRequestContextData $context = null): array
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function refundCapture(
-        string $captureId,
-        ?int $amount = null,
-        ?string $currency = null,
-        ?string $idempotencyKey = null,
-        ?PayPalRequestContextData $context = null,
-    ): array {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function createCatalogProduct(
-        array $payload,
-        ?string $idempotencyKey = null,
-        ?PayPalRequestContextData $context = null,
-    ): array {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function createPlan(
-        array $payload,
-        ?string $idempotencyKey = null,
-        ?PayPalRequestContextData $context = null,
-    ): array {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function createSubscription(
-        array $payload,
-        ?string $idempotencyKey = null,
-        ?PayPalRequestContextData $context = null,
-    ): array {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function getSubscription(string $subscriptionId, ?PayPalRequestContextData $context = null): array
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function cancelSubscription(
-        string $subscriptionId,
-        array $payload = [],
-        ?string $idempotencyKey = null,
-        ?PayPalRequestContextData $context = null,
-    ): array {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function getPaymentToken(string $paymentTokenId, ?PayPalRequestContextData $context = null): array
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function deletePaymentToken(string $paymentTokenId, ?PayPalRequestContextData $context = null): array
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function createPartnerReferral(
-        array $payload,
-        ?string $idempotencyKey = null,
-        ?PayPalRequestContextData $context = null,
-    ): array {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function getMerchantIntegration(
-        string $partnerMerchantId,
-        string $sellerMerchantId,
-        ?PayPalRequestContextData $context = null,
-    ): array {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function verifyWebhookSignature(array $payload, ?PayPalRequestContextData $context = null): bool
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-}
-
-final class NullPayPalPlatformFeePaymentMethodManager implements ManagesPaymentMethods
-{
-    public function registerPaymentMethod(PaymentMethodRegisterData $request): PaymentMethodData
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function listPaymentMethods(PaymentMethodsListData $request): array
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function setDefaultPaymentMethod(PaymentMethodSetDefaultData $request): PaymentMethodData
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function deactivatePaymentMethod(PaymentMethodDeactivateData $request): PaymentMethodData
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function resolveUsablePaymentMethod(PaymentMethodLookupData $request): PaymentMethodData
-    {
-        throw new RuntimeException('Not implemented.');
     }
 }
