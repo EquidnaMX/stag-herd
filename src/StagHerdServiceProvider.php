@@ -2,36 +2,40 @@
 
 namespace Equidna\StagHerd;
 
-use Equidna\StagHerd\Application\BillingService;
-use Equidna\StagHerd\Application\PaymentMethodService;
-use Equidna\StagHerd\Application\PaymentService;
-use Equidna\StagHerd\Contracts\BillingProvider;
-use Equidna\StagHerd\Contracts\BillingResourceRepository;
-use Equidna\StagHerd\Contracts\CredentialResolver;
-use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
-use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
-use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
-use Equidna\StagHerd\Contracts\ManagesPaymentMethods;
-use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
-use Equidna\StagHerd\Contracts\PaymentMethodHandler;
-use Equidna\StagHerd\Contracts\PaymentMethodRepository;
-use Equidna\StagHerd\Contracts\PaymentRepository;
-use Equidna\StagHerd\Contracts\PayPalSellerRepository;
-use Equidna\StagHerd\Contracts\WebhookIdempotencyStore;
-use Equidna\StagHerd\Infrastructure\Credentials\ConfigCredentialResolver;
+use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoPaymentMethodGatewaySynchronizer;
+use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalPaymentMethodGatewaySynchronizer;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripePaymentMethodGatewaySynchronizer;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentBillingResourceRepository;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentDisplayRepository;
 use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentMethodRepository;
-use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentRepository;
-use Equidna\StagHerd\Infrastructure\Persistence\EloquentPayPalSellerRepository;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoApiAdapter;
-use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalApiAdapter;
-use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeApiAdapter;
+use Equidna\StagHerd\Infrastructure\Persistence\EloquentPayPalSellerRepository;
 use Equidna\StagHerd\Infrastructure\Webhooks\EloquentWebhookIdempotencyStore;
 use Equidna\StagHerd\Infrastructure\Webhooks\RedisWebhookIdempotencyStore;
-use Equidna\StagHerd\Support\BillingProviderRegistry;
-use Equidna\StagHerd\Support\CredentialContextManager;
+use Equidna\StagHerd\Infrastructure\Persistence\EloquentPaymentRepository;
+use Equidna\StagHerd\Infrastructure\Credentials\ConfigCredentialResolver;
+use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalApiAdapter;
+use Equidna\StagHerd\Support\PaymentMethodGatewaySynchronizerRegistry;
+use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeApiAdapter;
+use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
 use Equidna\StagHerd\Support\PaymentMethodHandlerRegistry;
+use Equidna\StagHerd\Contracts\BillingResourceRepository;
+use Equidna\StagHerd\Contracts\PaymentDisplayRepository;
+use Equidna\StagHerd\Contracts\PaymentMethodRepository;
+use Equidna\StagHerd\Contracts\WebhookIdempotencyStore;
+use Equidna\StagHerd\Application\PaymentMethodService;
+use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
+use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
+use Equidna\StagHerd\Contracts\PayPalSellerRepository;
+use Equidna\StagHerd\Support\CredentialContextManager;
+use Equidna\StagHerd\Contracts\ManagesPaymentMethods;
+use Equidna\StagHerd\Support\BillingProviderRegistry;
+use Equidna\StagHerd\Contracts\PaymentMethodHandler;
+use Equidna\StagHerd\Contracts\CredentialResolver;
+use Equidna\StagHerd\Contracts\PaymentRepository;
+use Equidna\StagHerd\Application\BillingService;
+use Equidna\StagHerd\Application\PaymentService;
+use Equidna\StagHerd\Contracts\BillingProvider;
 use Equidna\StagHerd\Support\ProviderRegistry;
 use Illuminate\Support\ServiceProvider;
 
@@ -46,6 +50,7 @@ class StagHerdServiceProvider extends ServiceProvider
 
         $this->registerRepositories();
         $this->registerGateways();
+        $this->registerPaymentMethodGatewaySynchronizers();
         $this->registerWebhooks();
         $this->registerProviderMethodHandlers();
         $this->registerProviders();
@@ -136,6 +141,30 @@ class StagHerdServiceProvider extends ServiceProvider
             StripeGateway::class,
             StripeApiAdapter::class,
         );
+    }
+
+    private function registerPaymentMethodGatewaySynchronizers(): void
+    {
+        $this->app->singleton(PaymentMethodGatewaySynchronizerRegistry::class, function ($app) {
+            $registry = new PaymentMethodGatewaySynchronizerRegistry();
+
+            $registry->register(
+                'stripe',
+                $app->make(StripePaymentMethodGatewaySynchronizer::class),
+            );
+
+            $registry->register(
+                'paypal',
+                $app->make(PayPalPaymentMethodGatewaySynchronizer::class),
+            );
+
+            $registry->register(
+                'mercado_pago',
+                $app->make(MercadoPagoPaymentMethodGatewaySynchronizer::class),
+            );
+
+            return $registry;
+        });
     }
 
     private function registerWebhooks(): void

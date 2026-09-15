@@ -2,10 +2,9 @@
 
 namespace Equidna\StagHerd\Tests\Unit;
 
+use Equidna\StagHerd\Tests\Fakes\PaymentMethods\NullPaymentMethodGatewaySynchronizer;
+use Equidna\StagHerd\Support\PaymentMethodGatewaySynchronizerRegistry;
 use Equidna\StagHerd\Tests\Fakes\Credentials\NullCredentialResolver;
-use Equidna\StagHerd\Tests\Fakes\Gateways\NullMercadoPagoGateway;
-use Equidna\StagHerd\Tests\Fakes\Gateways\NullStripeGateway;
-use Equidna\StagHerd\Tests\Fakes\Gateways\NullPayPalGateway;
 use Equidna\StagHerd\Contracts\PaymentMethodRepository;
 use Equidna\StagHerd\Support\CredentialContextManager;
 use Equidna\StagHerd\Application\PaymentMethodService;
@@ -47,12 +46,15 @@ final class PaymentMethodServiceTest extends TestCase
 
     private function service(InMemoryPaymentMethodRepository $repository): PaymentMethodService
     {
+        $gatewaySynchronizers = new PaymentMethodGatewaySynchronizerRegistry();
+        $gatewaySynchronizers->register('stripe', new NullPaymentMethodGatewaySynchronizer());
+        $gatewaySynchronizers->register('paypal', new NullPaymentMethodGatewaySynchronizer());
+        $gatewaySynchronizers->register('mercado_pago', new NullPaymentMethodGatewaySynchronizer());
+
         return new PaymentMethodService(
             paymentMethods: $repository,
             credentials: new CredentialContextManager(new NullCredentialResolver()),
-            stripeGateway: new NullStripeGateway(),
-            payPalGateway: new NullPayPalGateway(),
-            mercadoPagoGateway: new NullMercadoPagoGateway(),
+            gatewaySynchronizers: $gatewaySynchronizers,
         );
     }
 }
