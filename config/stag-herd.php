@@ -132,6 +132,10 @@ return [
                 'webhook_secret' => env('MERCADO_PAGO_WEBHOOK_SECRET'),
             ],
 
+            'platform_fee' => [
+                'percentage' => env('STAG_HERD_MERCADO_PAGO_PLATFORM_FEE_PERCENTAGE'),
+            ],
+
             'http' => [
                 'base_uri' => env('MERCADO_PAGO_BASE_URI', 'https://api.mercadopago.com'),
                 'timeout' => 15,
@@ -167,6 +171,11 @@ return [
 
                 'environment' => env('PAYPAL_ENVIRONMENT', 'sandbox'),
                 'platform_attribution_id' => env('PAYPAL_PARTNER_ATTRIBUTION_ID'),
+                'partner_merchant_id' => env('PAYPAL_PARTNER_MERCHANT_ID'),
+            ],
+
+            'platform_fee' => [
+                'percentage' => env('STAG_HERD_PAYPAL_PLATFORM_FEE_PERCENTAGE'),
             ],
 
             'http' => [
@@ -227,6 +236,10 @@ return [
                 'secret_key' => env('STRIPE_SECRET_KEY'),
                 'public_key' => env('VITE_STRIPE_PUBLIC_KEY'),
                 'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+            ],
+
+            'platform_fee' => [
+                'percentage' => env('STAG_HERD_STRIPE_PLATFORM_FEE_PERCENTAGE'),
             ],
 
             'http' => [
