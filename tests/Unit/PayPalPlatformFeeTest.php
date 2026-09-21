@@ -4,6 +4,7 @@ namespace Equidna\StagHerd\Tests\Unit;
 
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalTokenizedCardHandler;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\Handlers\PayPalCheckoutHandler;
+use Equidna\StagHerd\Support\PlatformFeeResolver;
 use Equidna\StagHerd\Tests\Fakes\Gateways\RecordingPayPalPlatformFeeGateway;
 use Equidna\StagHerd\Tests\Fakes\PaymentMethods\NullPaymentMethodManager;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalResultMapper;
@@ -20,6 +21,7 @@ class PayPalPlatformFeeTest extends TestCase
         $handler = new PayPalCheckoutHandler(
             gateway: $gateway,
             mapper: new PayPalResultMapper(),
+            platformFees: new PlatformFeeResolver(),
         );
 
         $handler->createPayment(new PaymentRequestData(
@@ -57,6 +59,7 @@ class PayPalPlatformFeeTest extends TestCase
         $handler = new PayPalCheckoutHandler(
             gateway: $gateway,
             mapper: new PayPalResultMapper(),
+            platformFees: new PlatformFeeResolver(),
         );
 
         $handler->createPayment(new PaymentRequestData(
@@ -80,6 +83,7 @@ class PayPalPlatformFeeTest extends TestCase
         $handler = new PayPalCheckoutHandler(
             gateway: $gateway,
             mapper: new PayPalResultMapper(),
+            platformFees: new PlatformFeeResolver(),
         );
 
         $handler->createPayment(new PaymentRequestData(
@@ -130,6 +134,7 @@ class PayPalPlatformFeeTest extends TestCase
             gateway: $gateway,
             mapper: new PayPalResultMapper(),
             paymentMethods: new NullPaymentMethodManager(),
+            platformFees: new PlatformFeeResolver(),
         );
 
         $handler->createPayment(new PaymentRequestData(
@@ -146,6 +151,7 @@ class PayPalPlatformFeeTest extends TestCase
                 ],
             ],
             platformContext: new PlatformPaymentContextData(
+                sellerReference: 'SELLER-123',
                 platformFeeAmount: 1500,
             ),
         ));

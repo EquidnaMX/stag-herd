@@ -3,6 +3,7 @@
 namespace Equidna\StagHerd\Tests\Unit;
 
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\Services\StripeCardPaymentService;
+use Equidna\StagHerd\Support\PlatformFeeResolver;
 use Equidna\StagHerd\Tests\Fakes\Gateways\RecordingStripeConnectGateway;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeResultMapper;
 use Equidna\StagHerd\Data\PlatformPaymentContextData;
@@ -18,6 +19,7 @@ final class StripeConnectPaymentTest extends TestCase
         $service = new StripeCardPaymentService(
             gateway: $gateway,
             mapper: new StripeResultMapper(),
+            platformFees: new PlatformFeeResolver(),
         );
 
         $service->createPayment(

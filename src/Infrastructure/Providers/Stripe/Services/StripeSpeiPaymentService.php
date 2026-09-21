@@ -7,6 +7,7 @@ use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeResultMapper;
+use Equidna\StagHerd\Support\PlatformFeeResolver;
 use Illuminate\Support\Str;
 
 final class StripeSpeiPaymentService
@@ -15,6 +16,7 @@ final class StripeSpeiPaymentService
         private readonly StripeGateway $gateway,
         private readonly StripeResultMapper $mapper,
         private readonly StripeCustomerService $customers,
+        private readonly PlatformFeeResolver $platformFees,
     ) {
         //
     }
@@ -141,8 +143,9 @@ final class StripeSpeiPaymentService
     ): array {
         $context = $request->platformContext;
         $destination = $context->stripeDestinationAccount();
+        $platformFeeAmount = $this->platformFees->resolve('stripe', $request);
 
-        if ($context->platformFeeAmount !== null && $context->platformFeeAmount > 0) {
+        if ($platformFeeAmount !== null) {
             if ($destination === null || trim($destination) === '') {
                 throw InvalidPaymentPayloadException::invalidField(
                     'platform_context.seller_reference',
@@ -150,7 +153,7 @@ final class StripeSpeiPaymentService
                 );
             }
 
-            $payload['application_fee_amount'] = $context->platformFeeAmount;
+            $payload['application_fee_amount'] = $platformFeeAmount;
         }
 
         if ($destination !== null && trim($destination) !== '') {

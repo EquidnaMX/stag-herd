@@ -43,6 +43,7 @@ if (config('stag-herd.payments.routes.enabled', true)) {
 
                     if (config('stag-herd.providers.paypal.routes.onboarding_referral.enabled', false)) {
                         Route::post('/onboarding/referral', 'createPartnerReferral')->name('onboarding.referral');
+                        Route::post('/onboarding/complete', 'completePartnerReferral')->name('onboarding.complete');
                     }
                 });
             }

@@ -15,8 +15,9 @@ class PayPalOnboardingReferralRouteEnabledTest extends TestCase
         $app['config']->set('stag-herd.providers.paypal.routes.onboarding_referral.enabled', true);
     }
 
-    public function test_paypal_onboarding_referral_route_is_present_when_paypal_and_route_flag_are_enabled(): void
+    public function test_paypal_onboarding_routes_are_present_when_paypal_and_route_flag_are_enabled(): void
     {
         $this->assertTrue(Route::has('stag-herd.payments.paypal.onboarding.referral'));
+        $this->assertTrue(Route::has('stag-herd.payments.paypal.onboarding.complete'));
     }
 }

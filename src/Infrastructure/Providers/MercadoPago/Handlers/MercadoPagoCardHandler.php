@@ -17,6 +17,7 @@ use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoResultMapper;
 use Equidna\StagHerd\Support\MoneyFormatter;
+use Equidna\StagHerd\Support\PlatformFeeResolver;
 use Illuminate\Support\Str;
 
 final class MercadoPagoCardHandler implements PaymentMethodHandler, ExtractsPaymentMethodFromPayment
@@ -24,6 +25,7 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler, ExtractsPaym
     public function __construct(
         private readonly MercadoPagoGateway $gateway,
         private readonly MercadoPagoResultMapper $mapper,
+        private readonly PlatformFeeResolver $platformFees,
     ) {
         //
     }
@@ -264,8 +266,9 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler, ExtractsPaym
         PaymentRequestData $request,
     ): array {
         $context = $request->mercadoPagoContext();
+        $platformFeeAmount = $this->platformFees->resolve('mercado_pago', $request);
 
-        if ($request->platformContext->platformFeeAmount !== null && $request->platformContext->platformFeeAmount > 0) {
+        if ($platformFeeAmount !== null) {
             if (!$context->sellerAccessToken) {
                 throw InvalidPaymentPayloadException::invalidField(
                     'platform_context.provider_metadata.mercado_pago.seller_access_token',
@@ -273,7 +276,7 @@ final class MercadoPagoCardHandler implements PaymentMethodHandler, ExtractsPaym
                 );
             }
 
-            $payload['application_fee'] = (float) MoneyFormatter::toDecimal($request->platformContext->platformFeeAmount);
+            $payload['application_fee'] = (float) MoneyFormatter::toDecimal($platformFeeAmount);
         }
 
         if ($context->sellerReference !== null && trim($context->sellerReference) !== '') {

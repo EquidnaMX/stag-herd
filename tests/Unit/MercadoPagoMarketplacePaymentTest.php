@@ -5,6 +5,7 @@ namespace Equidna\StagHerd\Tests\Unit;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers\MercadoPagoCheckoutProHandler;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\Handlers\MercadoPagoCardHandler;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoResultMapper;
+use Equidna\StagHerd\Support\PlatformFeeResolver;
 use Equidna\StagHerd\Tests\Fakes\Gateways\RecordingMercadoPagoMarketplaceGateway;
 use Equidna\StagHerd\Data\PlatformPaymentContextData;
 use Equidna\StagHerd\Data\PaymentRequestData;
@@ -19,6 +20,7 @@ final class MercadoPagoMarketplacePaymentTest extends TestCase
         $handler = new MercadoPagoCheckoutProHandler(
             gateway: $gateway,
             mapper: new MercadoPagoResultMapper(),
+            platformFees: new PlatformFeeResolver(),
         );
 
         $handler->createPayment(new PaymentRequestData(
@@ -51,6 +53,7 @@ final class MercadoPagoMarketplacePaymentTest extends TestCase
         $handler = new MercadoPagoCardHandler(
             gateway: $gateway,
             mapper: new MercadoPagoResultMapper(),
+            platformFees: new PlatformFeeResolver(),
         );
 
         $handler->createPayment(new PaymentRequestData(

@@ -19,6 +19,7 @@ use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalResultMapper;
 use Equidna\StagHerd\Support\MoneyFormatter;
+use Equidna\StagHerd\Support\PlatformFeeResolver;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
@@ -28,6 +29,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
         private readonly PayPalGateway $gateway,
         private readonly PayPalResultMapper $mapper,
         private readonly ManagesPaymentMethods $paymentMethods,
+        private readonly PlatformFeeResolver $platformFees,
     ) {
         //
     }
@@ -535,7 +537,9 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
      */
     private function applyPlatformFeeAmount(array $purchaseUnits, PaymentRequestData $request): array
     {
-        if ($request->platformContext->platformFeeAmount === null || $request->platformContext->platformFeeAmount <= 0) {
+        $platformFeeAmount = $this->platformFees->resolve('paypal', $request);
+
+        if ($platformFeeAmount === null) {
             return $purchaseUnits;
         }
 
@@ -552,7 +556,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
                     [
                         'amount' => [
                             'currency_code' => strtoupper($request->currency),
-                            'value' => MoneyFormatter::toDecimalString($request->platformContext->platformFeeAmount),
+                            'value' => MoneyFormatter::toDecimalString($platformFeeAmount),
                         ],
                     ],
                 ],

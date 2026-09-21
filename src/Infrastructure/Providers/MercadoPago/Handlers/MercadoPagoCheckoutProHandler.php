@@ -14,12 +14,14 @@ use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoResultMapper;
 use Equidna\StagHerd\Support\MoneyFormatter;
+use Equidna\StagHerd\Support\PlatformFeeResolver;
 
 final class MercadoPagoCheckoutProHandler implements PaymentMethodHandler
 {
     public function __construct(
         private readonly MercadoPagoGateway $gateway,
         private readonly MercadoPagoResultMapper $mapper,
+        private readonly PlatformFeeResolver $platformFees,
     ) {
         //
     }
@@ -179,8 +181,9 @@ final class MercadoPagoCheckoutProHandler implements PaymentMethodHandler
         PaymentRequestData $request,
     ): array {
         $context = $request->mercadoPagoContext();
+        $platformFeeAmount = $this->platformFees->resolve('mercado_pago', $request);
 
-        if ($request->platformContext->platformFeeAmount !== null && $request->platformContext->platformFeeAmount > 0) {
+        if ($platformFeeAmount !== null) {
             if (!$context->sellerAccessToken) {
                 throw InvalidPaymentPayloadException::invalidField(
                     'platform_context.provider_metadata.mercado_pago.seller_access_token',
@@ -188,7 +191,7 @@ final class MercadoPagoCheckoutProHandler implements PaymentMethodHandler
                 );
             }
 
-            $payload['marketplace_fee'] = (float) MoneyFormatter::toDecimal($request->platformContext->platformFeeAmount);
+            $payload['marketplace_fee'] = (float) MoneyFormatter::toDecimal($platformFeeAmount);
         }
 
         if ($context->sellerReference !== null && trim($context->sellerReference) !== '') {
