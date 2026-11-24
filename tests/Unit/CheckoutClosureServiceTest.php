@@ -117,6 +117,16 @@ final class CheckoutClosureServiceTest extends TestCase
         self::assertFalse($this->service($gateway, 'mercado_pago')->close(new CheckoutClosureData('mercado_pago', 'pref_1', 'purchase', 'tenant-method'))->closed);
     }
 
+    public function test_mercado_pago_closes_reusable_preference_without_refunding_previously_settled_purchase(): void
+    {
+        $gateway = Mockery::mock(MercadoPagoGateway::class, ClosesMercadoPagoPreference::class);
+        $gateway->shouldReceive('getPreference')->twice()->andReturn(['id' => 'pref_1', 'external_reference' => 'purchase'], ['expires' => true, 'expiration_date_to' => '2020-01-01T00:00:00Z']);
+        $gateway->shouldReceive('updatePreference')->once()->andReturn([]);
+        $gateway->shouldReceive('searchPayments')->once()->andReturn(['results' => [['id' => 123, 'external_reference' => 'purchase']], 'paging' => ['total' => 1]]);
+        $gateway->shouldReceive('getPayment')->once()->andReturn(['id' => 123, 'external_reference' => 'purchase', 'status' => 'approved']);
+        self::assertTrue($this->service($gateway, 'mercado_pago')->close(new CheckoutClosureData('mercado_pago', 'pref_1', 'purchase', 'tenant-method', settledPaymentId: '123'))->closed);
+    }
+
     public function test_mercado_pago_checks_every_page_and_fails_closed_on_incomplete_search(): void
     {
         $gateway = Mockery::mock(MercadoPagoGateway::class, ClosesMercadoPagoPreference::class);

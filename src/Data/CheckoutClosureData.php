@@ -11,5 +11,6 @@ final readonly class CheckoutClosureData
         public string $externalReference,
         public string $credentialContext = 'default',
         public bool $consumerCaptureBlocked = false,
+        public ?string $settledPaymentId = null,
     ) {}
 }

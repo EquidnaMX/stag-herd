@@ -16,7 +16,10 @@ deletes provider movements. No HTTP route is added.
 - Mercado Pago Checkout Pro: verify the preference's external reference, expire
   and re-read it, paginate associated payments and re-read each before requesting
   cancellation of pending/in-process/authorized payments. Approved or uncertain
-  payments require reconciliation; no refund is attempted. Expiration alone is
+  payments require reconciliation; no refund is attempted. A consumer may supply
+  `settledPaymentId` only for an already completed/refunded local purchase: that
+  exact previously settled payment is preserved while closing its reusable
+  preference. Any other approved payment still blocks closure. Expiration alone is
   never sufficient proof that existing payments are closed.
 
 Network failures propagate. Remote effects cannot be rolled back by a database

@@ -123,7 +123,9 @@ final readonly class CheckoutClosureService
                 if (in_array($payment['status'] ?? null, ['pending', 'in_process', 'authorized'], true)) {
                     $payment = $this->mercadoPago->cancelPayment((string) $payment['id']);
                 }
-                if (!in_array($payment['status'] ?? null, ['cancelled', 'rejected', 'refunded', 'charged_back'], true)) {
+                $knownSettled = ($payment['status'] ?? null) === 'approved'
+                    && $request->settledPaymentId !== null && (string) $payment['id'] === $request->settledPaymentId;
+                if (!$knownSettled && !in_array($payment['status'] ?? null, ['cancelled', 'rejected', 'refunded', 'charged_back'], true)) {
                     return new CheckoutClosureResult(false, 'payment_not_closed');
                 }
             }
