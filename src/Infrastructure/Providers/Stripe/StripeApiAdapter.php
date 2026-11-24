@@ -3,6 +3,7 @@
 namespace Equidna\StagHerd\Infrastructure\Providers\Stripe;
 
 use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
+use Equidna\StagHerd\Contracts\Gateways\ExpiresStripeCheckout;
 use Equidna\StagHerd\Exceptions\ProviderAuthenticationException;
 use Equidna\StagHerd\Exceptions\ProviderCommunicationException;
 use Equidna\StagHerd\Exceptions\ProviderNotConfiguredException;
@@ -12,11 +13,16 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Throwable;
 
-final class StripeApiAdapter implements StripeGateway
+final class StripeApiAdapter implements StripeGateway, ExpiresStripeCheckout
 {
     private const PROVIDER = 'stripe';
 
     private const API_VERSION = '2026-02-25.clover';
+
+    public function expireCheckoutSession(string $checkoutSessionId): array
+    {
+        return $this->send('post', "/v1/checkout/sessions/{$checkoutSessionId}/expire", idempotencyKey: 'stag-herd-expire-' . $checkoutSessionId);
+    }
 
     public function createCheckoutSession(array $payload, ?string $idempotencyKey = null): array
     {

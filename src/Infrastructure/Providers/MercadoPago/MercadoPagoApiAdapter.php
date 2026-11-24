@@ -3,6 +3,7 @@
 namespace Equidna\StagHerd\Infrastructure\Providers\MercadoPago;
 
 use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
+use Equidna\StagHerd\Contracts\Gateways\ClosesMercadoPagoPreference;
 use Equidna\StagHerd\Exceptions\ProviderAuthenticationException;
 use Equidna\StagHerd\Exceptions\ProviderCommunicationException;
 use Equidna\StagHerd\Exceptions\ProviderNotConfiguredException;
@@ -13,8 +14,18 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Throwable;
 
-class MercadoPagoApiAdapter implements MercadoPagoGateway
+class MercadoPagoApiAdapter implements MercadoPagoGateway, ClosesMercadoPagoPreference
 {
+    public function getPreference(string $preferenceId): array
+    {
+        return $this->send('get', "/checkout/preferences/{$preferenceId}");
+    }
+
+    public function updatePreference(string $preferenceId, array $payload): array
+    {
+        return $this->send('put', "/checkout/preferences/{$preferenceId}", $payload);
+    }
+
     private const PROVIDER = 'mercado_pago';
 
     public function createPayment(
