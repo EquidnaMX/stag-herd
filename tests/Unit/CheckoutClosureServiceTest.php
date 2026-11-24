@@ -75,6 +75,14 @@ final class CheckoutClosureServiceTest extends TestCase
         self::assertFalse($this->service($gateway, 'paypal')->close(new CheckoutClosureData('paypal', 'ORDER1', 'purchase', 'tenant-method', true))->closed);
     }
 
+    public function test_paypal_automatic_capture_cannot_be_fenced_by_local_consumer(): void
+    {
+        $gateway = Mockery::mock(PayPalGateway::class);
+        $gateway->shouldReceive('getOrder')->once()->andReturn(['id' => 'ORDER1', 'intent' => 'CAPTURE', 'status' => 'APPROVED',
+            'processing_instruction' => 'ORDER_COMPLETE_ON_PAYMENT_APPROVAL', 'purchase_units' => [['reference_id' => 'purchase']]]);
+        self::assertFalse($this->service($gateway, 'paypal')->close(new CheckoutClosureData('paypal', 'ORDER1', 'purchase', 'tenant-method', true))->closed);
+    }
+
     public function test_mercado_pago_expires_preference_and_cancels_existing_pending_payment(): void
     {
         $gateway = Mockery::mock(MercadoPagoGateway::class, ClosesMercadoPagoPreference::class);

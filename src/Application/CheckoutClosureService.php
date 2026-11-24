@@ -67,6 +67,9 @@ final readonly class CheckoutClosureService
         if (!empty($units[0]['payments']['captures']) || !empty($units[0]['payments']['authorizations'])) {
             return new CheckoutClosureResult(false, 'payment_not_closed');
         }
+        if (($order['processing_instruction'] ?? 'NO_INSTRUCTION') !== 'NO_INSTRUCTION') {
+            return new CheckoutClosureResult(false, 'provider_can_capture_automatically');
+        }
         if (($order['status'] ?? null) === 'VOIDED') {
             return new CheckoutClosureResult(true, 'voided');
         }

@@ -8,7 +8,7 @@ deletes provider movements. No HTTP route is added.
 - Stripe: verify purchase attribution and payment mode, expire an open session,
   accept only `expired` + `unpaid`. Complete asynchronous sessions remain blocked.
 - PayPal Orders v2: verify a single CAPTURE purchase unit and no captures or
-  authorizations. There is no order cancellation endpoint. An unpaid order can
+  authorizations or automatic completion instructions. There is no order cancellation endpoint. An unpaid order can
   be closed **locally** only if `consumerCaptureBlocked=true`: the consumer must
   serialize every capture path with the purchase lock and durably cancel/delete
   that purchase before releasing the lock. The result explicitly reports
