@@ -7,6 +7,7 @@ use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeResultMapper;
+use Equidna\StagHerd\Support\PlatformFeeResolver;
 use Illuminate\Support\Str;
 
 final class StripeSpeiPaymentService
@@ -15,6 +16,7 @@ final class StripeSpeiPaymentService
         private readonly StripeGateway $gateway,
         private readonly StripeResultMapper $mapper,
         private readonly StripeCustomerService $customers,
+        private readonly PlatformFeeResolver $platformFees,
     ) {
         //
     }
@@ -107,7 +109,7 @@ final class StripeSpeiPaymentService
                     'payment_method_family' => 'spei',
                     'bank_transfer_type' => 'mx_bank_transfer',
                 ],
-                fn ($value) => $value !== null && $value !== ''
+                fn($value) => $value !== null && $value !== ''
             ),
         ];
 
@@ -121,12 +123,53 @@ final class StripeSpeiPaymentService
             );
         }
 
+        $payload = $this->applyPlatformContext($payload, $request);
+
         return array_filter(
             $payload,
-            fn ($value) => $value !== null
+            fn($value) => $value !== null
                 && $value !== ''
                 && $value !== [],
         );
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function applyPlatformContext(
+        array $payload,
+        PaymentRequestData $request,
+    ): array {
+        $context = $request->platformContext;
+        $destination = $context->stripeDestinationAccount();
+        $platformFeeAmount = $this->platformFees->resolve('stripe', $request);
+
+        if ($platformFeeAmount !== null) {
+            if ($destination === null || trim($destination) === '') {
+                throw InvalidPaymentPayloadException::invalidField(
+                    'platform_context.seller_reference',
+                    'Stripe Connect destination charges require seller_reference when platform_fee_amount is present.'
+                );
+            }
+
+            $payload['application_fee_amount'] = $platformFeeAmount;
+        }
+
+        if ($destination !== null && trim($destination) !== '') {
+            $payload['transfer_data'] = array_replace(
+                is_array($payload['transfer_data'] ?? null) ? $payload['transfer_data'] : [],
+                ['destination' => $destination],
+            );
+        }
+
+        $onBehalfOf = $context->stripeOnBehalfOfAccount();
+
+        if ($onBehalfOf !== null && trim($onBehalfOf) !== '') {
+            $payload['on_behalf_of'] = $onBehalfOf;
+        }
+
+        return $payload;
     }
 
     private function resolveIdempotencyKey(

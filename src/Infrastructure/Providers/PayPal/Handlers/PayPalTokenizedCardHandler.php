@@ -19,6 +19,7 @@ use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Infrastructure\Providers\PayPal\PayPalResultMapper;
 use Equidna\StagHerd\Support\MoneyFormatter;
+use Equidna\StagHerd\Support\PlatformFeeResolver;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
@@ -28,6 +29,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
         private readonly PayPalGateway $gateway,
         private readonly PayPalResultMapper $mapper,
         private readonly ManagesPaymentMethods $paymentMethods,
+        private readonly PlatformFeeResolver $platformFees,
     ) {
         //
     }
@@ -52,6 +54,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
                 reference: $request->externalReference,
                 metadata: $request->metadata,
             ),
+            context: $request->paypalContext(),
         );
 
         return $this->mapper->mapCreatedOrderToResult(
@@ -172,7 +175,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             ownerReference: $ownerReference,
             providerCustomerId: $customerId,
             providerPaymentMethodId: $paymentTokenId,
-            credentialContext: $request->credentialContext,
+            credentialContext: $request->platformContext->credentialContext,
             type: 'tokenized_card',
             brand: $this->firstString([
                 data_get($card, 'brand'),
@@ -201,6 +204,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             orderId: $request->providerOrderId,
             idempotencyKey: $request->metadata['idempotency_key']
                 ?? 'stag-herd-paypal-capture-' . $request->providerOrderId,
+            context: $request->paypalContext(),
         );
 
         return $this->mapper->mapCapturedOrderToResult(
@@ -285,7 +289,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             new PaymentMethodLookupData(
                 provider: 'paypal',
                 ownerReference: $ownerReference,
-                credentialContext: $request->credentialContext,
+                credentialContext: $request->platformContext->credentialContext,
             )
         );
 
@@ -343,6 +347,18 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             $payload = $paypal['payload'];
             $payload['payment_source'] = $paymentSource;
 
+            if (isset($payload['purchase_units']) && is_array($payload['purchase_units'])) {
+                $payload['purchase_units'] = $this->applyPayeeMerchantId(
+                    purchaseUnits: $payload['purchase_units'],
+                    sellerMerchantId: $request->platformContext->paypalSellerMerchantId()
+                );
+
+                $payload['purchase_units'] = $this->applyPlatformFeeAmount(
+                    purchaseUnits: $payload['purchase_units'],
+                    request: $request,
+                );
+            }
+
             return $payload;
         }
 
@@ -356,8 +372,18 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
                     'currency_code' => strtoupper($request->currency),
                     'value' => MoneyFormatter::toDecimal($request->amount),
                 ],
-            ], fn ($value) => $value !== null && $value !== ''),
+            ], fn($value) => $value !== null && $value !== ''),
         ];
+
+        $purchaseUnits = $this->applyPayeeMerchantId(
+            purchaseUnits: $purchaseUnits,
+            sellerMerchantId: $request->platformContext->paypalSellerMerchantId(),
+        );
+
+        $purchaseUnits = $this->applyPlatformFeeAmount(
+            purchaseUnits: $purchaseUnits,
+            request: $request,
+        );
 
         $applicationContext = array_filter([
             'return_url' => $paypal['return_url'] ?? $request->returnUrl,
@@ -366,7 +392,7 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
             'landing_page' => $paypal['landing_page'] ?? 'LOGIN',
             'user_action' => $paypal['user_action'] ?? 'PAY_NOW',
             'shipping_preference' => $paypal['shipping_preference'] ?? 'NO_SHIPPING',
-        ], fn ($value) => $value !== null && $value !== '');
+        ], fn($value) => $value !== null && $value !== '');
 
         $payload = [
             'intent' => strtoupper((string) ($paypal['intent'] ?? 'CAPTURE')),
@@ -474,5 +500,69 @@ final class PayPalTokenizedCardHandler implements PaymentMethodHandler, Extracts
         }
 
         return [];
+    }
+
+    /**
+     * @param array<int, mixed> $purchaseUnits
+     * @return array<int, mixed>
+     */
+    private function applyPayeeMerchantId(array $purchaseUnits, ?string $sellerMerchantId): array
+    {
+        if ($sellerMerchantId === null || trim($sellerMerchantId) === '') {
+            return $purchaseUnits;
+        }
+
+        return array_map(
+            function (mixed $purchaseUnit) use ($sellerMerchantId): mixed {
+                if (!is_array($purchaseUnit)) {
+                    return $purchaseUnit;
+                }
+
+                $purchaseUnit['payee'] = array_replace(
+                    is_array($purchaseUnit['payee'] ?? null) ? $purchaseUnit['payee'] : [],
+                    [
+                        'merchant_id' => trim($sellerMerchantId),
+                    ],
+                );
+
+                return $purchaseUnit;
+            },
+            $purchaseUnits,
+        );
+    }
+
+    /**
+     * @param array<int, mixed> $purchaseUnits
+     * @return array<int, mixed>
+     */
+    private function applyPlatformFeeAmount(array $purchaseUnits, PaymentRequestData $request): array
+    {
+        $platformFeeAmount = $this->platformFees->resolve('paypal', $request);
+
+        if ($platformFeeAmount === null) {
+            return $purchaseUnits;
+        }
+
+        if (!isset($purchaseUnits[0]) || !is_array($purchaseUnits[0])) {
+            return $purchaseUnits;
+        }
+
+        $purchaseUnits[0]['payment_instruction'] = array_replace(
+            is_array($purchaseUnits[0]['payment_instruction'] ?? null)
+                ? $purchaseUnits[0]['payment_instruction']
+                : [],
+            [
+                'platform_fees' => [
+                    [
+                        'amount' => [
+                            'currency_code' => strtoupper($request->currency),
+                            'value' => MoneyFormatter::toDecimalString($platformFeeAmount),
+                        ],
+                    ],
+                ],
+            ],
+        );
+
+        return $purchaseUnits;
     }
 }

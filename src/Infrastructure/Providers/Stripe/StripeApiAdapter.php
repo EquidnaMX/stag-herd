@@ -10,6 +10,7 @@ use Equidna\StagHerd\Exceptions\ProviderNotConfiguredException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -269,6 +270,16 @@ final class StripeApiAdapter implements StripeGateway, ExpiresStripeCheckout
             }
 
             if ($response->failed()) {
+                Log::error('Payment provider request failed', [
+                    'provider' => self::PROVIDER,
+                    'method' => $method,
+                    'endpoint' => $endpoint,
+                    'status' => $response->status(),
+                    'payload' => $payload,
+                    'response_json' => $response->json(),
+                    'response_body' => $response->body(),
+                ]);
+
                 throw ProviderCommunicationException::requestFailed(
                     self::PROVIDER,
                     $response->status(),

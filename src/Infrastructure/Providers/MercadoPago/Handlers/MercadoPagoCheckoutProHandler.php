@@ -14,12 +14,14 @@ use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoResultMapper;
 use Equidna\StagHerd\Support\MoneyFormatter;
+use Equidna\StagHerd\Support\PlatformFeeResolver;
 
 final class MercadoPagoCheckoutProHandler implements PaymentMethodHandler
 {
     public function __construct(
         private readonly MercadoPagoGateway $gateway,
         private readonly MercadoPagoResultMapper $mapper,
+        private readonly PlatformFeeResolver $platformFees,
     ) {
         //
     }
@@ -34,7 +36,8 @@ final class MercadoPagoCheckoutProHandler implements PaymentMethodHandler
         $this->validateCreatePaymentRequest($request);
 
         $response = $this->gateway->createPreference(
-            $this->buildCreatePreferencePayload($request),
+            payload: $this->buildCreatePreferencePayload($request),
+            context: $request->mercadoPagoContext(),
         );
 
         return $this->mapper->mapPreferenceResponseToResult($request, $response);
@@ -100,7 +103,7 @@ final class MercadoPagoCheckoutProHandler implements PaymentMethodHandler
         $mercadoPago = $request->metadata['mercado_pago'] ?? [];
 
         if (isset($mercadoPago['payload']) && is_array($mercadoPago['payload'])) {
-            return $mercadoPago['payload'];
+            return $this->applyMarketplaceContext($mercadoPago['payload'], $request);
         }
 
         $payload = [
@@ -161,10 +164,44 @@ final class MercadoPagoCheckoutProHandler implements PaymentMethodHandler
             }
         }
 
+        $payload = $this->applyMarketplaceContext($payload, $request);
+
         return array_filter(
             $payload,
-            fn ($value) => $value !== null && $value !== [] && $value !== ''
+            fn($value) => $value !== null && $value !== [] && $value !== ''
         );
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function applyMarketplaceContext(
+        array $payload,
+        PaymentRequestData $request,
+    ): array {
+        $context = $request->mercadoPagoContext();
+        $platformFeeAmount = $this->platformFees->resolve('mercado_pago', $request);
+
+        if ($platformFeeAmount !== null) {
+            if (!$context->sellerAccessToken) {
+                throw InvalidPaymentPayloadException::invalidField(
+                    'platform_context.provider_metadata.mercado_pago.seller_access_token',
+                    'Mercado Pago marketplace Checkout Pro requires the seller OAuth access token when platform_fee_amount is present.'
+                );
+            }
+
+            $payload['marketplace_fee'] = (float) MoneyFormatter::toDecimal($platformFeeAmount);
+        }
+
+        if ($context->sellerReference !== null && trim($context->sellerReference) !== '') {
+            $payload['metadata'] = array_replace(
+                is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                ['seller_reference' => trim($context->sellerReference)],
+            );
+        }
+
+        return $payload;
     }
 
     private function lookupByProviderPaymentId(PaymentLookupData $request): PaymentResultData

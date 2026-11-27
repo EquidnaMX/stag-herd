@@ -2,6 +2,8 @@
 
 namespace Equidna\StagHerd\Contracts\Gateways;
 
+use Equidna\StagHerd\Data\MercadoPagoRequestContextData;
+
 interface MercadoPagoGateway
 {
     /**
@@ -12,11 +14,10 @@ interface MercadoPagoGateway
         array $payload,
         ?string $idempotencyKey = null,
         ?string $deviceId = null,
+        ?MercadoPagoRequestContextData $context = null,
     ): array;
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function getPayment(string $providerPaymentId): array;
 
     /**
@@ -25,14 +26,10 @@ interface MercadoPagoGateway
      */
     public function searchPayments(array $filters = []): array;
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function cancelPayment(string $providerPaymentId): array;
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function refundPayment(
         string $providerPaymentId,
         ?int $amount = null,
@@ -43,7 +40,10 @@ interface MercadoPagoGateway
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    public function createPreference(array $payload): array;
+    public function createPreference(
+        array $payload,
+        ?MercadoPagoRequestContextData $context = null,
+    ): array;
 
     /**
      * @param array<string, mixed> $payload
@@ -54,9 +54,7 @@ interface MercadoPagoGateway
         ?string $idempotencyKey = null,
     ): array;
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function getPreapprovalPlan(string $planId): array;
 
     /**
@@ -68,9 +66,7 @@ interface MercadoPagoGateway
         ?string $idempotencyKey = null,
     ): array;
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function getPreapproval(string $subscriptionId): array;
 
     /**
@@ -83,13 +79,9 @@ interface MercadoPagoGateway
         ?string $idempotencyKey = null,
     ): array;
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
+    /** @return array<int, array<string, mixed>> */
     public function getCustomerCards(string $customerId): array;
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function deleteCustomerCard(string $customerId, string $cardId): array;
 }

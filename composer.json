@@ -42,7 +42,6 @@
     "test": "vendor/bin/phpunit",
     "phpstan": "vendor/bin/phpstan analyse"
   },
-  "minimum-stability": "dev",
   "prefer-stable": true,
   "config": {
     "platform": {

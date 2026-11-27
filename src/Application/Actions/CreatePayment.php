@@ -34,6 +34,8 @@ final readonly class CreatePayment
             returnUrl: $request->returnUrl,
             cancelUrl: $request->cancelUrl,
             metadata: $request->metadata,
+            credentialContext: $request->credentialContext,
+            platformContext: $request->platformContext,
         );
 
         $provider = $this->providers->get($request->provider);

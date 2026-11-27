@@ -12,6 +12,7 @@ use Equidna\StagHerd\Data\RefundRequestData;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Infrastructure\Providers\Stripe\StripeResultMapper;
+use Equidna\StagHerd\Support\PlatformFeeResolver;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -20,6 +21,7 @@ final class StripeCardPaymentService
     public function __construct(
         private readonly StripeGateway $gateway,
         private readonly StripeResultMapper $mapper,
+        private readonly PlatformFeeResolver $platformFees,
     ) {
         //
     }
@@ -81,7 +83,7 @@ final class StripeCardPaymentService
                     ?? $request->metadata['return_url']
                     ?? null,
             ],
-            fn ($value) => $value !== null && $value !== ''
+            fn($value) => $value !== null && $value !== ''
         );
 
         if ($paymentMethodId) {
@@ -166,7 +168,7 @@ final class StripeCardPaymentService
                 'amount' => $request->amount,
                 'reason' => $this->normalizeRefundReason($request->reason),
             ],
-            fn ($value) => $value !== null && $value !== ''
+            fn($value) => $value !== null && $value !== ''
         );
 
         $response = $this->gateway->createRefund(
@@ -211,7 +213,7 @@ final class StripeCardPaymentService
                     'source' => $request->metadata['source']
                         ?? ($options['default_source'] ?? null),
                 ],
-                fn ($value) => $value !== null && $value !== ''
+                fn($value) => $value !== null && $value !== ''
             ),
         ];
 
@@ -282,12 +284,53 @@ final class StripeCardPaymentService
             );
         }
 
+        $payload = $this->applyPlatformContext($payload, $request);
+
         return array_filter(
             $payload,
-            fn ($value) => $value !== null
+            fn($value) => $value !== null
                 && $value !== []
                 && $value !== '',
         );
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function applyPlatformContext(
+        array $payload,
+        PaymentRequestData $request,
+    ): array {
+        $context = $request->platformContext;
+        $destination = $context->stripeDestinationAccount();
+        $platformFeeAmount = $this->platformFees->resolve('stripe', $request);
+
+        if ($platformFeeAmount !== null) {
+            if ($destination === null || trim($destination) === '') {
+                throw InvalidPaymentPayloadException::invalidField(
+                    'platform_context.seller_reference',
+                    'Stripe Connect destination charges require seller_reference when platform_fee_amount is present.'
+                );
+            }
+
+            $payload['application_fee_amount'] = $platformFeeAmount;
+        }
+
+        if ($destination !== null && trim($destination) !== '') {
+            $payload['transfer_data'] = array_replace(
+                is_array($payload['transfer_data'] ?? null) ? $payload['transfer_data'] : [],
+                ['destination' => $destination],
+            );
+        }
+
+        $onBehalfOf = $context->stripeOnBehalfOfAccount();
+
+        if ($onBehalfOf !== null && trim($onBehalfOf) !== '') {
+            $payload['on_behalf_of'] = $onBehalfOf;
+        }
+
+        return $payload;
     }
 
     private function lookupByPaymentIntentId(

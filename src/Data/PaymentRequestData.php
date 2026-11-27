@@ -6,7 +6,11 @@ use Equidna\StagHerd\Support\MoneyFormatter;
 
 final readonly class PaymentRequestData
 {
-    /** @param array<string, mixed> $metadata */
+    public PlatformPaymentContextData $platformContext;
+
+    /**
+     * @param array<string, mixed> $metadata
+     */
     public function __construct(
         public int $amount,
         public string $currency,
@@ -21,11 +25,16 @@ final readonly class PaymentRequestData
         public ?string $cancelUrl = null,
         public array $metadata = [],
         public string $credentialContext = 'default',
+        ?PlatformPaymentContextData $platformContext = null,
     ) {
-        //
+        $this->platformContext = $platformContext ?? new PlatformPaymentContextData(
+            credentialContext: $this->credentialContext,
+        );
     }
 
-    /** @param array<string, mixed> $metadata */
+    /**
+     * @param array<string, mixed> $metadata
+     */
     public static function fromDecimalAmount(
         int|float|string $amount,
         string $currency,
@@ -40,6 +49,7 @@ final readonly class PaymentRequestData
         ?string $cancelUrl = null,
         array $metadata = [],
         string $credentialContext = 'default',
+        ?PlatformPaymentContextData $platformContext = null,
     ): self {
         return new self(
             amount: MoneyFormatter::fromDecimal($amount),
@@ -55,12 +65,19 @@ final readonly class PaymentRequestData
             cancelUrl: $cancelUrl,
             metadata: $metadata,
             credentialContext: $credentialContext,
+            platformContext: $platformContext ?? new PlatformPaymentContextData(
+                credentialContext: $credentialContext,
+            ),
         );
     }
 
     /** @param array<string, mixed> $data */
     public static function fromArray(array $data): self
     {
+        $platformContext = isset($data['platform_context']) && is_array($data['platform_context'])
+            ? PlatformPaymentContextData::fromArray($data['platform_context'])
+            : new PlatformPaymentContextData();
+
         return new self(
             amount: (int) $data['amount'],
             currency: strtoupper((string) $data['currency']),
@@ -88,8 +105,19 @@ final readonly class PaymentRequestData
             metadata: isset($data['metadata']) && is_array($data['metadata'])
                 ? $data['metadata']
                 : [],
-            credentialContext: (string) ($data['credential_context'] ?? $data['credentialContext'] ?? 'default'),
+            credentialContext: (string) ($data['credential_context'] ?? $data['credentialContext'] ?? $platformContext->credentialContext),
+            platformContext: $platformContext,
         );
+    }
+
+    public function paypalContext(): PayPalRequestContextData
+    {
+        return PayPalRequestContextData::fromPlatformContext($this->platformContext);
+    }
+
+    public function mercadoPagoContext(): MercadoPagoRequestContextData
+    {
+        return MercadoPagoRequestContextData::fromPlatformContext($this->platformContext);
     }
 
     public function withProvider(string $provider): self
@@ -108,6 +136,7 @@ final readonly class PaymentRequestData
             cancelUrl: $this->cancelUrl,
             metadata: $this->metadata,
             credentialContext: $this->credentialContext,
+            platformContext: $this->platformContext,
         );
     }
 
@@ -128,6 +157,7 @@ final readonly class PaymentRequestData
             'cancel_url' => $this->cancelUrl,
             'metadata' => $this->metadata,
             'credential_context' => $this->credentialContext,
+            'platform_context' => $this->platformContext->toArray(),
         ];
     }
 }

@@ -46,6 +46,7 @@ return [
         'payment_display' => null,
         'webhooks' => null,
         'payment_methods' => null,
+        'paypal_sellers' => null,
     ],
 
     'payments' => [
@@ -58,7 +59,7 @@ return [
 
     'payment_methods' => [
         'routes' => [
-            'enabled' => true,
+            'enabled' => false,
             'prefix' => 'stag-herd/payments/payment-methods',
             'middleware' => ['api'],
         ],
@@ -131,6 +132,10 @@ return [
                 'webhook_secret' => env('MERCADO_PAGO_WEBHOOK_SECRET'),
             ],
 
+            'platform_fee' => [
+                'percentage' => env('STAG_HERD_MERCADO_PAGO_PLATFORM_FEE_PERCENTAGE'),
+            ],
+
             'http' => [
                 'base_uri' => env('MERCADO_PAGO_BASE_URI', 'https://api.mercadopago.com'),
                 'timeout' => 15,
@@ -163,6 +168,14 @@ return [
                 'client_id' => env('VITE_PAYPAL_CLIENT_ID'),
                 'secret' => env('PAYPAL_CLIENT_SECRET', env('PAYPAL_SECRET')),
                 'webhook_id' => env('PAYPAL_WEBHOOK_ID'),
+
+                'environment' => env('PAYPAL_ENVIRONMENT', 'sandbox'),
+                'platform_attribution_id' => env('PAYPAL_PARTNER_ATTRIBUTION_ID'),
+                'partner_merchant_id' => env('PAYPAL_PARTNER_MERCHANT_ID'),
+            ],
+
+            'platform_fee' => [
+                'percentage' => env('STAG_HERD_PAYPAL_PLATFORM_FEE_PERCENTAGE'),
             ],
 
             'http' => [
@@ -172,6 +185,12 @@ return [
 
             'webhooks' => [
                 'parser' => PayPalWebhookParser::class,
+            ],
+
+            'routes' => [
+                'onboarding_referral' => [
+                    'enabled' => false,
+                ],
             ],
         ],
         'stripe' => [
@@ -217,6 +236,10 @@ return [
                 'secret_key' => env('STRIPE_SECRET_KEY'),
                 'public_key' => env('VITE_STRIPE_PUBLIC_KEY'),
                 'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+            ],
+
+            'platform_fee' => [
+                'percentage' => env('STAG_HERD_STRIPE_PLATFORM_FEE_PERCENTAGE'),
             ],
 
             'http' => [

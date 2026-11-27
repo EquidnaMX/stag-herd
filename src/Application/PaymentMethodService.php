@@ -2,28 +2,24 @@
 
 namespace Equidna\StagHerd\Application;
 
-use Equidna\StagHerd\Contracts\Gateways\MercadoPagoGateway;
-use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
-use Equidna\StagHerd\Contracts\Gateways\StripeGateway;
-use Equidna\StagHerd\Contracts\ManagesPaymentMethods;
-use Equidna\StagHerd\Contracts\PaymentMethodRepository;
-use Equidna\StagHerd\Data\PaymentMethodData;
-use Equidna\StagHerd\Data\PaymentMethodDeactivateData;
-use Equidna\StagHerd\Data\PaymentMethodLookupData;
-use Equidna\StagHerd\Data\PaymentMethodRegisterData;
-use Equidna\StagHerd\Data\PaymentMethodSetDefaultData;
-use Equidna\StagHerd\Data\PaymentMethodsListData;
+use Equidna\StagHerd\Support\PaymentMethodGatewaySynchronizerRegistry;
 use Equidna\StagHerd\Exceptions\PaymentMethodNotFoundException;
+use Equidna\StagHerd\Contracts\PaymentMethodRepository;
+use Equidna\StagHerd\Data\PaymentMethodSetDefaultData;
+use Equidna\StagHerd\Data\PaymentMethodDeactivateData;
 use Equidna\StagHerd\Support\CredentialContextManager;
+use Equidna\StagHerd\Contracts\ManagesPaymentMethods;
+use Equidna\StagHerd\Data\PaymentMethodRegisterData;
+use Equidna\StagHerd\Data\PaymentMethodLookupData;
+use Equidna\StagHerd\Data\PaymentMethodsListData;
+use Equidna\StagHerd\Data\PaymentMethodData;
 
 final readonly class PaymentMethodService implements ManagesPaymentMethods
 {
     public function __construct(
         private PaymentMethodRepository $paymentMethods,
         private CredentialContextManager $credentials,
-        private StripeGateway $stripeGateway,
-        private PayPalGateway $payPalGateway,
-        private MercadoPagoGateway $mercadoPagoGateway,
+        private PaymentMethodGatewaySynchronizerRegistry $gatewaySynchronizers,
     ) {
         //
     }
@@ -34,7 +30,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn (): PaymentMethodData => $this->upsertWithinContext($request),
+            fn(): PaymentMethodData => $this->upsertWithinContext($request),
         );
     }
 
@@ -47,8 +43,8 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn (): array => array_map(
-                static fn (array $record): PaymentMethodData => PaymentMethodData::fromArray($record),
+            fn(): array => array_map(
+                static fn(array $record): PaymentMethodData => PaymentMethodData::fromArray($record),
                 $this->paymentMethods->listActiveByOwner(
                     strtolower($request->provider),
                     $request->credentialContext,
@@ -64,7 +60,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn (): PaymentMethodData => $this->markDefaultWithinContext(
+            fn(): PaymentMethodData => $this->markDefaultWithinContext(
                 $request->toLookupData()
             ),
         );
@@ -76,7 +72,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn (): PaymentMethodData => $this->deactivateWithinContext(
+            fn(): PaymentMethodData => $this->deactivateWithinContext(
                 $request->toLookupData()
             ),
         );
@@ -88,7 +84,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
         return $this->credentials->run(
             $request->provider,
             $request->credentialContext,
-            fn (): PaymentMethodData => $this->resolveUsableWithinContext($request),
+            fn(): PaymentMethodData => $this->resolveUsableWithinContext($request),
         );
     }
 
@@ -196,8 +192,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
         $paymentMethod = $this->resolveExistingActiveMethod($request);
 
         $this->syncProviderDefaultPaymentMethod(
-            provider: $paymentMethod->provider,
-            providerCustomerId: $paymentMethod->providerCustomerId,
+            paymentMethod: $paymentMethod,
             providerPaymentMethodId: $paymentMethod->providerPaymentMethodId,
         );
 
@@ -234,8 +229,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
         }
 
         $this->syncProviderDefaultPaymentMethod(
-            provider: $paymentMethod->provider,
-            providerCustomerId: $paymentMethod->providerCustomerId,
+            paymentMethod: $paymentMethod,
             providerPaymentMethodId: $nextDefault?->providerPaymentMethodId,
         );
 
@@ -361,7 +355,7 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
     private function listActiveByOwner(PaymentMethodData $paymentMethod): array
     {
         return array_map(
-            static fn (array $record): PaymentMethodData => PaymentMethodData::fromArray($record),
+            static fn(array $record): PaymentMethodData => PaymentMethodData::fromArray($record),
             $this->paymentMethods->listActiveByOwner(
                 $paymentMethod->provider,
                 $paymentMethod->credentialContext,
@@ -371,39 +365,19 @@ final readonly class PaymentMethodService implements ManagesPaymentMethods
     }
 
     private function syncProviderDefaultPaymentMethod(
-        string $provider,
-        string $providerCustomerId,
+        PaymentMethodData $paymentMethod,
         ?string $providerPaymentMethodId,
     ): void {
-        if ($provider !== 'stripe') {
-            return;
-        }
-
-        $this->stripeGateway->updateCustomer(
-            customerId: $providerCustomerId,
-            payload: [
-                'invoice_settings' => [
-                    'default_payment_method' => $providerPaymentMethodId,
-                ],
-            ],
-        );
+        $this->gatewaySynchronizers
+            ->get($paymentMethod->provider)
+            ?->syncDefaultPaymentMethod($paymentMethod, $providerPaymentMethodId);
     }
 
     private function detachProviderPaymentMethod(
         PaymentMethodData $paymentMethod
     ): void {
-        match ($paymentMethod->provider) {
-            'stripe' => $this->stripeGateway->detachPaymentMethod(
-                $paymentMethod->providerPaymentMethodId,
-            ),
-            'paypal' => $this->payPalGateway->deletePaymentToken(
-                $paymentMethod->providerPaymentMethodId,
-            ),
-            'mercado_pago' => $this->mercadoPagoGateway->deleteCustomerCard(
-                $paymentMethod->providerCustomerId,
-                $paymentMethod->providerPaymentMethodId,
-            ),
-            default => null,
-        };
+        $this->gatewaySynchronizers
+            ->get($paymentMethod->provider)
+            ?->detachPaymentMethod($paymentMethod);
     }
 }

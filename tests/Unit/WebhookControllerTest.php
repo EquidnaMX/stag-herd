@@ -10,6 +10,7 @@ use Equidna\StagHerd\Data\PaymentCancellationData;
 use Equidna\StagHerd\Data\PaymentLookupData;
 use Equidna\StagHerd\Data\PaymentRequestData;
 use Equidna\StagHerd\Data\PaymentResultData;
+use Equidna\StagHerd\Data\PayPalRequestContextData;
 use Equidna\StagHerd\Data\RefundRequestData;
 use Equidna\StagHerd\Data\WebhookPayloadData;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
@@ -140,23 +141,33 @@ final class ControllerSpyPayPalGateway implements \Equidna\StagHerd\Contracts\Ga
         //
     }
 
-    public function createOrder(array $payload, ?string $idempotencyKey = null): array
-    {
+    public function createOrder(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         throw new RuntimeException('Not implemented.');
     }
 
-    public function getOrder(string $orderId): array
-    {
+    public function getOrder(
+        string $orderId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         throw new RuntimeException('Not implemented.');
     }
 
-    public function captureOrder(string $orderId, ?string $idempotencyKey = null): array
-    {
+    public function captureOrder(
+        string $orderId,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         throw new RuntimeException('Not implemented.');
     }
 
-    public function getCapture(string $captureId): array
-    {
+    public function getCapture(
+        string $captureId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         throw new RuntimeException('Not implemented.');
     }
 
@@ -165,27 +176,39 @@ final class ControllerSpyPayPalGateway implements \Equidna\StagHerd\Contracts\Ga
         ?int $amount = null,
         ?string $currency = null,
         ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
     ): array {
         throw new RuntimeException('Not implemented.');
     }
 
-    public function createCatalogProduct(array $payload, ?string $idempotencyKey = null): array
-    {
+    public function createCatalogProduct(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         throw new RuntimeException('Not implemented.');
     }
 
-    public function createPlan(array $payload, ?string $idempotencyKey = null): array
-    {
+    public function createPlan(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         throw new RuntimeException('Not implemented.');
     }
 
-    public function createSubscription(array $payload, ?string $idempotencyKey = null): array
-    {
+    public function createSubscription(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         throw new RuntimeException('Not implemented.');
     }
 
-    public function getSubscription(string $subscriptionId): array
-    {
+    public function getSubscription(
+        string $subscriptionId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         throw new RuntimeException('Not implemented.');
     }
 
@@ -193,22 +216,45 @@ final class ControllerSpyPayPalGateway implements \Equidna\StagHerd\Contracts\Ga
         string $subscriptionId,
         array $payload = [],
         ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
     ): array {
         throw new RuntimeException('Not implemented.');
     }
 
-    public function getPaymentToken(string $paymentTokenId): array
-    {
+    public function getPaymentToken(
+        string $paymentTokenId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         throw new RuntimeException('Not implemented.');
     }
 
-    public function deletePaymentToken(string $paymentTokenId): array
-    {
+    public function deletePaymentToken(
+        string $paymentTokenId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
         throw new RuntimeException('Not implemented.');
     }
 
-    public function verifyWebhookSignature(array $payload): bool
-    {
+    public function createPartnerReferral(
+        array $payload,
+        ?string $idempotencyKey = null,
+        ?PayPalRequestContextData $context = null,
+    ): array {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function getMerchantIntegration(
+        string $partnerMerchantId,
+        string $sellerMerchantId,
+        ?PayPalRequestContextData $context = null,
+    ): array {
+        throw new RuntimeException('Not implemented.');
+    }
+
+    public function verifyWebhookSignature(
+        array $payload,
+        ?PayPalRequestContextData $context = null,
+    ): bool {
         return $this->verificationResult;
     }
 }

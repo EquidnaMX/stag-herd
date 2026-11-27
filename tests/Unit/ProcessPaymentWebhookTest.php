@@ -2,27 +2,26 @@
 
 namespace Equidna\StagHerd\Tests\Unit;
 
-use Equidna\StagHerd\Application\Actions\LookupPayment;
+use Equidna\StagHerd\Tests\Fakes\Webhooks\FakeBillingPaymentWebhookParser;
+use Equidna\StagHerd\Tests\Fakes\Providers\FailingWebhookPaymentProvider;
+use Equidna\StagHerd\Tests\Fakes\Providers\FakeWebhookPaymentProvider;
 use Equidna\StagHerd\Application\Actions\ProcessPaymentWebhook;
-use Equidna\StagHerd\Contracts\BillingResourceRepository;
-use Equidna\StagHerd\Contracts\PaymentProvider;
-use Equidna\StagHerd\Contracts\WebhookIdempotencyStore;
-use Equidna\StagHerd\Contracts\WebhookParser;
-use Equidna\StagHerd\Data\NormalizedWebhookData;
-use Equidna\StagHerd\Data\PaymentCancellationData;
-use Equidna\StagHerd\Data\PaymentLookupData;
-use Equidna\StagHerd\Data\PaymentRequestData;
-use Equidna\StagHerd\Data\PaymentResultData;
-use Equidna\StagHerd\Data\ProviderReferencesData;
-use Equidna\StagHerd\Data\RefundRequestData;
-use Equidna\StagHerd\Data\WebhookPayloadData;
-use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
-use Equidna\StagHerd\Domain\Payment;
-use Equidna\StagHerd\Events\PaymentApproved;
+use Equidna\StagHerd\Tests\Fakes\Webhooks\FakeWebhookParser;
 use Equidna\StagHerd\Exceptions\DuplicateWebhookException;
+use Equidna\StagHerd\Contracts\BillingResourceRepository;
+use Equidna\StagHerd\Application\Actions\LookupPayment;
+use Equidna\StagHerd\Contracts\WebhookIdempotencyStore;
+use Equidna\StagHerd\Domain\Enums\PaymentStatusEnum;
+use Equidna\StagHerd\Data\ProviderReferencesData;
 use Equidna\StagHerd\Support\ProviderRegistry;
-use Equidna\StagHerd\Tests\TestCase;
+use Equidna\StagHerd\Data\PaymentRequestData;
+use Equidna\StagHerd\Data\WebhookPayloadData;
+use Equidna\StagHerd\Data\PaymentLookupData;
+use Equidna\StagHerd\Data\PaymentResultData;
+use Equidna\StagHerd\Events\PaymentApproved;
 use Illuminate\Support\Facades\Event;
+use Equidna\StagHerd\Domain\Payment;
+use Equidna\StagHerd\Tests\TestCase;
 use RuntimeException;
 
 class ProcessPaymentWebhookTest extends TestCase
@@ -31,7 +30,7 @@ class ProcessPaymentWebhookTest extends TestCase
     {
         config()->set('stag-herd.providers.mercado_pago.webhooks.parser', FakeWebhookParser::class);
 
-        $repository = new InMemoryWebhookPaymentRepository(new Payment(
+        $repository = new InMemoryPaymentRepository(new Payment(
             id: 'payment-1',
             provider: 'mercado_pago',
             method: 'card',
@@ -69,7 +68,7 @@ class ProcessPaymentWebhookTest extends TestCase
     {
         config()->set('stag-herd.providers.mercado_pago.webhooks.parser', FakeWebhookParser::class);
 
-        $repository = new InMemoryWebhookPaymentRepository(new Payment(
+        $repository = new InMemoryPaymentRepository(new Payment(
             id: 'payment-1',
             provider: 'mercado_pago',
             method: 'card',
@@ -110,7 +109,7 @@ class ProcessPaymentWebhookTest extends TestCase
     {
         config()->set('stag-herd.providers.mercado_pago.webhooks.parser', FakeWebhookParser::class);
 
-        $repository = new InMemoryWebhookPaymentRepository(new Payment(
+        $repository = new InMemoryPaymentRepository(new Payment(
             id: 'payment-1',
             provider: 'mercado_pago',
             method: 'card',
@@ -150,7 +149,7 @@ class ProcessPaymentWebhookTest extends TestCase
         config()->set('stag-herd.providers.mercado_pago.enabled', true);
         config()->set('stag-herd.providers.mercado_pago.methods.card.enabled', true);
 
-        $repository = new InMemoryWebhookPaymentRepository(new Payment(
+        $repository = new InMemoryPaymentRepository(new Payment(
             id: 'payment-1',
             provider: 'mercado_pago',
             method: 'card',
@@ -182,7 +181,7 @@ class ProcessPaymentWebhookTest extends TestCase
         config()->set('stag-herd.providers.stripe.webhooks.parser', FakeBillingPaymentWebhookParser::class);
         Event::fake([PaymentApproved::class]);
         $billingResources = new SpyBillingResourceRepository();
-        $repository = new InMemoryWebhookPaymentRepository(new Payment(
+        $repository = new InMemoryPaymentRepository(new Payment(
             id: 'unused',
             provider: 'stripe',
             method: 'card',
@@ -225,36 +224,6 @@ class ProcessPaymentWebhookTest extends TestCase
     }
 }
 
-final class FakeBillingPaymentWebhookParser implements WebhookParser
-{
-    public function parse(WebhookPayloadData $webhook): NormalizedWebhookData
-    {
-        return new NormalizedWebhookData(
-            provider: 'stripe',
-            eventType: 'payment_intent.succeeded',
-            resourceType: 'payment_intent',
-            resourceId: 'pi_123',
-            providerPaymentId: 'pi_123',
-            method: 'card',
-            rawPayload: [
-                'created' => 200,
-                'data' => ['object' => [
-                    'id' => 'pi_123',
-                    'amount_received' => 12500,
-                    'currency' => 'mxn',
-                    'metadata' => [
-                        'purchase_uuid' => 'purchase-uuid',
-                        'payment_method_uuid' => 'method-uuid',
-                    ],
-                ]],
-            ],
-            providerEventId: 'evt_1',
-            credentialContext: $webhook->credentialContext,
-            status: 'succeeded',
-        );
-    }
-}
-
 final class SpyBillingResourceRepository implements BillingResourceRepository
 {
     public ?string $resourceType = null;
@@ -271,21 +240,6 @@ final class SpyBillingResourceRepository implements BillingResourceRepository
         $this->resourceType = $resourceType;
 
         return true;
-    }
-}
-
-final class FakeWebhookParser implements WebhookParser
-{
-    public function parse(WebhookPayloadData $webhook): NormalizedWebhookData
-    {
-        return new NormalizedWebhookData(
-            provider: 'mercado_pago',
-            eventType: 'payment.updated',
-            resourceType: 'payment',
-            resourceId: '123',
-            providerPaymentId: '123',
-            rawPayload: $webhook->payload,
-        );
     }
 }
 
@@ -347,54 +301,6 @@ final class SpyWebhookIdempotencyStore implements WebhookIdempotencyStore
     }
 }
 
-class FakeWebhookPaymentProvider implements PaymentProvider
-{
-    public function getName(): string
-    {
-        return 'mercado_pago';
-    }
-
-    public function getMethods(): array
-    {
-        return ['card'];
-    }
-
-    public function createPayment(PaymentRequestData $request): PaymentResultData
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function lookupPayment(PaymentLookupData $request): PaymentResultData
-    {
-        return PaymentResultData::approved(
-            provider: 'mercado_pago',
-            method: 'card',
-            providerStatus: 'approved',
-            references: new ProviderReferencesData(providerPaymentId: '123'),
-            amount: 12000,
-            currency: 'MXN',
-        );
-    }
-
-    public function cancelPayment(PaymentCancellationData $request): PaymentResultData
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-
-    public function refundPayment(RefundRequestData $request): PaymentResultData
-    {
-        throw new RuntimeException('Not implemented.');
-    }
-}
-
-final class FailingWebhookPaymentProvider extends FakeWebhookPaymentProvider
-{
-    public function lookupPayment(PaymentLookupData $request): PaymentResultData
-    {
-        throw new RuntimeException('lookup failed');
-    }
-}
-
 final class SpyFallbackWebhookPaymentProvider extends FakeWebhookPaymentProvider
 {
     public ?string $lastLookupMethod = null;
@@ -420,7 +326,7 @@ final class SpyFallbackWebhookPaymentProvider extends FakeWebhookPaymentProvider
     }
 }
 
-final class InMemoryWebhookPaymentRepository implements \Equidna\StagHerd\Contracts\PaymentRepository
+final class InMemoryPaymentRepository implements \Equidna\StagHerd\Contracts\PaymentRepository
 {
     public function __construct(
         private Payment $payment,

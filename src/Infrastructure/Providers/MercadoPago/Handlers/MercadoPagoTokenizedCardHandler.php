@@ -17,6 +17,7 @@ use Equidna\StagHerd\Exceptions\PaymentNotFoundException;
 use Equidna\StagHerd\Exceptions\UnsupportedOperationException;
 use Equidna\StagHerd\Infrastructure\Providers\MercadoPago\MercadoPagoResultMapper;
 use Equidna\StagHerd\Support\MoneyFormatter;
+use Equidna\StagHerd\Support\PlatformFeeResolver;
 use Illuminate\Support\Str;
 
 final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
@@ -25,6 +26,7 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
         private readonly MercadoPagoGateway $gateway,
         private readonly MercadoPagoResultMapper $mapper,
         private readonly ManagesPaymentMethods $paymentMethods,
+        private readonly PlatformFeeResolver $platformFees,
     ) {
         //
     }
@@ -42,6 +44,7 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
             payload: $this->buildCreatePaymentPayload($request, $resolved),
             idempotencyKey: $this->resolveIdempotencyKey($request),
             deviceId: $this->resolveDeviceId($request),
+            context: $request->mercadoPagoContext(),
         );
 
         return $this->mapper->mapPaymentResponseToResult($request, $response);
@@ -275,10 +278,44 @@ final class MercadoPagoTokenizedCardHandler implements PaymentMethodHandler
             );
         }
 
+        $payload = $this->applyMarketplaceContext($payload, $request);
+
         return array_filter(
             $payload,
-            fn ($value) => $value !== null && $value !== [],
+            fn($value) => $value !== null && $value !== [],
         );
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function applyMarketplaceContext(
+        array $payload,
+        PaymentRequestData $request,
+    ): array {
+        $context = $request->mercadoPagoContext();
+        $platformFeeAmount = $this->platformFees->resolve('mercado_pago', $request);
+
+        if ($platformFeeAmount !== null) {
+            if (!$context->sellerAccessToken) {
+                throw InvalidPaymentPayloadException::invalidField(
+                    'platform_context.provider_metadata.mercado_pago.seller_access_token',
+                    'Mercado Pago API payments require the seller OAuth access token when application_fee is present.'
+                );
+            }
+
+            $payload['application_fee'] = (float) MoneyFormatter::toDecimal($platformFeeAmount);
+        }
+
+        if ($context->sellerReference !== null && trim($context->sellerReference) !== '') {
+            $payload['metadata'] = array_replace(
+                is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                ['seller_reference' => trim($context->sellerReference)],
+            );
+        }
+
+        return $payload;
     }
 
     private function lookupByProviderPaymentId(PaymentLookupData $request): PaymentResultData

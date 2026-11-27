@@ -5,6 +5,7 @@ namespace Equidna\StagHerd\Infrastructure\Providers\PayPal;
 use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
 use Equidna\StagHerd\Contracts\WebhookParser;
 use Equidna\StagHerd\Data\NormalizedWebhookData;
+use Equidna\StagHerd\Data\PayPalRequestContextData;
 use Equidna\StagHerd\Data\WebhookPayloadData;
 use Equidna\StagHerd\Exceptions\InvalidPaymentPayloadException;
 use Equidna\StagHerd\Exceptions\InvalidWebhookSignatureException;
@@ -62,7 +63,11 @@ final readonly class PayPalWebhookParser implements WebhookParser
             'webhook_event' => $webhook->payload,
         ];
 
-        if (!$this->gateway->verifyWebhookSignature($verificationPayload)) {
+        $context = new PayPalRequestContextData(
+            credentialContext: $webhook->credentialContext,
+        );
+
+        if (!$this->gateway->verifyWebhookSignature($verificationPayload, $context)) {
             throw InvalidWebhookSignatureException::forProvider('paypal');
         }
     }

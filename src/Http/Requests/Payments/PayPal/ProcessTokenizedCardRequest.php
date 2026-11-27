@@ -2,7 +2,9 @@
 
 namespace Equidna\StagHerd\Http\Requests\Payments\PayPal;
 
+use Equidna\StagHerd\Data\PlatformPaymentContextData;
 use Equidna\StagHerd\Data\PaymentRequestData;
+use Equidna\StagHerd\Support\MoneyFormatter;
 use Illuminate\Validation\Validator;
 
 class ProcessTokenizedCardRequest extends PayPalFormRequest
@@ -23,7 +25,12 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             'cancel_url' => ['nullable', 'url', 'max:500'],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
             'credential_context' => ['nullable', 'string', 'max:255'],
+            'seller_merchant_id' => ['nullable', 'string', 'max:255'],
+            'platform_attribution_id' => ['nullable', 'string', 'max:255'],
+            'environment' => ['nullable', 'string', 'in:sandbox,live'],
+            'external_metadata' => ['nullable', 'array'],
             'metadata' => ['nullable', 'array'],
+            'platform_fee_amount' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 
@@ -41,6 +48,10 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             'cancel_url' => $this->normalizeNullableString($this->input('cancel_url')),
             'idempotency_key' => $this->normalizeNullableString($this->input('idempotency_key')),
             'credential_context' => $this->normalizeNullableString($this->input('credential_context')),
+            'seller_merchant_id' => $this->normalizeNullableString($this->input('seller_merchant_id')),
+            'platform_attribution_id' => $this->normalizeNullableString($this->input('platform_attribution_id')),
+            'environment' => $this->normalizeNullableString(strtolower((string) $this->input('environment'))),
+            'platform_fee_amount' => $this->normalizeNullableString($this->input('platform_fee_amount')),
         ]);
     }
 
@@ -62,6 +73,8 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
     public function toPaymentRequestData(): PaymentRequestData
     {
         $data = $this->validated();
+
+        $platformContext = $this->platformContext();
 
         $externalReference = $data['external_reference']
             ?: 'PAYPAL-TOKENIZED-' . now()->format('YmdHis');
@@ -98,7 +111,26 @@ class ProcessTokenizedCardRequest extends PayPalFormRequest
             returnUrl: $data['return_url'] ?? null,
             cancelUrl: $data['cancel_url'] ?? null,
             metadata: $this->cleanMetadata($metadata),
-            credentialContext: (string) ($data['credential_context'] ?? 'default'),
+            platformContext: $platformContext,
+        );
+    }
+
+    public function platformContext(): PlatformPaymentContextData
+    {
+        return new PlatformPaymentContextData(
+            credentialContext: (string) ($this->validated('credential_context') ?? 'default'),
+            sellerReference: $this->validated('seller_merchant_id'),
+            platformFeeAmount: $this->validated('platform_fee_amount') !== null
+                ? MoneyFormatter::fromDecimal($this->validated('platform_fee_amount'))
+                : null,
+            environment: $this->validated('environment'),
+            providerMetadata: [
+                'paypal' => array_filter([
+                    'seller_merchant_id' => $this->validated('seller_merchant_id'),
+                    'platform_attribution_id' => $this->validated('platform_attribution_id'),
+                    'external_metadata' => $this->validated('external_metadata') ?? [],
+                ], static fn($value) => $value !== null && $value !== []),
+            ],
         );
     }
 }

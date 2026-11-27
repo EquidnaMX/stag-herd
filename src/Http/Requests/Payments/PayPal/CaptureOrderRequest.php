@@ -3,6 +3,8 @@
 namespace Equidna\StagHerd\Http\Requests\Payments\PayPal;
 
 use Equidna\StagHerd\Data\PaymentRequestData;
+use Equidna\StagHerd\Data\PayPalRequestContextData;
+use Equidna\StagHerd\Data\PlatformPaymentContextData;
 
 class CaptureOrderRequest extends PayPalFormRequest
 {
@@ -11,16 +13,19 @@ class CaptureOrderRequest extends PayPalFormRequest
     {
         return [
             'provider_order_id' => ['required', 'string', 'max:255'],
-
             'amount' => ['required', 'numeric', 'min:0.01'],
             'currency' => ['required', 'string', 'size:3'],
             'external_reference' => ['nullable', 'string', 'max:255'],
             'payer_email' => ['nullable', 'email', 'max:255'],
             'description' => ['nullable', 'string', 'max:255'],
-
             'idempotency_key' => ['nullable', 'string', 'max:64'],
-
             'metadata' => ['nullable', 'array'],
+            'credential_context' => ['nullable', 'string', 'max:100'],
+            'seller_merchant_id' => ['nullable', 'string', 'max:255'],
+            'platform_attribution_id' => ['nullable', 'string', 'max:255'],
+            'environment' => ['nullable', 'string', 'in:sandbox,live'],
+            'external_metadata' => ['nullable', 'array'],
+            'platform_fee_amount' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 
@@ -33,6 +38,11 @@ class CaptureOrderRequest extends PayPalFormRequest
             'payer_email' => $this->normalizeNullableString($this->input('payer_email')),
             'description' => $this->normalizeNullableString($this->input('description')),
             'idempotency_key' => $this->normalizeNullableString($this->input('idempotency_key')),
+            'credential_context' => $this->normalizeNullableString($this->input('credential_context')) ?? 'default',
+            'seller_merchant_id' => $this->normalizeNullableString($this->input('seller_merchant_id')),
+            'platform_attribution_id' => $this->normalizeNullableString($this->input('platform_attribution_id')),
+            'environment' => $this->normalizeNullableString(strtolower((string) $this->input('environment'))),
+            'platform_fee_amount' => $this->normalizeNullableString($this->input('platform_fee_amount')),
         ]);
     }
 
@@ -79,6 +89,31 @@ class CaptureOrderRequest extends PayPalFormRequest
             payerEmail: $this->validated('payer_email') ?? 'cliente@test.com',
             description: $this->validated('description') ?? 'Captured PayPal payment',
             metadata: $this->metadata(),
+            platformContext: $this->platformContext(),
         );
+    }
+
+    public function platformContext(): PlatformPaymentContextData
+    {
+        return new PlatformPaymentContextData(
+            credentialContext: $this->validated('credential_context') ?? 'default',
+            sellerReference: $this->validated('seller_merchant_id'),
+            platformFeeAmount: $this->validated('platform_fee_amount') !== null
+                ? \Equidna\StagHerd\Support\MoneyFormatter::fromDecimal($this->validated('platform_fee_amount'))
+                : null,
+            environment: $this->validated('environment'),
+            providerMetadata: [
+                'paypal' => array_filter([
+                    'seller_merchant_id' => $this->validated('seller_merchant_id'),
+                    'platform_attribution_id' => $this->validated('platform_attribution_id'),
+                    'external_metadata' => $this->validated('external_metadata') ?? [],
+                ], static fn($value) => $value !== null && $value !== []),
+            ],
+        );
+    }
+
+    public function paypalContext(): PayPalRequestContextData
+    {
+        return PayPalRequestContextData::fromPlatformContext($this->platformContext());
     }
 }

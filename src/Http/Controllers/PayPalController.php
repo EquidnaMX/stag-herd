@@ -2,32 +2,44 @@
 
 namespace Equidna\StagHerd\Http\Controllers;
 
-use Equidna\StagHerd\Application\PaymentService;
-use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
+use Equidna\StagHerd\Infrastructure\Providers\PayPal\Services\PayPalPaymentMethodService;
+use Equidna\StagHerd\Http\Requests\Payments\PayPal\CompletePartnerReferralRequest;
+use Equidna\StagHerd\Http\Requests\Payments\PayPal\RegisterPaymentMethodRequest;
+use Equidna\StagHerd\Http\Requests\Payments\PayPal\CreatePartnerReferralRequest;
+use Equidna\StagHerd\Http\Requests\Payments\PayPal\ProcessTokenizedCardRequest;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\CaptureOrderRequest;
 use Equidna\StagHerd\Http\Requests\Payments\PayPal\CreateOrderRequest;
-use Equidna\StagHerd\Http\Requests\Payments\PayPal\ProcessTokenizedCardRequest;
-use Equidna\StagHerd\Http\Requests\Payments\PayPal\RegisterPaymentMethodRequest;
-use Equidna\StagHerd\Infrastructure\Providers\PayPal\Services\PayPalPaymentMethodService;
-use Illuminate\Http\JsonResponse;
+use Equidna\StagHerd\Application\PayPalSellerOnboardingService;
+use Equidna\StagHerd\Support\CredentialContextManager;
+use Equidna\StagHerd\Contracts\Gateways\PayPalGateway;
+use Equidna\StagHerd\Application\PaymentService;
 use Illuminate\Routing\Controller;
+use Illuminate\Http\JsonResponse;
 use Throwable;
 
 class PayPalController extends Controller
 {
     public function __construct(
-        private readonly PayPalGateway $payPalGateway,
         private readonly PayPalPaymentMethodService $payPalPaymentMethods,
+        private readonly PayPalSellerOnboardingService $sellerOnboarding,
+        private readonly CredentialContextManager $credentials,
+        private readonly PayPalGateway $payPalGateway,
         private readonly PaymentService $payments,
-    ) {
-    }
+    ) {}
 
     public function createOrder(CreateOrderRequest $request): JsonResponse
     {
         try {
-            $response = $this->payPalGateway->createOrder(
-                payload: $request->payload(),
-                idempotencyKey: $request->idempotencyKey(),
+            $context = $request->paypalContext();
+
+            $response = $this->credentials->run(
+                'paypal',
+                $context->credentialContext,
+                fn() => $this->payPalGateway->createOrder(
+                    payload: $request->payload(),
+                    idempotencyKey: $request->idempotencyKey(),
+                    context: $context,
+                ),
             );
 
             $providerOrderId = data_get($response, 'id');
@@ -125,6 +137,92 @@ class PayPalController extends Controller
                 'ok' => true,
                 'message' => 'PayPal payment method registered correctly.',
                 'payment_method' => $paymentMethod->toArray(),
+            ]);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
+            ], 422);
+        }
+    }
+
+    public function createPartnerReferral(CreatePartnerReferralRequest $request): JsonResponse
+    {
+        try {
+            $context = $request->paypalContext();
+
+            $response = $this->credentials->run(
+                'paypal',
+                $context->credentialContext,
+                fn() => $this->payPalGateway->createPartnerReferral(
+                    payload: $request->payload(),
+                    idempotencyKey: $request->idempotencyKey(),
+                    context: $context,
+                ),
+            );
+
+            $actionUrl = null;
+            $links = $response['links'] ?? [];
+
+            if (is_array($links)) {
+                foreach ($links as $link) {
+                    if (
+                        is_array($link)
+                        && ($link['rel'] ?? null) === 'action_url'
+                        && isset($link['href'])
+                        && is_string($link['href'])
+                    ) {
+                        $actionUrl = $link['href'];
+
+                        break;
+                    }
+                }
+            }
+
+            if (!$actionUrl) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'PayPal did not return an onboarding action URL.',
+                    'paypal_response' => $response,
+                ], 422);
+            }
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'PayPal seller onboarding link created correctly.',
+                'action_url' => $actionUrl,
+                'paypal_response' => $response,
+            ]);
+        } catch (Throwable $exception) {
+            return response()->json([
+                'ok' => false,
+                'type' => class_basename($exception),
+                'message' => $exception->getMessage(),
+                'file' => config('app.debug') ? $exception->getFile() : null,
+                'line' => config('app.debug') ? $exception->getLine() : null,
+            ], 422);
+        }
+    }
+
+    public function completePartnerReferral(CompletePartnerReferralRequest $request): JsonResponse
+    {
+        try {
+            $seller = $this->sellerOnboarding->complete(
+                sellerMerchantId: $request->sellerMerchantId(),
+                partnerMerchantId: $request->partnerMerchantId(),
+                trackingId: $request->trackingId(),
+                ownerReference: $request->ownerReference(),
+                context: $request->paypalContext(),
+                query: $request->query(),
+            );
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'PayPal seller onboarding completed correctly.',
+                'seller' => $seller->toArray(),
             ]);
         } catch (Throwable $exception) {
             return response()->json([
